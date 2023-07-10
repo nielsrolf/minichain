@@ -5,7 +5,7 @@ def split_recursively(text, split_at=["\n"], max_length=1000):
     for i in text.split(split_at[0]):
         if len(i.split()) > max_length:
             # split finer using the next token
-            print("splitting finer:", i)
+            # print("splitting finer:", i)
             splits += split_recursively(i, split_at[1:])
         else:
             splits.append(i)
@@ -18,7 +18,6 @@ def split_document(text, words=1000, overlap=100, split_at=["\n\n", "\n", ".", "
         return [text]
     splits = split_recursively(text, split_at, words)
     # make sure no split is longer than the max length
-    print([len(i.split()) for i in splits])
     idx = 0
     while idx < len(splits):
         i = splits[idx]
@@ -42,7 +41,6 @@ def split_document(text, words=1000, overlap=100, split_at=["\n\n", "\n", ".", "
 
         # If the current chunk is full, add the chunk to the list of merged splits and start a new chunk
         if len(current_chunk.split()) > words - overlap:
-            print("finished chunk at length:", len(current_chunk.split()))
             merged_splits.append(current_chunk)
             if len(current_split.split()) <= overlap:
                 current_chunk = current_split
