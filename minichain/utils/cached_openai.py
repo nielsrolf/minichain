@@ -31,7 +31,6 @@ def get_openai_response(
         # delete all fields that are None
         message = {k: v for k, v in message.items() if v is not None or k == "content"}
         messages.append(message)
-    print(messages[0])
     if len(functions) > 0:
         completion = openai.ChatCompletion.create(
             model=model,

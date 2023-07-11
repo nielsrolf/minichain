@@ -15,10 +15,13 @@ def summarize_until_word_limit_is_okay(
         return text
     else:
         if question is None:
-            summary = summarizer_function(text=text).content
+            summary = summarizer_function(text=text)
         else:
             summary = qa_function(text=text, question=question)
-        return summarize_until_word_limit_is_okay(summary, max_words=max_words, question=question)
+            summary = summary['content'] + "\nSources: " + "\n".join(f"[{i['id']}] {i['source']}" for i in summary['citations'])
+        summary = summarize_until_word_limit_is_okay(summary, max_words=max_words, question=question)
+        print(len(text.split()), "->", len(summary.split()))
+        return summary
 
 
 class DocumentQARequest(BaseModel):

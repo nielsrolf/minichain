@@ -24,6 +24,8 @@ def qa(request: QuestionAnsweringQuery):
     return _qa(request.text, request.question)
 
 def _qa(text, question, instructions=[]):
+    """
+    Returns: a dict {content: str, citations: List[Citation]}}"""
     # system_message = f"Scan the text provided by the user for relevant information related to the question: '{question}'. Summarize long passages if needed. You may repeat sections of the text verbatim if they are very relevant. Do not start the summary with 'The text provided by the user' or similar phrases. Only respond with informative text relevant to the question. Summarize by generating a shorter text that has the most important information from the text provided by the user."
     system_message = (
         f"You are a document based QA system. Your task is to find all relevant information in the provided text related to the question: '{question}'."
@@ -44,8 +46,8 @@ def _qa(text, question, instructions=[]):
         response_openapi=AnswerWithCitations,
     )
     summary = summarizer.run(text=text)
-    if summary.content.lower() == "skip":
-        summary.content
+    if summary['content'].lower() == "skip":
+        summary['content'] = ""
     return summary
 
 

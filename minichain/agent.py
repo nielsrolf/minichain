@@ -15,6 +15,9 @@ class SystemMessage:
 
     def dict(self):
         return asdict(self)
+    
+    def __str__(self):
+        return f"{self.role}: {self.content}"
 
 
 @dataclass
@@ -27,6 +30,9 @@ class UserMessage:
 
     def dict(self):
         return asdict(self)
+    
+    def __str__(self):
+        return f"{self.role}: {self.content}"
 
 
 @dataclass
@@ -49,6 +55,9 @@ class AssistantMessage:
 
     def dict(self):
         return asdict(self)
+    
+    def __str__(self):
+        return f"{self.role}: {self.content} {self.function_call}"
 
 
 @dataclass
@@ -64,9 +73,6 @@ class FunctionMessage:
 
 def make_return_function(openapi_json):
     def return_function(arguments):
-        # arguments: pydantic model
-        # return: json
-        # json is turned into a pydantic model again by the function_obj.__call__ method
         return arguments.dict()
 
     function_obj = Function(
@@ -146,7 +152,6 @@ class Agent:
                 not self.has_structured_response
                 and assistant_message.content is not None
             ):
-                breakpoint()
                 return assistant_message.content
             function_call = assistant_message.function_call
             if function_call is not None:
@@ -233,7 +238,6 @@ class Function:
         self.function = function
         self.description = description
 
-    @debug
     def __call__(self, **arguments):
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments)

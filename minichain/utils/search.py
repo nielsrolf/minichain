@@ -13,7 +13,7 @@ pprint = PrettyPrinter(indent=4).pprint
 load_dotenv()
 
 
-# @disk_cache  # remove at production
+@disk_cache  # remove at production
 def google_search(query):
     search = GoogleSearch({"q": query, "api_key": os.getenv("SERP_API_KEY")})
     keys = [
