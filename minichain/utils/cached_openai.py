@@ -31,8 +31,8 @@ def get_openai_response(
         # delete all fields that are None
         message = {k: v for k, v in message.items() if v is not None or k == "content"}
         messages.append(message)
-    print(messages)
-    print("=====================================")
+    # print(messages[-2])
+    # print("=====================================")
     if len(functions) > 0:
         completion = openai.ChatCompletion.create(
             model=model,
@@ -50,4 +50,7 @@ def get_openai_response(
     response = message.to_dict_recursive()
     # if not validate_message(message):
     #     breakpoint()
+    print(messages[-1])
+    print(response)
+    print("=====================================")
     return response
