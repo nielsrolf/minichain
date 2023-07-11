@@ -20,23 +20,19 @@
 # Docs
 There are many use cases for wrapping agents inside of a function. This often looks like this:
 ```
-def tool(tool_inputs: PydanticModel): -> dict
+def tool(**inputs like schema): -> dict
     return outputs
 
 tool_function = Function(
     name="tool",
     openapi=PydanticModel.schema()
-)
+) # dict like schema-> any dict
 
 agent_with_tool = Agent(
     functions=[tool_dunction],
     response_format=PydanticResponseModel
-)
+) # .run(): prompt_template_inputs -> dict like response_format
 ```
-## Quickfix convention:
-- tool: pydantic -> dict
-- tool_function: dict -> (pydantic -> dict)
-- agent_with_tool: dict -> dict
 
 ## Longterm fixes:
 - merge tool and tool_function via decorators
@@ -45,7 +41,6 @@ agent_with_tool = Agent(
     @input_field(type, ...)
     ```
 - give function input and output schema
-- never pass pydantic models, always pass dicts. only convert to pydantic to validate
 
 
 ## Install

@@ -72,8 +72,8 @@ class FunctionMessage:
 
 
 def make_return_function(openapi_json):
-    def return_function(arguments):
-        return arguments.dict()
+    def return_function(**arguments):
+        return arguments
 
     function_obj = Function(
         name="return",
@@ -157,6 +157,8 @@ class Agent:
             if function_call is not None:
                 output = self.execute_action(function_call)
                 if function_call.name == "return":
+                    if output is False:
+                        breakpoint()
                     return output
 
     def task_to_history(self, arguments):
@@ -202,7 +204,6 @@ class Agent:
         except Exception as e:
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
         self.onFunctionMessage(self.history[-1])
-        breakpoint()
         print(self.history[-1].content)
         return False
 
