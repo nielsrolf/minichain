@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import List
 
 from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
 
@@ -6,6 +7,17 @@ from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
 class QuestionAnsweringQuery(BaseModel):
     text: str = Field(..., description="The text to scan for relevant information.")
     question: str = Field(..., description="The question to answer.")
+
+
+class Citation(BaseModel):
+    id: int = Field(..., description="The number that was used in the answer to reference the citation.")
+    source: str = Field(..., description="The url of the citation.")
+
+
+class AnswerWithCitations(BaseModel):
+    content: str = Field(..., description="The answer to the question.")
+    citations: List[Citation] = Field(..., description="A list of citations.")
+
 
 
 def qa(request: QuestionAnsweringQuery):
@@ -20,7 +32,8 @@ def _qa(text, question, instructions=[]):
     )
     system_message += (
         "\n"
-        + "Ignore parts of a website that are not content, such as navigation bars, footers, sidebars, etc. Respond only with the word 'skip' if the text consists of only these parts. If the text contains no information related to the question, also answer only with the word 'skip'."
+        + "Ignore parts of a website that are not content, such as navigation bars, footers, sidebars, etc. Respond only with the word 'skip' if the text consists of only these parts. If the text contains no information related to the question, also answer only with the word 'skip'.\n" +
+        "If a source link is mentioned, please cite the url of the source."
     )
     if instructions and len(instructions) > 0:
         system_message += "\n" + "\n".join(instructions)
@@ -28,10 +41,11 @@ def _qa(text, question, instructions=[]):
         functions=[],
         system_message=SystemMessage(system_message),
         prompt_template="{text}".format,
+        response_openapi=AnswerWithCitations,
     )
     summary = summarizer.run(text=text)
-    if summary.lower() == "skip":
-        summary = ""
+    if summary.content.lower() == "skip":
+        summary.content
     return summary
 
 

@@ -126,10 +126,13 @@ class Agent:
             self.functions,
             self.system_message,
             self.prompt_template,
+            self.response_openapi,
             self.init_history,
             onUserMessage=self.onUserMessage,
             onFunctionMessage=self.onFunctionMessage,
             onAssistantMessage=self.onAssistantMessage,
+            keep_first_messages=self.keep_first_messages,
+            keep_last_messages=self.keep_last_messages,
         )
         agent_session.task_to_history(arguments)
         return agent_session.run_until_done()
@@ -143,6 +146,7 @@ class Agent:
                 not self.has_structured_response
                 and assistant_message.content is not None
             ):
+                breakpoint()
                 return assistant_message.content
             function_call = assistant_message.function_call
             if function_call is not None:

@@ -15,7 +15,7 @@ def summarize_until_word_limit_is_okay(
         return text
     else:
         if question is None:
-            summary = summarizer_function(text=text)
+            summary = summarizer_function(text=text).content
         else:
             summary = qa_function(text=text, question=question)
         return summarize_until_word_limit_is_okay(summary, max_words=max_words, question=question)
