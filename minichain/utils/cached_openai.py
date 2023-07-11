@@ -1,24 +1,24 @@
 import openai
 from retry import retry
+import json
 
 from minichain.utils.disk_cache import disk_cache
+from minichain.utils.debug import debug
 
 
-def debug(f):
-    def debugged(*args, **kwargs):
+def validate_message(message):
+    if function := message.get("function_call"):
         try:
-            return f(*args, **kwargs)
-        except Exception as e:
-            print(type(e), e)
-            breakpoint()
-            f(*args, **kwargs)
-
-    return debugged
+            json.loads(function["arguments"])
+            return True
+        except:
+            return False
+    return True
 
 
 @disk_cache
-@debug
 @retry(tries=3, delay=1)
+@debug
 def get_openai_response(
     chat_history, functions, model="gpt-3.5-turbo-16k"
 ) -> str:  # "gpt-4-0613"
@@ -45,5 +45,8 @@ def get_openai_response(
             temperature=0.1,
         )
     message = completion.choices[0].message
-    return message.to_dict_recursive()
+    response = message.to_dict_recursive()
+    # if not validate_message(message):
+    #     breakpoint()
+    return response
 

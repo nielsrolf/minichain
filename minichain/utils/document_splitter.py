@@ -8,7 +8,7 @@ def split_recursively(text, split_at=["\n"], max_length=1000):
             # print("splitting finer:", i)
             splits += split_recursively(i, split_at[1:])
         else:
-            splits.append(i)
+            splits.append(i + split_at[0])
     return splits
 
 
@@ -26,7 +26,7 @@ def split_document(
         if len(i.split()) > words:
             # force split every overlap words
             finer_split = []
-            for j in range(0, len(i.split()), overlap):
+            for j in range(0, len(i.split(" ")), overlap):
                 finer_split.append(" ".join(i.split()[j : j + overlap]))
             # replace the split with the finer split
             splits = splits[:idx] + finer_split + splits[idx + 1 :]

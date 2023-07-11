@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
 
 from minichain.utils.cached_openai import get_openai_response
-
+from minichain.utils.debug import debug
 
 @dataclass
 class SystemMessage:
@@ -85,6 +85,8 @@ class Agent:
         onUserMessage=None,
         onFunctionMessage=None,
         onAssistantMessage=None,
+        keep_first_messages=1,
+        keep_last_messages=20,
     ):
         functions = functions.copy()
         self.response_openapi = response_openapi
@@ -98,6 +100,8 @@ class Agent:
         self.system_message = system_message
         self.history = [system_message] + (init_history or [])
         self.prompt_template = prompt_template
+        self.keep_first_messages = keep_first_messages
+        self.keep_last_messages = keep_last_messages
 
         def do_nothing(*args, **kwargs):
             pass
@@ -146,7 +150,11 @@ class Agent:
 
     def get_next_action(self):
         # do the openai call
-        response = get_openai_response(self.history, self.functions_openai)
+        indizes = list(range(len(self.history)))
+        keep = [indizes[0]] + indizes[1: self.keep_first_messages + 1] + indizes[-self.keep_last_messages :]
+        keep = sorted(list(set(keep)))
+        history = [self.history[i] for i in keep]
+        response = get_openai_response(history, self.functions_openai)
         function_call = response.get("function_call", None)
         if function_call is not None:
             function_call = FunctionCall(**function_call)
@@ -154,21 +162,25 @@ class Agent:
             response.get("content", None), function_call=function_call
         )
 
+    @debug
     def execute_action(self, function_call):
-        for function in self.functions:
-            if function.name == function_call.name:
-                function_output = function(**json.loads(function_call.arguments))
-                if not isinstance(function_output, str):
-                    function_output = json.dumps(function_output)
-                function_message = FunctionMessage(function_output, function.name)
-                self.history_append(function_message)
-                self.onFunctionMessage(self.history[-1])
-                return False
-            self.history_append(
-                FunctionMessage("Error: this function does not exist", function.name)
-            )
-            self.onFunctionMessage(self.history[-1])
-            return False
+        try:
+            for function in self.functions:
+                if function.name == function_call.name:
+                    function_output = function(**json.loads(function_call.arguments))
+                    if not isinstance(function_output, str):
+                        function_output = json.dumps(function_output)
+                    function_message = FunctionMessage(function_output, function.name)
+                    self.history_append(function_message)
+                    self.onFunctionMessage(self.history[-1])
+                    return False
+                self.history_append(
+                    FunctionMessage(f"Error: this function does not exist", function.name)
+                )
+        except Exception as e:
+            self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
+        self.onFunctionMessage(self.history[-1])
+        return False
 
     def follow_up(self, user_message):
         self.history_append(user_message)
