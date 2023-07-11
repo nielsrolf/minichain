@@ -3,6 +3,7 @@ import os
 import pickle
 
 
+
 class DiskCache:
     def __init__(self, cache_dir="./.cache"):
         self.cache_dir = cache_dir
@@ -19,11 +20,21 @@ class DiskCache:
         cache_path = self._get_cache_path(key)
         try:
             with open(cache_path, "rb") as cache_file:
-                return pickle.load(cache_file)
+                output = pickle.load(cache_file)
+                try:
+                    output = output.get("disk_cache_object", output)
+                except:
+                    pass
+                return output
         except FileNotFoundError:
             return None
 
-    def save_to_cache(self, key, value):
+    def save_to_cache(self, key, args, kwargs, value):
+        value = {
+            "disk_cache_object": value,
+            "disk_cache_args": args,
+            "disk_cache_kwargs": kwargs,
+        }
         cache_path = self._get_cache_path(key)
         with open(cache_path, "wb") as cache_file:
             pickle.dump(value, cache_file)
@@ -35,8 +46,9 @@ class DiskCache:
             if cached_value is not None:
                 return cached_value
             else:
+                print(f"Cache miss")
                 result = func(*args, **kwargs)
-                self.save_to_cache(key, result)
+                self.save_to_cache(key, args, kwargs, result)
                 return result
 
         return wrapper
@@ -48,6 +60,7 @@ class DiskCache:
 
     def __call__(self, func):
         return self.cache(func)
+
 
 
 disk_cache = DiskCache()

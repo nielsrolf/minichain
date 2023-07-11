@@ -57,7 +57,8 @@ def text_to_memory(text, source=None):
     memories = []
     lines = text.split("\n")
 
-    def add_memory(memory):
+    def add_memory(**memory):
+        memory = Memory(**memory)
         content = "\n".join(lines[memory.start_line : memory.end_line + 1])
         warning = ""
         if len(content.split()) < 50:
