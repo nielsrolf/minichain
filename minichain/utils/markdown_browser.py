@@ -1,10 +1,12 @@
+import warnings
+
+import click
+import html2text
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from bs4 import BeautifulSoup
-import html2text
 from webdriver_manager.chrome import ChromeDriverManager
-import click
-import warnings
+
 warnings.filterwarnings("ignore")
 from minichain.utils.disk_cache import disk_cache
 
@@ -23,18 +25,18 @@ def markdown_browser(url):
     # Close the driver
     driver.quit()
     # Parse the HTML with BeautifulSoup
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(html, "html.parser")
     # Convert HTML to markdown
     markdown = html2text.html2text(str(soup))
     return markdown
 
 
 @click.command()
-@click.argument('url')
+@click.argument("url")
 def main(url):
     print(url)
     print(markdown_browser(url))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,11 +1,14 @@
-import openai
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Optional, Union
+import json
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel
+
 from minichain.utils.cached_openai import get_openai_response
 
 
 @dataclass
-class SystemMessage():
+class SystemMessage:
     content: str
     role: str = "system"
 
@@ -14,37 +17,41 @@ class SystemMessage():
 
 
 @dataclass
-class UserMessage():
+class UserMessage:
     content: str
     role: str = "user"
-    parent: Union["UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"] = None
+    parent: Union[
+        "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
+    ] = None
 
     def dict(self):
         return asdict(self)
 
 
 @dataclass
-class FunctionCall():
+class FunctionCall:
     name: str
-    inputs: Dict[str, Any]
+    arguments: Dict[str, Any]
 
     def dict(self):
         return asdict(self)
 
 
 @dataclass
-class AssistantMessage():
+class AssistantMessage:
     content: str
     function_call: Optional[FunctionCall] = None
     role: str = "assistant"
-    parent: Union["UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"] = None
+    parent: Union[
+        "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
+    ] = None
 
     def dict(self):
         return asdict(self)
 
 
 @dataclass
-class FunctionMessage():
+class FunctionMessage:
     content: str
     name: str
     role: str = "function"
@@ -54,83 +61,155 @@ class FunctionMessage():
         return asdict(self)
 
 
-class Agent():
-    def __init__(self, functions, system_message, prompt_template="{task}".format, init_history=None, onUserMessage=None, onFunctionMessage=None, onAssistantMessage=None):
+def make_return_function(openapi_json):
+    def return_function(**arguments):
+        return arguments
+
+    function_obj = Function(
+        "return",
+        return_function,
+        openapi_json,
+        "End the conversation and return a structured response.",
+    )
+    return function_obj
+
+
+class Agent:
+    def __init__(
+        self,
+        functions,
+        system_message,
+        prompt_template="{task}".format,
+        response_openapi=None,
+        init_history=None,
+        onUserMessage=None,
+        onFunctionMessage=None,
+        onAssistantMessage=None,
+    ):
+        functions = functions.copy()
+        self.response_openapi = response_openapi
+        self.has_structured_response = response_openapi is not None
+        if response_openapi is not None and not any(
+            [i.name == "return" for i in functions]
+        ):
+            functions.append(make_return_function(response_openapi))
         self.functions = functions
         self.init_history = init_history
         self.system_message = system_message
         self.history = [system_message] + (init_history or [])
         self.prompt_template = prompt_template
+
         def do_nothing(*args, **kwargs):
             pass
+
         self.onUserMessage = onUserMessage or do_nothing
         self.onFunctionMessage = onFunctionMessage or do_nothing
         self.onAssistantMessage = onAssistantMessage or do_nothing
-    
 
-    
+        self.functions_openai = [i.openapi_json for i in self.functions]
+
     def history_append(self, message):
         message.parent = self.history[-1]
         self.history.append(message)
-    
-    def run(self, **inputs):
-        """inputs: dict with values mentioned in the prompt template"""
-        agent_session = Agent(self.functions, self.system_message, self.prompt_template, self.init_history, onUserMessage=self.onUserMessage, onFunctionMessage=self.onFunctionMessage, onAssistantMessage=self.onAssistantMessage)
-        agent_session.task_to_history(inputs)
+
+    def run(self, **arguments):
+        """arguments: dict with values mentioned in the prompt template"""
+        agent_session = Agent(
+            self.functions,
+            self.system_message,
+            self.prompt_template,
+            self.init_history,
+            onUserMessage=self.onUserMessage,
+            onFunctionMessage=self.onFunctionMessage,
+            onAssistantMessage=self.onAssistantMessage,
+        )
+        agent_session.task_to_history(arguments)
         return agent_session.run_until_done()
-    
+
     def run_until_done(self):
         while True:
             assistant_message = self.get_next_action()
             self.history_append(assistant_message)
             self.onAssistantMessage(self.history[-1])
-            if assistant_message.content is not None:
+            if (
+                not self.has_structured_response
+                and assistant_message.content is not None
+            ):
                 return assistant_message
+            if assistant_message.function_call.name == "return":
+                return assistant_message.function_call.arguments
             self.execute_action(assistant_message.function_call)
-    
-    def task_to_history(self, inputs):
-        self.history_append(UserMessage(self.prompt_template(**inputs)))
+
+    def task_to_history(self, arguments):
+        self.history_append(UserMessage(self.prompt_template(**arguments)))
         self.onUserMessage(self.history[-1])
-    
+
     def get_next_action(self):
         # do the openai call
-        response = get_openai_response(self.history, self.functions)
-        return AssistantMessage(response['content'], response.get('function_call', None))
-    
+        response = get_openai_response(self.history, self.functions_openai)
+        function_call = response.get("function_call", None)
+        if function_call is not None:
+            function_call = FunctionCall(**function_call)
+        return AssistantMessage(
+            response.get("content", None), function_call=function_call
+        )
+
     def execute_action(self, function_call):
-        if function_call["name"] == "done":
-            return True
         for function in self.functions:
-            if function.name == function_call["name"]:
-                output = function(**function_call["inputs"])
-                function_message = FunctionMessage(output, function.name)
+            if function.name == function_call.name:
+                function_output = function(**json.loads(function_call.arguments))
+                if not isinstance(function_output, str):
+                    function_output = json.dumps(function_output)
+                function_message = FunctionMessage(function_output, function.name)
                 self.history_append(function_message)
                 self.onFunctionMessage(self.history[-1])
                 return False
-            self.history_append(FunctionMessage("Error: this function does not exist", function.name))
+            self.history_append(
+                FunctionMessage("Error: this function does not exist", function.name)
+            )
             self.onFunctionMessage(self.history[-1])
             return False
-    
+
     def follow_up(self, user_message):
         self.history_append(user_message)
         self.onUserMessage(self.history[-1])
         return self.run_until_done()
 
-            
-        
 
-
-        
-
-class Function():
+class Function:
     def __init__(self, openapi, name, function, description):
-        self.openapi = openapi
+        """
+        Arguments:
+            openapi (dict): the openapi.json describing the function
+            name (str): the name of the function
+            function (any -> FunctionMessage): the function to call. Must return a FunctionMessage
+            description (str): the description of the function
+        """
+        self.pydantic_model = None
+        if isinstance(openapi, dict):
+            parameters_openapi = openapi
+        elif issubclass(openapi, BaseModel):
+            parameters_openapi = openapi.schema()
+            self.pydantic_model = openapi
+        else:
+            raise ValueError(
+                "openapi must be a dict or a pydantic BaseModel describing the function parameters."
+            )
+        self.parameters_openapi = parameters_openapi
         self.name = name
         self.function = function
         self.description = description
-    
-    def __call__(self, **inputs):
-        return self.function(**inputs).content
 
+    def __call__(self, **arguments):
+        if self.pydantic_model is not None:
+            arguments = self.pydantic_model(**arguments)
+            return self.function(arguments)
+        return self.function(**arguments)
 
-
+    @property
+    def openapi_json(self):
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": self.parameters_openapi,
+        }

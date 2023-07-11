@@ -12,7 +12,9 @@ def split_recursively(text, split_at=["\n"], max_length=1000):
     return splits
 
 
-def split_document(text, words=1000, overlap=100, split_at=["\n\n", "\n", ".", "?", "!"]):
+def split_document(
+    text, words=1000, overlap=100, split_at=["\n\n", "\n", ".", "?", "!"]
+):
     total_words = len(text.split())
     if total_words < words:
         return [text]
@@ -25,12 +27,12 @@ def split_document(text, words=1000, overlap=100, split_at=["\n\n", "\n", ".", "
             # force split every overlap words
             finer_split = []
             for j in range(0, len(i.split()), overlap):
-                finer_split.append(" ".join(i.split()[j:j+overlap]))
+                finer_split.append(" ".join(i.split()[j : j + overlap]))
             # replace the split with the finer split
-            splits = splits[:idx] + finer_split + splits[idx+1:]
+            splits = splits[:idx] + finer_split + splits[idx + 1 :]
             idx += len(finer_split) - 1
         idx += 1
-            
+
     merged_splits = []
     current_chunk = ""
     while len(splits) > 0:

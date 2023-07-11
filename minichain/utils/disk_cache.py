@@ -1,16 +1,16 @@
 import hashlib
-import pickle
 import os
+import pickle
 
 
-class DiskCache():
+class DiskCache:
     def __init__(self, cache_dir="./.cache"):
         self.cache_dir = cache_dir
         os.makedirs(self.cache_dir, exist_ok=True)
 
     @staticmethod
     def _hash_string(string):
-        return hashlib.sha256(string.encode('utf-8')).hexdigest()
+        return hashlib.sha256(string.encode("utf-8")).hexdigest()
 
     def _get_cache_path(self, key):
         return os.path.join(self.cache_dir, f"{self._hash_string(key)}.pkl")

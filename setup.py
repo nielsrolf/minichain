@@ -14,10 +14,18 @@ setup(
         "openai",
         "replicate",
         "retry",
-        "google-search-results"
+        "google-search-results",
     ],
     extras_require={
-        "test": ["pytest", "pylint!=2.5.0", "black", "mypy", "flake8", "pytest-cov", "httpx"],
+        "test": [
+            "pytest",
+            "pylint!=2.5.0",
+            "black",
+            "mypy",
+            "flake8",
+            "pytest-cov",
+            "httpx",
+        ],
     },
     entry_points={
         "console_scripts": [],
