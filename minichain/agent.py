@@ -202,6 +202,8 @@ class Agent:
         except Exception as e:
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
         self.onFunctionMessage(self.history[-1])
+        breakpoint()
+        print(self.history[-1].content)
         return False
 
     def follow_up(self, user_message):
