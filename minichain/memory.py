@@ -7,6 +7,7 @@ from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
 from minichain.tools.recursive_summarizer import long_document_qa
 from minichain.tools.text_to_memory import (Memory, MemoryWithMeta,
                                             text_to_memory)
+from minichain.utils.markdown_browser import markdown_browser
 
 
 class KeywordList(BaseModel):
@@ -35,15 +36,37 @@ class VectorDB:
         # self.index.add(key_embedding, value)
 
 
+class IngestQuery(BaseModel):
+    url: str = Field(..., description="The url of the website to read and tag.")
+
+
+class RecallQuery(BaseModel):
+    question: str = Field(..., description="The question to search for.")
+
+
+
 class SemanticParagraphMemory:
     def __init__(self):
         self.memories: List[MemoryWithMeta] = []
         self.vector_db = None
         self.snippet_template = snippet_template
+        self.read_website = Function(
+            name="read_website",
+            openapi=IngestQuery,
+            function=self._read_website,
+            description="Read a website and create annoted memories.",
+        )
+        self.recall = Function(
+            name="recall",
+            openapi=RecallQuery,
+            function=self._recall,
+            description="Recall memories based on a question.",
+        )
 
     def ingest(self, content, source):
         memories = text_to_memory(content, source)
         self.memories += memories
+        return self.get_available_tags(memories)
 
     def search_by_vector(self, question, num_results=8):
         query_questions = self.generate_questions(question)
@@ -72,9 +95,14 @@ class SemanticParagraphMemory:
         results = [i[1] for i in highest_scoring_memories]
         return results
 
+    def get_available_tags(self, memories=None):
+        if memories is None:
+            memories = self.memories
+        return list(set([i for i in memories for i in i.memory.tags]))
+    
     def generate_keywords(self, question):
         # Use gpt to generate keywords
-        available_tags = list(set([i for i in self.memories for i in i.memory.tags]))
+        available_tags = self.get_available_tags()
         keyword_agent = Agent(
             # system_message=SystemMessage(
             #     f"You are a memory retrieval assistant. You have memories with the following tags: {available_tags}. Your task is to list all tags from the list that might be associated with information relevant to the question provided by the user. Do not respond with tags that are not in the list. Respond with the most relevant tags first. When in doubt, respond with more tags rather than less."
@@ -129,6 +157,15 @@ class SemanticParagraphMemory:
             context=memory.memory.context,
             content=memory.meta.content,
         )
+    
+    def _read_website(self, query: IngestQuery):
+        text = markdown_browser(query.url)
+        available_tags = self.ingest(text, query.url)
+        return f"You now have new memories with the following tags: {available_tags}"
+    
+    def _recall(self, query: RecallQuery):
+        results = self.semantic_search(query.question)
+        return results
 
 
 def test_semantic_paragraph_memory():
