@@ -81,6 +81,7 @@ print(user)
 print(user.id)
 # > 123"""
     assert is_prompt_injection(prompt) == False
+    print("is_prompt_injection_test passed")
 
 
 if __name__ == "__main__":

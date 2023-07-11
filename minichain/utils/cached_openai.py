@@ -1,9 +1,10 @@
-import openai
-from retry import retry
 import json
 
-from minichain.utils.disk_cache import disk_cache
+import openai
+from retry import retry
+
 from minichain.utils.debug import debug
+from minichain.utils.disk_cache import disk_cache
 
 
 def validate_message(message):
@@ -30,7 +31,7 @@ def get_openai_response(
         # delete all fields that are None
         message = {k: v for k, v in message.items() if v is not None or k == "content"}
         messages.append(message)
-
+    print(messages[0])
     if len(functions) > 0:
         completion = openai.ChatCompletion.create(
             model=model,
@@ -49,4 +50,3 @@ def get_openai_response(
     # if not validate_message(message):
     #     breakpoint()
     return response
-

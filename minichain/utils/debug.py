@@ -1,5 +1,6 @@
 from minichain.utils.disk_cache import disk_cache
 
+
 def debug(f):
     def debugged(*args, **kwargs):
         try:

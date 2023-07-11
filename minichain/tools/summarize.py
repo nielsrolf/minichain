@@ -1,11 +1,17 @@
-from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
-                             FunctionMessage, SystemMessage, UserMessage)
-from minichain.memory import SemanticParagraphMemory
-from minichain.utils.markdown_browser import markdown_browser
-from minichain.utils.search import google_search
+from pydantic import BaseModel, Field
+
+from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
 
 
-def summarize(text, question=None, instructions=[]):
+class SummarizeQuery(BaseModel):
+    text: str = Field(..., description="The text to summarize.")
+
+
+def summarize(request: SummarizeQuery):
+    return _summarize(request.text)
+
+
+def _summarize(text, instructions=[]):
     system_message = f"Summarize the the text provided by the user. Do not start the summary with 'The text provided by the user' or similar phrases. Summarize by generating a shorter text that has the most important information from the text provided by the user."
     system_message += (
         "\n\n"
@@ -19,21 +25,14 @@ def summarize(text, question=None, instructions=[]):
         prompt_template="{text}".format,
     )
     summary = summarizer.run(text=text)
-    if summary.content.lower() == "skip":
-        summary.content = ""
-    return FunctionMessage(
-        name="summarizer",
-        content=summary.content,
-    )
+    if summary.lower() == "skip":
+        summary = ""
+    return summary
 
 
 summarizer_function = Function(
     name="summarizer",
-    openapi={
-        "text": "string",
-        # optionally provide a list of instructions on what to focus on
-        "instructions": "list",
-    },
+    openapi=SummarizeQuery,
     function=summarize,
     description="Summarize the the text provided by the user.",
 )

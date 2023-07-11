@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -14,15 +15,21 @@ class Memory(BaseModel):
     end_line: int = Field(
         ..., description="The line number where the memory ends in the document."
     )
-    title: str = Field(..., description="The title of this memory. Provide plain, unformatted text without links.")
+    title: str = Field(
+        ...,
+        description="The title of this memory. Provide plain, unformatted text without links.",
+    )
     relevant_questions: List[str] = Field(
-        ..., description="Questions that are answered by the content of this memory. You will later be asked to find all memories related to arbitrary questions. Use this field to generate example questions for which you would like this memory to show up. Provide plain, unformatted questions without links."
+        ...,
+        description="Questions that are answered by the content of this memory. You will later be asked to find all memories related to arbitrary questions. Use this field to generate example questions for which you would like this memory to show up. Provide plain, unformatted questions without links.",
     )
     tags: List[str] = Field(
-        ..., description="Tags that describe the content of this memory. You will later be asked to find all memories related to arbitrary tags. Use this field to generate example tags for which you would like this memory to show up."
+        ...,
+        description="Tags that describe the content of this memory. You will later be asked to find all memories related to arbitrary tags. Use this field to generate example tags for which you would like this memory to show up.",
     )
     context: Optional[str] = Field(
-        ..., description="Additional context for this memory. This should contain information from the previous sections that is needed to correctly understand the content. Provide plain, unformatted text without links."
+        ...,
+        description="Additional context for this memory. This should contain information from the previous sections that is needed to correctly understand the content. Provide plain, unformatted text without links.",
     )
 
 
@@ -34,6 +41,10 @@ class MemoryMeta(BaseModel):
 class MemoryWithMeta(BaseModel):
     memory: Memory
     meta: MemoryMeta
+    id: str = Field(
+        description="A unique id for this memory. This is generated automatically.",
+        default_factory=lambda: str(uuid.uuid4()),
+    )
 
 
 def text_to_memory(text, source=None):
@@ -87,6 +98,7 @@ def test_text_to_memory():
     text = markdown_browser(url)
     memories = text_to_memory(text, source=url)
     breakpoint()
+
 
 if __name__ == "__main__":
     test_text_to_memory()

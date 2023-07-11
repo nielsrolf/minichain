@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from minichain.utils.cached_openai import get_openai_response
 from minichain.utils.debug import debug
 
+
 @dataclass
 class SystemMessage:
     content: str
@@ -62,14 +63,17 @@ class FunctionMessage:
 
 
 def make_return_function(openapi_json):
-    def return_function(**arguments):
-        return arguments
+    def return_function(arguments):
+        # arguments: pydantic model
+        # return: json
+        # json is turned into a pydantic model again by the function_obj.__call__ method
+        return arguments.dict()
 
     function_obj = Function(
-        "return",
-        return_function,
-        openapi_json,
-        "End the conversation and return a structured response.",
+        name="return",
+        function=return_function,
+        openapi=openapi_json,
+        description="End the conversation and return a structured response.",
     )
     return function_obj
 
@@ -139,10 +143,12 @@ class Agent:
                 not self.has_structured_response
                 and assistant_message.content is not None
             ):
-                return assistant_message
-            if assistant_message.function_call.name == "return":
-                return assistant_message.function_call.arguments
-            self.execute_action(assistant_message.function_call)
+                return assistant_message.content
+            function_call = assistant_message.function_call
+            if function_call is not None:
+                output = self.execute_action(function_call)
+                if function_call.name == "return":
+                    return output
 
     def task_to_history(self, arguments):
         self.history_append(UserMessage(self.prompt_template(**arguments)))
@@ -151,7 +157,11 @@ class Agent:
     def get_next_action(self):
         # do the openai call
         indizes = list(range(len(self.history)))
-        keep = [indizes[0]] + indizes[1: self.keep_first_messages + 1] + indizes[-self.keep_last_messages :]
+        keep = (
+            [indizes[0]]
+            + indizes[1 : self.keep_first_messages + 1]
+            + indizes[-self.keep_last_messages :]
+        )
         keep = sorted(list(set(keep)))
         history = [self.history[i] for i in keep]
         response = get_openai_response(history, self.functions_openai)
@@ -168,15 +178,18 @@ class Agent:
             for function in self.functions:
                 if function.name == function_call.name:
                     function_output = function(**json.loads(function_call.arguments))
+                    function_output_str = function_output
                     if not isinstance(function_output, str):
-                        function_output = json.dumps(function_output)
-                    function_message = FunctionMessage(function_output, function.name)
+                        function_output_str = json.dumps(function_output)
+                    function_message = FunctionMessage(function_output_str, function.name)
                     self.history_append(function_message)
                     self.onFunctionMessage(self.history[-1])
-                    return False
-                self.history_append(
-                    FunctionMessage(f"Error: this function does not exist", function.name)
+                    return function_output
+            self.history_append(
+                FunctionMessage(
+                    f"Error: this function does not exist", function.name
                 )
+            )
         except Exception as e:
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
         self.onFunctionMessage(self.history[-1])
@@ -198,20 +211,25 @@ class Function:
             description (str): the description of the function
         """
         self.pydantic_model = None
-        if isinstance(openapi, dict):
-            parameters_openapi = openapi
-        elif issubclass(openapi, BaseModel):
-            parameters_openapi = openapi.schema()
-            self.pydantic_model = openapi
-        else:
-            raise ValueError(
-                "openapi must be a dict or a pydantic BaseModel describing the function parameters."
-            )
+        try:
+            if isinstance(openapi, dict):
+                parameters_openapi = openapi
+            elif issubclass(openapi, BaseModel):
+                parameters_openapi = openapi.schema()
+                self.pydantic_model = openapi
+            else:
+                raise ValueError(
+                    "openapi must be a dict or a pydantic BaseModel describing the function parameters."
+                )
+        except:
+            print(openapi, type(openapi))
+            breakpoint()
         self.parameters_openapi = parameters_openapi
         self.name = name
         self.function = function
         self.description = description
 
+    @debug
     def __call__(self, **arguments):
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments)

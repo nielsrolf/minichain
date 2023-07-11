@@ -1,11 +1,17 @@
-from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
-                             FunctionMessage, SystemMessage, UserMessage)
-from minichain.memory import SemanticParagraphMemory
-from minichain.utils.markdown_browser import markdown_browser
-from minichain.utils.search import google_search
+from pydantic import BaseModel, Field
+
+from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
 
 
-def qa(text, question, instructions=[]):
+class QuestionAnsweringQuery(BaseModel):
+    text: str = Field(..., description="The text to scan for relevant information.")
+    question: str = Field(..., description="The question to answer.")
+
+
+def qa(request: QuestionAnsweringQuery):
+    return _qa(request.text, request.question)
+
+def _qa(text, question, instructions=[]):
     # system_message = f"Scan the text provided by the user for relevant information related to the question: '{question}'. Summarize long passages if needed. You may repeat sections of the text verbatim if they are very relevant. Do not start the summary with 'The text provided by the user' or similar phrases. Only respond with informative text relevant to the question. Summarize by generating a shorter text that has the most important information from the text provided by the user."
     system_message = (
         f"You are a document based QA system. Your task is to find all relevant information in the provided text related to the question: '{question}'."
@@ -24,22 +30,14 @@ def qa(text, question, instructions=[]):
         prompt_template="{text}".format,
     )
     summary = summarizer.run(text=text)
-    if summary.content.lower() == "skip":
-        summary.content = ""
-    return FunctionMessage(
-        name="document_qa",
-        content=summary.content,
-    )
+    if summary.lower() == "skip":
+        summary = ""
+    return summary
 
 
 qa_function = Function(
     name="document_qa",
-    openapi={
-        "text": "string",
-        "question": "string",
-        # optionally provide a list of instructions on what to focus on
-        "instructions": "list",
-    },
+    openapi=QuestionAnsweringQuery,
     function=qa,
     description="Scan a text for relevant information related to a question.",
 )

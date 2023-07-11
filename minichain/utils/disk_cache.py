@@ -40,12 +40,12 @@ class DiskCache:
                 return result
 
         return wrapper
-    
+
     def invalidate(self, func, *args, **kwargs):
         key = str(repr({"args": args, "kwargs": kwargs, "f": func.__name__}))
         cache_path = self._get_cache_path(key)
         os.remove(cache_path)
-    
+
     def __call__(self, func):
         return self.cache(func)
 
