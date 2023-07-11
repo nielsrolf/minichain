@@ -7,11 +7,7 @@ class SummarizeQuery(BaseModel):
     text: str = Field(..., description="The text to summarize.")
 
 
-def summarize(request: SummarizeQuery):
-    return _summarize(request.text)
-
-
-def _summarize(text, instructions=[]):
+def summarize(text, instructions=[]):
     system_message = f"Summarize the the text provided by the user. Do not start the summary with 'The text provided by the user' or similar phrases. Summarize by generating a shorter text that has the most important information from the text provided by the user."
     system_message += (
         "\n\n"

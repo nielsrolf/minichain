@@ -18,11 +18,11 @@ def validate_message(message):
 
 
 @disk_cache
-@retry(tries=3, delay=1)
+@retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
 @debug
 def get_openai_response(
     chat_history, functions, model="gpt-3.5-turbo-16k"
-) -> str:  # "gpt-4-0613"
+) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     messages = []
     for i in chat_history:
         message = i.dict()
@@ -31,6 +31,8 @@ def get_openai_response(
         # delete all fields that are None
         message = {k: v for k, v in message.items() if v is not None or k == "content"}
         messages.append(message)
+    print(messages)
+    print("=====================================")
     if len(functions) > 0:
         completion = openai.ChatCompletion.create(
             model=model,

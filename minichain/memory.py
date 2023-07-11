@@ -44,7 +44,6 @@ class RecallQuery(BaseModel):
     question: str = Field(..., description="The question to search for.")
 
 
-
 class SemanticParagraphMemory:
     def __init__(self):
         self.memories: List[MemoryWithMeta] = []
@@ -89,9 +88,9 @@ class SemanticParagraphMemory:
     def search_by_keywords(self, question, num_results=8):
         keywords = self.generate_keywords(question)
         scores = [len(set(keywords) & set(i.memory.tags)) for i in self.memories]
-        highest_scoring_memories = sorted(zip(scores, self.memories), reverse=True, key=lambda i: i[0])[
-            :num_results
-        ]
+        highest_scoring_memories = sorted(
+            zip(scores, self.memories), reverse=True, key=lambda i: i[0]
+        )[:num_results]
         results = [i[1] for i in highest_scoring_memories]
         return results
 
@@ -99,7 +98,7 @@ class SemanticParagraphMemory:
         if memories is None:
             memories = self.memories
         return list(set([i for i in memories for i in i.memory.tags]))
-    
+
     def generate_keywords(self, question):
         # Use gpt to generate keywords
         available_tags = self.get_available_tags()
@@ -157,28 +156,12 @@ class SemanticParagraphMemory:
             context=memory.memory.context,
             content=memory.meta.content,
         )
-    
+
     def _read_website(self, query: IngestQuery):
         text = markdown_browser(query.url)
         available_tags = self.ingest(text, query.url)
         return f"You now have new memories with the following tags: {available_tags}"
-    
+
     def _recall(self, query: RecallQuery):
         results = self.semantic_search(query.question)
         return results
-
-
-def test_semantic_paragraph_memory():
-    from minichain.utils.markdown_browser import markdown_browser
-
-    memory = SemanticParagraphMemory()
-    url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
-    text = markdown_browser(url)
-    memory.ingest(text, url)
-    result = memory.semantic_search("What is the latest version of Python?")
-    print(result)
-    breakpoint()
-
-
-if __name__ == "__main__":
-    test_semantic_paragraph_memory()

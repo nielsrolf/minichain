@@ -6,12 +6,12 @@ def debug(f):
         try:
             return f(*args, **kwargs)
         except Exception as e:
-            print(type(e), e)
             try:
                 disk_cache.invalidate(f, *args, **kwargs)
             except:
                 pass
             breakpoint()
+            print(type(e), e)
             f(*args, **kwargs)
 
     return debugged

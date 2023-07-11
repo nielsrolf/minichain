@@ -15,7 +15,7 @@ class SystemMessage:
 
     def dict(self):
         return asdict(self)
-    
+
     def __str__(self):
         return f"{self.role}: {self.content}"
 
@@ -30,7 +30,7 @@ class UserMessage:
 
     def dict(self):
         return asdict(self)
-    
+
     def __str__(self):
         return f"{self.role}: {self.content}"
 
@@ -55,7 +55,7 @@ class AssistantMessage:
 
     def dict(self):
         return asdict(self)
-    
+
     def __str__(self):
         return f"{self.role}: {self.content} {self.function_call}"
 
@@ -190,14 +190,14 @@ class Agent:
                     function_output_str = function_output
                     if not isinstance(function_output, str):
                         function_output_str = json.dumps(function_output)
-                    function_message = FunctionMessage(function_output_str, function.name)
+                    function_message = FunctionMessage(
+                        function_output_str, function.name
+                    )
                     self.history_append(function_message)
                     self.onFunctionMessage(self.history[-1])
                     return function_output
             self.history_append(
-                FunctionMessage(
-                    f"Error: this function does not exist", function.name
-                )
+                FunctionMessage(f"Error: this function does not exist", function.name)
             )
         except Exception as e:
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
@@ -240,8 +240,7 @@ class Function:
 
     def __call__(self, **arguments):
         if self.pydantic_model is not None:
-            arguments = self.pydantic_model(**arguments)
-            return self.function(arguments)
+            arguments = self.pydantic_model(**arguments).dict()
         return self.function(**arguments)
 
     @property

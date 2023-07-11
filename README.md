@@ -34,9 +34,9 @@ agent_with_tool = Agent(
 )
 ```
 ## Quickfix convention:
-- tool always returns a dict
-- tool_function returns the same dict
-- agent_with_tool returns a pydantic_response_model
+- tool: pydantic -> dict
+- tool_function: dict -> (pydantic -> dict)
+- agent_with_tool: dict -> dict
 
 ## Longterm fixes:
 - merge tool and tool_function via decorators
@@ -44,7 +44,8 @@ agent_with_tool = Agent(
     @openai_function(description, ...)
     @input_field(type, ...)
     ```
-- give function input and output schema, only return pydantic objects
+- give function input and output schema
+- never pass pydantic models, always pass dicts. only convert to pydantic to validate
 
 
 ## Install

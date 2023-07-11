@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from typing import List
+
+from pydantic import BaseModel, Field
 
 from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
 
@@ -10,7 +11,10 @@ class QuestionAnsweringQuery(BaseModel):
 
 
 class Citation(BaseModel):
-    id: int = Field(..., description="The number that was used in the answer to reference the citation.")
+    id: int = Field(
+        ...,
+        description="The number that was used in the answer to reference the citation.",
+    )
     source: str = Field(..., description="The url of the citation.")
 
 
@@ -19,11 +23,7 @@ class AnswerWithCitations(BaseModel):
     citations: List[Citation] = Field(..., description="A list of citations.")
 
 
-
-def qa(request: QuestionAnsweringQuery):
-    return _qa(request.text, request.question)
-
-def _qa(text, question, instructions=[]):
+def qa(text, question, instructions=[]):
     """
     Returns: a dict {content: str, citations: List[Citation]}}"""
     # system_message = f"Scan the text provided by the user for relevant information related to the question: '{question}'. Summarize long passages if needed. You may repeat sections of the text verbatim if they are very relevant. Do not start the summary with 'The text provided by the user' or similar phrases. Only respond with informative text relevant to the question. Summarize by generating a shorter text that has the most important information from the text provided by the user."
@@ -34,8 +34,8 @@ def _qa(text, question, instructions=[]):
     )
     system_message += (
         "\n"
-        + "Ignore parts of a website that are not content, such as navigation bars, footers, sidebars, etc. Respond only with the word 'skip' if the text consists of only these parts. If the text contains no information related to the question, also answer only with the word 'skip'.\n" +
-        "If a source link is mentioned, please cite the url of the source."
+        + "Ignore parts of a website that are not content, such as navigation bars, footers, sidebars, etc. Respond only with the word 'skip' if the text consists of only these parts. If the text contains no information related to the question, also answer only with the word 'skip'.\n"
+        + "If a source link is mentioned, please cite the url of the source."
     )
     if instructions and len(instructions) > 0:
         system_message += "\n" + "\n".join(instructions)
@@ -46,8 +46,8 @@ def _qa(text, question, instructions=[]):
         response_openapi=AnswerWithCitations,
     )
     summary = summarizer.run(text=text)
-    if summary['content'].lower() == "skip":
-        summary['content'] = ""
+    if summary["content"].lower() == "skip":
+        summary["content"] = ""
     return summary
 
 

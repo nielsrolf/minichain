@@ -91,14 +91,3 @@ def text_to_memory(text, source=None):
     for paragraph in paragraphs:
         agent.run(text=paragraph)
     return memories
-
-
-def test_text_to_memory():
-    url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
-    text = markdown_browser(url)
-    memories = text_to_memory(text, source=url)
-    breakpoint()
-
-
-if __name__ == "__main__":
-    test_text_to_memory()
