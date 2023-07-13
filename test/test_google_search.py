@@ -8,9 +8,9 @@ def test_google_search():
         functions=[google_search_function, long_document_qa],
         system_message=SystemMessage("Use google to search the web for a query."),
         prompt_template="{query}".format,
-        onAssistantMessage=lambda message: print(message),
-        onUserMessage=lambda message: print(message),
-        onFunctionMessage=lambda message: print(message),
+        on_assistant_message=lambda message: print(message),
+        on_user_message=lambda message: print(message),
+        on_function_message=lambda message: print(message),
     )
     query = "What is the capital of France?"
     result = agent.run(query=query)

@@ -1,0 +1,34 @@
+# Start with a base image
+FROM python:3.11
+
+# Install dependencies for building Python packages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libffi-dev \
+        libssl-dev \
+        curl
+
+# Install node via NVM
+ENV NVM_DIR /root/.nvm
+ENV NODE_VERSION 20.4.0
+
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash \
+    && . $NVM_DIR/nvm.sh \
+    && nvm install $NODE_VERSION \
+    && nvm alias default $NODE_VERSION \
+    && nvm use default
+
+# Add node and npm to path so that they're usable
+ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
+
+# Confirm installation
+RUN node -v
+RUN npm -v
+
+# Install tree
+RUN apt-get install -y tree
+
+# Clean up
+RUN apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

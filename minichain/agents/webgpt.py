@@ -16,8 +16,8 @@ webgpt = Agent(
         "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
     ),
     prompt_template="{query}".format,
-    # onAssistantMessage=lambda message: print(message),
-    # onUserMessage=lambda message: print(message),
-    onFunctionMessage=lambda message: print(message),
+    # on_assistant_message=lambda message: print(message),
+    # on_user_message=lambda message: print(message),
+    on_function_message=lambda message: print(message),
     response_openapi=AnswerWithCitations,
 )

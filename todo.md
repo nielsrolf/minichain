@@ -11,7 +11,6 @@
 
 
 Random:
-- Agent: on return function, validate schema
 - Function: use openai decorators
 
 - summarize code: add instruction to use symbol identifiers as tags

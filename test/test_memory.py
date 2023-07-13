@@ -30,7 +30,7 @@ def test_keyword_memory():
     )
     text = markdown_browser(url)
     memory.ingest(text, url)
-    memories = memory.retrieve()
+    memories = memory.retrieve(question)
     print_memories(memories)
     print(memory.rank_or_summarize(memories, question))
 

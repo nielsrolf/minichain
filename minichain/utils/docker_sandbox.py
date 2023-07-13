@@ -1,11 +1,15 @@
 import os
 from typing import List
+import asyncio
 
 import docker
 
 
+import threading
+from time import sleep
+
 def run_in_container(
-    commands: List[str], container_name: str = None, image_name="ubuntu:latest"
+    commands: List[str], container_name: str = None, image_name="nielsrolf/minichain:latest"
 ):
     client = docker.from_env()
 
@@ -39,7 +43,27 @@ def run_in_container(
         yield f"\n> {command}\n"
         result = container.exec_run(command, stream=True)
         for line in result.output:
-            yield line.strip().decode()
+            yield line.strip().decode() + "\n"
+
+
+
+def bash(commands, session=None, stream=lambda i: i):
+    """Callback wrapper for run_in_container.
+
+    Args:
+        commands (List[str]): A list of bash commands.
+        session (str, optional): A session name. Defaults to None.
+        on_newline (Callable[[str], str], optional): A callback function that
+            takes a string and returns a string. Defaults to lambda i: i.
+
+    Returns:
+        str: A string.
+    """
+    response = ""
+    for token in run_in_container(commands, session):
+        stream(token)
+        response += token
+    return response
 
 
 def test_run_in_container():
@@ -62,5 +86,19 @@ def test_run_in_container():
         print(token, end="")
 
 
+def test_bash():
+    commands = [
+        "sleep 1 && echo hello world && sleep 1 && echo hello world",
+        "echo next",
+        "sleep 1",
+        "echo hello world",
+        "pip install --upgrade pip",
+    ]
+    outputs = bash(commands, stream=lambda i: print(i, end=""))
+
+
+
+
 if __name__ == "__main__":
-    test_run_in_container()
+    # test_run_in_container()
+    test_bash()

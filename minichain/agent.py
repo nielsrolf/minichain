@@ -71,7 +71,7 @@ class FunctionMessage:
         return asdict(self)
 
 
-def make_return_function(openapi_json):
+def make_return_function(openapi_json: BaseModel):
     def return_function(**arguments):
         return arguments
 
@@ -92,9 +92,11 @@ class Agent:
         prompt_template="{task}".format,
         response_openapi=None,
         init_history=None,
-        onUserMessage=None,
-        onFunctionMessage=None,
-        onAssistantMessage=None,
+        on_user_message=None,
+        on_function_message=None,
+        on_assistant_message=None,
+        function_stream=None,
+        assistant_stream=None,
         keep_first_messages=1,
         keep_last_messages=20,
     ):
@@ -116,11 +118,15 @@ class Agent:
         def do_nothing(*args, **kwargs):
             pass
 
-        self.onUserMessage = onUserMessage or do_nothing
-        self.onFunctionMessage = onFunctionMessage or do_nothing
-        self.onAssistantMessage = onAssistantMessage or do_nothing
+        self.on_user_message = on_user_message or do_nothing
+        self.on_function_message = on_function_message or do_nothing
+        self.on_assistant_message = on_assistant_message or do_nothing
+        self.function_stream = function_stream or do_nothing
+        self.assistant_stream = assistant_stream or do_nothing
 
         self.functions_openai = [i.openapi_json for i in self.functions]
+        for function in self.functions:
+            function._register_stream(self.function_stream)
 
     def history_append(self, message):
         message.parent = self.history[-1]
@@ -134,9 +140,9 @@ class Agent:
             self.prompt_template,
             self.response_openapi,
             self.init_history,
-            onUserMessage=self.onUserMessage,
-            onFunctionMessage=self.onFunctionMessage,
-            onAssistantMessage=self.onAssistantMessage,
+            on_user_message=self.on_user_message,
+            on_function_message=self.on_function_message,
+            on_assistant_message=self.on_assistant_message,
             keep_first_messages=self.keep_first_messages,
             keep_last_messages=self.keep_last_messages,
         )
@@ -147,7 +153,7 @@ class Agent:
         while True:
             assistant_message = self.get_next_action()
             self.history_append(assistant_message)
-            self.onAssistantMessage(self.history[-1])
+            self.on_assistant_message(self.history[-1])
             if (
                 not self.has_structured_response
                 and assistant_message.content is not None
@@ -163,7 +169,7 @@ class Agent:
 
     def task_to_history(self, arguments):
         self.history_append(UserMessage(self.prompt_template(**arguments)))
-        self.onUserMessage(self.history[-1])
+        self.on_user_message(self.history[-1])
 
     def get_next_action(self):
         # do the openai call
@@ -196,7 +202,7 @@ class Agent:
                         function_output_str, function.name
                     )
                     self.history_append(function_message)
-                    self.onFunctionMessage(self.history[-1])
+                    self.on_function_message(self.history[-1])
                     return function_output
             self.history_append(
                 FunctionMessage(
@@ -205,13 +211,13 @@ class Agent:
             )
         except Exception as e:
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
-        self.onFunctionMessage(self.history[-1])
+        self.on_function_message(self.history[-1])
         print(self.history[-1].content)
         return False
 
     def follow_up(self, user_message):
         self.history_append(user_message)
-        self.onUserMessage(self.history[-1])
+        self.on_user_message(self.history[-1])
         return self.run_until_done()
 
 
@@ -247,6 +253,9 @@ class Function:
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments).dict()
         return self.function(**arguments)
+    
+    def _register_stream(self, stream):
+        self.stream = stream
 
     @property
     def openapi_json(self):
