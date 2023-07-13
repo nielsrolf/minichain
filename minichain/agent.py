@@ -2,7 +2,7 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from minichain.utils.cached_openai import get_openai_response
 from minichain.utils.debug import debug
@@ -199,7 +199,7 @@ class Agent:
                     self.onFunctionMessage(self.history[-1])
                     return function_output
             self.history_append(
-                FunctionMessage(f"Error: this function does not exist", function.name)
+                FunctionMessage(f"Error: this function does not exist", function_call.name)
             )
         except Exception as e:
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
@@ -253,3 +253,10 @@ class Function:
             "description": self.description,
             "parameters": self.parameters_openapi,
         }
+
+
+class Done(BaseModel):
+    success: bool = Field(
+        ...,
+        description="Always set this to true to indicate that you are done with this function.",
+    )

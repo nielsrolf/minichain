@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Function
+from minichain.agent import Agent, Function, SystemMessage, Done
 from minichain.tools.document_qa import qa_function
 from minichain.tools.summarize import summarizer_function
 from minichain.utils.document_splitter import split_document
@@ -46,13 +46,13 @@ class DocumentSummaryRequest(BaseModel):
     )
 
 
-def recursive_summarizer(text, question=None, max_words=500):
+def recursive_summarizer(text, question=None, max_words=500, instructions=[]):
     paragraphs = split_document(text)
     summarize_at_least_once = True
     while len(paragraphs) > 1:
         # print("splitting paragraphs:", [len(i.split()) for i in paragraphs])
         summaries = [
-            recursive_summarizer(i, max_words=max_words, question=question)
+            recursive_summarizer(i, max_words=max_words, question=question, instructions=instructions)
             for i in paragraphs
         ]
         joint_summary = "\n\n".join(summaries)
@@ -64,8 +64,45 @@ def recursive_summarizer(text, question=None, max_words=500):
         paragraphs[0],
         max_words=max_words,
         question=question,
-        summarize_at_least_once=summarize_at_least_once,
+        summarize_at_least_once=summarize_at_least_once
     )
+
+
+def text_scan(text, response_openapi, system_message):
+    """
+    Splits the text into paragraphs and asks the document_to_json agent for outouts."""
+    outputs = []
+    def add_output(**output):
+        print("adding output:", output)
+        if output in outputs:
+            return "Error: already added."
+        outputs.append(output)
+        return "Output added. continue to scan the text and add relevant outputs or end the scan with the 'return' function."
+    add_output_function = Function(
+        name="add_output",
+        openapi=response_openapi,
+        function=add_output,
+        description="Add an output to the list of outputs. Don't add the same item twice."
+    )
+    
+    document_to_json = Agent(
+        functions=[
+            add_output_function
+        ],
+        system_message=SystemMessage(system_message),
+        prompt_template="{text}".format,
+        response_openapi=Done,
+        keep_last_messages=20
+    )
+
+
+    paragraphs = split_document(text)
+    for paragraph in paragraphs:
+        document_to_json.run(text=paragraph)
+    return outputs
+
+        
+
 
 
 def recursive_web_summarizer(url, question=None, max_words=500):

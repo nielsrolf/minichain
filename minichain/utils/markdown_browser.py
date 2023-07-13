@@ -13,6 +13,7 @@ from minichain.utils.disk_cache import disk_cache
 
 @disk_cache
 def markdown_browser(url):
+    print("markdown_browser", url)
     # Initialize Chrome options
     chrome_options = Options()
     chrome_options.add_argument("--headless")

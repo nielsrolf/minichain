@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Function, SystemMessage
+from minichain.agent import Agent, Function, SystemMessage, Done
 from minichain.utils.document_splitter import split_document
 from minichain.utils.markdown_browser import markdown_browser
 
@@ -47,14 +47,8 @@ class MemoryWithMeta(BaseModel):
     )
 
 
-class Done(BaseModel):
-    success: bool = Field(
-        ...,
-        description="Always set this to true to indicate that you are done with this function.",
-    )
 
-
-def text_to_memory(text, source=None):
+def text_to_memory(text, source=None) -> List[MemoryWithMeta]:
     """
     Turn a text into a list of semantic paragraphs.
     - add line numbers to the text
