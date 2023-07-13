@@ -1,14 +1,30 @@
+"""
+TODO
+- docstring parsing is broken
+- save line range to symbol
+"""
+
+
+
 import click
 import os
 from pprint import pprint
 
 
-def parse_functions(code, file):
+def parse_function(code, file):
     lines = code.split("\n")
-    line = lines[0]
-    function_name = line.split("def ")[1].split("(")[0]
-    function_signature = ""
     end_line = 0
+    try:
+        while not lines[end_line].startswith("def "):
+            end_line += 1
+    except IndexError:
+        return None, len(lines)
+    line = lines[end_line]
+    try:
+        function_name = line.split("def ")[1].split("(")[0]
+    except:
+        breakpoint()
+    function_signature = ""
     for potential_signature_end in lines[end_line:]:
         end_line += 1
         function_signature += potential_signature_end
@@ -23,7 +39,7 @@ def parse_functions(code, file):
                 break
     code = ""
     for line in lines[end_line:]:
-        if line.startswith(" ") or line.startswith("\t"):
+        if line.startswith(" ") or line.startswith("\t") or line == "":
             code += line + "\n"
             end_line += 1
         else:
@@ -35,8 +51,19 @@ def parse_functions(code, file):
             "docstring": docstring,
             "code": code,
             "path": file,
+            "start": 0,
+            "end": i,
         }, i
 
+
+def parse_functions(code, file):
+    functions = []
+    while code:
+        function, i = parse_function(code, file)
+        if function is not None:
+            functions.append(function)
+        code = "\n".join(code.split("\n")[i:])
+    return functions
 
 def get_symbols(file):
     print(file)
@@ -49,10 +76,13 @@ def get_symbols(file):
         line = lines[i]
         # print(line)
         if line.startswith("def "):
-            functions, j = parse_functions("\n".join(lines[i:]), file)
+            function, j = parse_function("\n".join(lines[i:]), file)
+            function["start"] += i
+            function["end"] += i
             i += j
-            symbols += functions
+            symbols += [function]
         elif line.startswith("class "):
+            class_start_line = i
             class_name = line.split("class ")[1].split("(")[0]
             class_signature = ""
             end_line = i
@@ -70,13 +100,14 @@ def get_symbols(file):
                         break
             code = ""
             for line in lines[end_line:]:
-                if line.startswith(" ") or line.startswith("\t"):
+                if line.startswith(" ") or line.startswith("\t") or line == "":
                     code += line + "\n"
                     end_line += 1
                 else:
                     break
             i = end_line
             # parse the methods from the code
+            code_start_line = i
             # get the indention of the first line
             indention_str = ""
             for char in code.split("\n")[0]:
@@ -98,8 +129,15 @@ def get_symbols(file):
             if len(unindented_code) == 0:
                 methods = []
             else:
-                methods, j = parse_functions("\n".join(unindented_code), file)
-                i += j
+                # methods_code = "\n".join([i for i in unindented_code if not i == "" and not i.strip().startswith("#") and not i.strip().startswith("@")])
+                methods_code =  "\n".join(unindented_code)
+                if methods_code.strip() == "":
+                    methods = []
+                else:
+                    methods = parse_functions(methods_code, file)
+                for m in methods:
+                    m["start"] += code_start_line
+                    m["end"] += code_start_line
             symbols.append(
                 {
                     "name": class_name,
@@ -109,6 +147,8 @@ def get_symbols(file):
                     "path": file,
                     "methods": methods,
                     "fields": fields,
+                    "start": class_start_line,
+                    "end": end_line,
                 }
             )
         else:
@@ -127,17 +167,36 @@ def generate_docs(src):
     symbols = []
     for file in files:
         symbols += get_symbols(file)
-    breakpoint()
-    # Step 3: Generate docs
-    for symbol in symbols:
-        pprint(symbol)
+    return symbols
+
+
+def print_symbol_as_markdown(symbol, prefix=""):
+    try:
+        print(f"{prefix}{symbol['signature']} {symbol['start']}-{symbol['end']}")
+    except:
+        breakpoint()
+    if symbol["docstring"]:
+        print(f"{prefix}  docstring: {symbol['docstring']}")
+    if symbol.get("fields"):
+        print(symbol["fields"])
+    if symbol.get("methods"):
+        for method in symbol["methods"]:
+            print_symbol_as_markdown(method, prefix=f"    ")
+    print()
 
               
 
 @click.command()
 @click.argument("src")
 def main(src):
-    generate_docs(src)
+    print(src)
+    symbols = generate_docs(src)
+    symbols_by_file = {  file: [i for i in symbols if i["path"] == file] 
+                        for file in set([i["path"] for i in symbols])}
+    for file, symbols in symbols_by_file.items():
+        print(f"## {file}")
+        for i in symbols:
+            print_symbol_as_markdown(i)
 
 
 if __name__ == "__main__":
