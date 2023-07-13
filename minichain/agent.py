@@ -199,7 +199,9 @@ class Agent:
                     self.onFunctionMessage(self.history[-1])
                     return function_output
             self.history_append(
-                FunctionMessage(f"Error: this function does not exist", function_call.name)
+                FunctionMessage(
+                    f"Error: this function does not exist", function_call.name
+                )
             )
         except Exception as e:
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))

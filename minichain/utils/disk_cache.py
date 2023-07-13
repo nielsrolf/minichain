@@ -3,7 +3,6 @@ import os
 import pickle
 
 
-
 class DiskCache:
     def __init__(self, cache_dir="./.cache"):
         self.cache_dir = cache_dir
@@ -60,7 +59,6 @@ class DiskCache:
 
     def __call__(self, func):
         return self.cache(func)
-
 
 
 disk_cache = DiskCache()

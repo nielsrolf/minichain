@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Function, SystemMessage, Done
+from minichain.agent import Agent, Done, Function, SystemMessage
 from minichain.utils.document_splitter import split_document
 from minichain.utils.markdown_browser import markdown_browser
 
@@ -47,7 +47,6 @@ class MemoryWithMeta(BaseModel):
     )
 
 
-
 def text_to_memory(text, source=None) -> List[MemoryWithMeta]:
     """
     Turn a text into a list of semantic paragraphs.
@@ -66,10 +65,15 @@ def text_to_memory(text, source=None) -> List[MemoryWithMeta]:
 
     def add_memory(**memory):
         memory = Memory(**memory)
-        progress = max([0] + [i.memory.end_line for i in memories if i.meta.source == source])
+        progress = max(
+            [0] + [i.memory.end_line for i in memories if i.meta.source == source]
+        )
         content = "\n".join(lines[memory.start_line : memory.end_line + 1])
         warning = ""
-        if memory.start_line < current_paragraph_start or memory.end_line > current_paragraph_end:
+        if (
+            memory.start_line < current_paragraph_start
+            or memory.end_line > current_paragraph_end
+        ):
             return f"Fatal error: you are trying to add a memory referencing lines that are currently not visible to you. ."
         if len(memories) > 2 and memory.end_line <= memories[-2].memory.end_line:
             return f"Memory ignored because you already scanned the document until line: {memories[-1].memory.end_line}. Provide a start_line and end_line that are both larger than {memories[-1].memory.end_line}. Left to-do are lines: lines {progress}-{current_paragraph_end}"
@@ -92,7 +96,6 @@ def text_to_memory(text, source=None) -> List[MemoryWithMeta]:
         description="Add a memory to the memory list. Remember only useful information, skip over references, links, navbars, or other uninformative text. Memories should usually be self-contained and atomic and include 10-1000 lines of text. Create memories for the earlier parts of the document first - don't create memories out of order.",
     )
 
-    
     agent = Agent(
         functions=[
             add_memory_function,
@@ -103,7 +106,7 @@ def text_to_memory(text, source=None) -> List[MemoryWithMeta]:
         prompt_template="{text}".format,
         keep_first_messages=1,
         keep_last_messages=5,
-        response_openapi=Done
+        response_openapi=Done,
     )
 
     for paragraph in paragraphs:

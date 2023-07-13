@@ -1,8 +1,8 @@
+from agent import Agent, UserMessage
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from agent import Agent, UserMessage
 
 app = FastAPI()
 

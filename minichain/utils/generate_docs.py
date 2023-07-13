@@ -5,10 +5,10 @@ TODO
 """
 
 
-
-import click
 import os
 from pprint import pprint
+
+import click
 
 
 def parse_function(code, file):
@@ -46,14 +46,14 @@ def parse_function(code, file):
             break
     i = end_line
     return {
-            "name": function_name,
-            "signature": function_signature,
-            "docstring": docstring,
-            "code": code,
-            "path": file,
-            "start": 0,
-            "end": i,
-        }, i
+        "name": function_name,
+        "signature": function_signature,
+        "docstring": docstring,
+        "code": code,
+        "path": file,
+        "start": 0,
+        "end": i,
+    }, i
 
 
 def parse_functions(code, file):
@@ -65,8 +65,8 @@ def parse_functions(code, file):
         code = "\n".join(code.split("\n")[i:])
     return functions
 
+
 def get_symbols(file):
-    print(file)
     symbols = []
     with open(file) as f:
         content = f.read()
@@ -121,16 +121,18 @@ def get_symbols(file):
             ]
             # if dataclass etc, parse the fields. we know it's a dataclass if the first code line is not a def
             fields = ""
-            while len(unindented_code) > 0 and not unindented_code[0].startswith("def "):
+            while len(unindented_code) > 0 and not unindented_code[0].startswith(
+                "def "
+            ):
                 fields += unindented_code[0] + "\n"
                 unindented_code = unindented_code[1:]
             fields = fields.strip()
-            
+
             if len(unindented_code) == 0:
                 methods = []
             else:
                 # methods_code = "\n".join([i for i in unindented_code if not i == "" and not i.strip().startswith("#") and not i.strip().startswith("@")])
-                methods_code =  "\n".join(unindented_code)
+                methods_code = "\n".join(unindented_code)
                 if methods_code.strip() == "":
                     methods = []
                 else:
@@ -155,13 +157,13 @@ def get_symbols(file):
             i += 1
     return symbols
 
+
 def generate_docs(src):
     # Step 1: Get all files
     files = []
     for root, dirs, filenames in os.walk(src):
         for filename in filenames:
             if filename.endswith(".py"):
-                print(filename)
                 files.append(os.path.join(root, filename))
     # Step 2: Get all functions, classes, and methods
     symbols = []
@@ -184,15 +186,16 @@ def print_symbol_as_markdown(symbol, prefix=""):
             print_symbol_as_markdown(method, prefix=f"    ")
     print()
 
-              
 
 @click.command()
 @click.argument("src")
 def main(src):
     print(src)
     symbols = generate_docs(src)
-    symbols_by_file = {  file: [i for i in symbols if i["path"] == file] 
-                        for file in set([i["path"] for i in symbols])}
+    symbols_by_file = {
+        file: [i for i in symbols if i["path"] == file]
+        for file in set([i["path"] for i in symbols])
+    }
     for file, symbols in symbols_by_file.items():
         print(f"## {file}")
         for i in symbols:
@@ -201,4 +204,3 @@ def main(src):
 
 if __name__ == "__main__":
     main()
-    

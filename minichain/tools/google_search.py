@@ -18,4 +18,3 @@ google_search_function = Function(
     function=google_search,
     description="Use google to search the web for a query.",
 )
-

@@ -1,7 +1,7 @@
-from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass
-import re
 import math
+import re
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -11,8 +11,8 @@ from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
 from minichain.tools.text_to_memory import (Memory, MemoryWithMeta,
                                             text_to_memory)
-from minichain.utils.markdown_browser import markdown_browser
 from minichain.utils.cached_openai import get_embedding
+from minichain.utils.markdown_browser import markdown_browser
 
 
 class KeywordList(BaseModel):
@@ -25,6 +25,7 @@ Source: {source}
 Content: {content}
 """
 
+
 @dataclass
 class VectorSearchScore:
     score: float
@@ -32,8 +33,13 @@ class VectorSearchScore:
 
 
 class TitleScore(BaseModel):
-    title: str = Field(..., description="Title of the document as written in the input text.")
-    score: int = Field(..., description="The score of how relevant this document seems to be. A score of 80 means there is an 80% chance that this document contains the answer to the question.")
+    title: str = Field(
+        ..., description="Title of the document as written in the input text."
+    )
+    score: int = Field(
+        ...,
+        description="The score of how relevant this document seems to be. A score of 80 means there is an 80% chance that this document contains the answer to the question.",
+    )
 
 
 class VectorDB:
@@ -41,7 +47,7 @@ class VectorDB:
         self.values = []
         self.keys = []
         self.embedding_function = embedding_function
-    
+
     def encode(self, texts):
         return np.array([self.embedding_function(text) for text in texts])
 
@@ -51,7 +57,9 @@ class VectorDB:
         num_results = max(num_results // len(query_embeddings), 1)
         for i in range(len(scores)):
             indices = np.argsort(scores[i])[::-1][:num_results]
-            selection += [VectorSearchScore(scores[i][j], self.values[j]) for j in indices]
+            selection += [
+                VectorSearchScore(scores[i][j], self.values[j]) for j in indices
+            ]
         # remove duplicates
         selection = sorted(selection, key=lambda x: x.score, reverse=True)
         deduplicated = []
@@ -77,15 +85,27 @@ class RecallQuery(BaseModel):
 
 
 class RelatedQuestionList(BaseModel):
-    sub_questions: List[str] = Field(..., description="A list of all question that should be answered in order to answer the original question.")
+    sub_questions: List[str] = Field(
+        ...,
+        description="A list of all question that should be answered in order to answer the original question.",
+    )
 
 
 class SemanticParagraphMemory:
-    def __init__(self, use_vector_search=True, use_keywords_search=True, use_content_scan_search=True):
+    def __init__(
+        self,
+        use_vector_search=True,
+        use_keywords_search=True,
+        use_content_scan_search=True,
+    ):
         self.use_vector_search = use_vector_search
         self.use_keywords_search = use_keywords_search
         self.use_content_scan_search = use_content_scan_search
-        self.num_search_methods = int(use_vector_search) + int(use_keywords_search) + int(use_content_scan_search)
+        self.num_search_methods = (
+            int(use_vector_search)
+            + int(use_keywords_search)
+            + int(use_content_scan_search)
+        )
         self.memories: List[MemoryWithMeta] = []
         self.vector_db = VectorDB()
         self.snippet_template = snippet_template
@@ -163,7 +183,7 @@ class SemanticParagraphMemory:
         keywords = keyword_agent.run(available_tags=available_tags)["keywords"]
         print("looking for keywords", keywords)
         return keywords
-    
+
     def generate_questions(self, question: str) -> List[str]:
         # Use gpt to generate questions
         question_agent = Agent(
@@ -197,7 +217,7 @@ class SemanticParagraphMemory:
             if i.id not in [x.id for x in results[n + 1 :]]
         ]
         return results
-    
+
     def answer_from_memory(self, question: str):
         results = self.retrieve(question)
         result = self.rank_or_summarize(results, question)
@@ -236,34 +256,34 @@ class SemanticParagraphMemory:
     def _recall(self, query: RecallQuery):
         results = self.answer_from_memory(query.question)
         return results
-    
+
     def print(self):
         print(self.get_content_summary())
-    
+
     def get_content_summary(self):
         summary = "======= MEMORIES =======\n"
         for i in self.memories:
             summary += i.memory.title + "\n"
             summary += f"    {i.memory.tags}\n"
         return summary
-    
+
     def search_by_content_scan(self, question, num_results) -> List[MemoryWithMeta]:
         content_summary = self.get_content_summary()
         # Use long document qa to generate a list of titles to search for
         titles = text_scan(
             text=content_summary,
             response_openapi=TitleScore,
-            system_message=f"List all titles related to the question: {question}."
+            system_message=f"List all titles related to the question: {question}.",
         )
-        titles = sorted(titles, reverse=True, key=lambda i: i['score'])[:num_results]
-        titles = [i['title'] for i in titles]
+        titles = sorted(titles, reverse=True, key=lambda i: i["score"])[:num_results]
+        titles = [i["title"] for i in titles]
         print("Titles: ", titles)
         selection = []
         # Search for each title
         for title in titles:
             selection.append(self.search_by_title(title))
         return selection
-    
+
     def search_by_title(self, title: str) -> MemoryWithMeta:
         # Remove enumeration if it exists
         title = re.sub(r"^\d+\.\s+", "", title)
@@ -275,14 +295,14 @@ class SemanticParagraphMemory:
         query_embeddings = self.vector_db.encode([title])
         match = self.vector_db.search(query_embeddings, 1)[0]
         return match.value
-    
+
 
 if __name__ == "__main__":
     url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
     memory = SemanticParagraphMemory(
         use_content_scan_search=input("Use content scan search? (y/n) ") == "y",
         use_keywords_search=input("Use keywords search? (y/n) ") == "y",
-        use_vector_search=input("Use vector search? (y/n) ") == "y"
+        use_vector_search=input("Use vector search? (y/n) ") == "y",
     )
     text = markdown_browser(url)
     memory.ingest(text, url)
@@ -292,6 +312,7 @@ if __name__ == "__main__":
             print(memory.answer_from_memory(question))
     except KeyboardInterrupt:
         from pprint import pprint
+
         retrieved = memory.retrieve(question)
         for i in retrieved:
             pprint(i.dict())

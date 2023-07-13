@@ -61,8 +61,5 @@ def get_openai_response(
 @retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
 @debug
 def get_embedding(text):
-    response = openai.Embedding.create(
-        model="text-embedding-ada-002",
-        input=text
-    )
-    return np.array(response['data'][0]['embedding'])
+    response = openai.Embedding.create(model="text-embedding-ada-002", input=text)
+    return np.array(response["data"][0]["embedding"])

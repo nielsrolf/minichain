@@ -1,20 +1,35 @@
 # Minichain
 
-# Done
-- recursive text summarizer
-- long document qa
-- is_prompt_injection
+Agents that understand and return structured data.
 
-# WIP
+## Overview
+- core: Agent, Function
 - memory
-- webgpt
-- replicate_client
+- utils:
+    - disk_cache
+    - cached_openai
+    - docker_sandbox
+    - markdown_browser
+    - search
+    - generate_docs
+    - document_splitter
+- tools:
+    - bash_user
+    - code_interpreter
+    - document_qa
+    - summarize
+    - recursive_summarizer:
+        - long_document_summarizer
+        - long_document_qa
+        - scan_text
+    - is_prompt_injection
+    - text_to_memory
+    - google_search
+- agents
+    - webgpt
+    - programmer
+    - replicate_multimodal
 
-# Todo
-- bash_user
-- python_user
-- textedit
-- tree of thought
 
 
 # Docs
@@ -48,22 +63,3 @@ agent_with_tool = Agent(
 pip install -e .
 ```
 
-## Defining a function
-The best way to define a function is to define a pydantic model that describes the input type for the function. Let's do this with the example of the `GoogleSearch` function:
-```
-class SearchQuery(BaseModel):
-    query: str = Field(..., description="The query to search for.")
-
-
-google_search_function = Function(
-    name="google_search",
-    openapi=SearchQuery,
-    function=lambda search_query: google_search(search_query.query),
-    description="Use google to search the web for a query."
-)
-```
-
-## Defining an agent
-```
-todo
-```
