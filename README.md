@@ -1,11 +1,19 @@
-# Minichain
 
-![logo](logo.png)
+![`{mini: ⛓}`](logo.png)
+<!-- # `{mini: ⛓}` -->
 
-Agents that understand and return structured data.
+`{mini: ⛓}` is yet another langchain alternative: agents that understand and return structured data.
 
+**Why?**
+- structured output should be the default. Always converting to text is often a bottleneck
+- langchain has too many classes and is generally too big.
+- it's fun to build from scratch
 
-# Docs
+**Core concepts**
+The two core concepts are agents and functions that the agent can use. In order to respond, an an agent can use as many function calls as it needs until it uses the built-in return function that returns structured output.
+Chat models are agents without structured output and end their turn by responding without a message that is not a function call. They return a string.
+
+# Getting started
 
 ## Defining an agent
 ```python
@@ -63,7 +71,7 @@ pip install -e .
 ```
 
 
-
+---
 ## Roadmap
 ### Basics
 - [x] `Agent` that uses tools and returns structured outputs 
@@ -130,3 +138,7 @@ pip install -e .
     - task board
     - return: {all good / message to refocus}
 - [ ] output of the planner appears as a function message in the chat
+
+
+---
+`{mini: ⛓}`
