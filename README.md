@@ -1,11 +1,8 @@
 # Minichain
 
+![logo](logo.png)
+
 Agents that understand and return structured data.
-
-
-
-
-
 
 
 # Docs
