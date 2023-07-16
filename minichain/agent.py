@@ -103,6 +103,7 @@ class Agent:
         keep_first_messages=1,
         keep_last_messages=20,
         silent=False,
+        keep_session=False,
     ):
         functions = functions.copy()
         self.response_openapi = response_openapi
@@ -118,6 +119,7 @@ class Agent:
         self.prompt_template = prompt_template
         self.keep_first_messages = keep_first_messages
         self.keep_last_messages = keep_last_messages
+        self.keep_session = keep_session
 
         def do_nothing(*args, **kwargs):
             pass
@@ -144,14 +146,14 @@ class Agent:
         except:
             pass
         print("-" * 120)
-        if input("Press enter to continue, or b to breakpoint") == "b":
-            breakpoint()
+        # if input("Press enter to continue, or b to breakpoint") == "b":
+        #     breakpoint()
 
     def history_append(self, message):
         message.parent = self.history[-1]
         self.history.append(message)
 
-    def run(self, **arguments):
+    def run(self, keep_session=False, **arguments):
         """arguments: dict with values mentioned in the prompt template"""
         agent_session = Agent(
             self.functions,
@@ -164,9 +166,10 @@ class Agent:
             on_assistant_message=self.on_assistant_message,
             keep_first_messages=self.keep_first_messages,
             keep_last_messages=self.keep_last_messages,
+            keep_session=keep_session,
         )
         agent_session.task_to_history(arguments)
-        return agent_session.run_until_done()
+        return agent_session.run_until_done()        
 
     def run_until_done(self):
         while True:
@@ -184,6 +187,8 @@ class Agent:
                 if function_call.name == "return":
                     if output is False:
                         breakpoint()
+                    if self.keep_session:
+                        output.session = self
                     return output
 
     def task_to_history(self, arguments):

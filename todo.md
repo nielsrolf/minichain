@@ -1,6 +1,14 @@
 # todo
+- save / load memory
+- webgpt alternative:
+    - scan_document with qa or read_link option, return as soon as website seems irrelevant or question is answered
+- separate document_qa from document_filter
 
-- add max_num_memories to text_to_memory
+- use memory only for docs that should always be available and learned once initially
+    - docs_agent.init("Learn the python docs about elementary.audio")
+        - spend more time on preparation by eg
+            - scan infos and build a default context information for the qa's 
+    - docs_agent.run("how can i do xyz?")
 
 
 

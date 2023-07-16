@@ -102,8 +102,14 @@ pip install -e .
 ### WebGPT
 - [x] markdown browser
 - [x] google search
+- [ ] document_qa_scan
+
+### DocsGPT
 - [x] Memory
-- [ ] links tool
+- [ ] init:
+    - [x] generate subquestions -> 
+    - [x] current webgpt
+    - [ ] document_qa_scan: build a general context
 
 ### Programmer
 - [ ] bash:

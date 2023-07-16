@@ -22,6 +22,12 @@ class AnswerWithCitations(BaseModel):
     content: str = Field(..., description="The answer to the question.")
     citations: List[Citation] = Field(..., description="A list of citations.")
 
+    def __str__(self):
+        repr = self.content
+        if self.citations:
+            repr += "\nSources: "
+            repr += "\n".join(f"[{i.id}] {i.source}" for i in self.citations)
+        return repr
 
 def qa(text, question, instructions=[]):
     """

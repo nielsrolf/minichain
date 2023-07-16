@@ -20,4 +20,7 @@ webgpt = Agent(
 if __name__ == "__main__":
     response = webgpt.run(query="In elementary.audio, how can I play an audio file from s3 using the virtual file system?")
     print(response)
-    breakpoint()
+    while query := input("query: "):
+        response = webgpt.run(query=query)
+        print(response.content)
+        print(response.citations)

@@ -2,6 +2,9 @@ import math
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
+import pickle
+import json
+import os
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -99,7 +102,7 @@ class SemanticParagraphMemory:
     def __init__(
         self,
         use_vector_search=True,
-        use_keywords_search=True,
+        use_keywords_search=False,
         use_content_scan_search=True,
     ):
         self.use_vector_search = use_vector_search
@@ -205,7 +208,7 @@ class SemanticParagraphMemory:
             questions = [question] + questions
         return questions
 
-    def retrieve(self, question: str, num_results=4) -> List[MemoryWithMeta]:
+    def retrieve(self, question: str, num_results=8) -> List[MemoryWithMeta]:
         results = []
         num_results_per_search = math.ceil(num_results / self.num_search_methods)
         if self.use_keywords_search:
@@ -272,7 +275,8 @@ class SemanticParagraphMemory:
         if question is not None:
             current_answer = self.answer_from_memory(question)
             content_summary += f"A current answer to the question '{question}', based on the memories you have is: \n"
-            content_summary += f"{current_answer}"
+            content_summary += f"{current_answer}\n\n"
+            content_summary += "If this is a satisfactory answer, you can stop and respond to the user. If not, continue browsing."
         
         return content_summary
 
@@ -328,13 +332,33 @@ class SemanticParagraphMemory:
         # Remove enumeration if it exists
         title = re.sub(r"^\d+\.\s+", "", title)
         # Check for exact title match
-        found = False
         for memory in self.memories:
             if memory.memory.title.lower() == title.lower():
                 return memory
         query_embeddings = self.vector_db.encode([title])
         match = self.vector_db.search(query_embeddings, 1)[0]
         return match.value
+    
+    def save(self, memory_dir):
+        os.makedirs(memory_dir, exist_ok=True)
+        # save the vector db
+        with open(os.path.join(memory_dir, "vector_db_keys.pkl"), "wb") as f:
+            pickle.dump(self.vector_db.keys, f)
+        with open(os.path.join(memory_dir, "vector_db_values.pkl"), "wb") as f:
+            pickle.dump(self.vector_db.values, f)
+        # save the memories as json
+        with open(os.path.join(memory_dir, "memories.json"), "w") as f:
+            json.dump([i.dict() for i in self.memories], f)
+    
+    def load(self, memory_dir):
+        # load the vector db
+        with open(os.path.join(memory_dir, "vector_db_keys.pkl"), "rb") as f:
+            self.vector_db.keys = pickle.load(f)
+        with open(os.path.join(memory_dir, "vector_db_values.pkl"), "rb") as f:
+            self.vector_db.values = pickle.load(f)
+        with open(os.path.join(memory_dir, "memories.json"), "r") as f:
+            memories = json.load(f)
+        self.memories = [MemoryWithMeta(**i) for i in memories]
 
 
 if __name__ == "__main__":
@@ -357,3 +381,5 @@ if __name__ == "__main__":
         for i in retrieved:
             pprint(i.dict())
         breakpoint()
+
+        
