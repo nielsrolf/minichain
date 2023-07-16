@@ -103,7 +103,7 @@ pip install -e .
 - [x] markdown browser
 - [x] google search
 - [x] Memory
-- [ ] read_later tool
+- [ ] links tool
 
 ### Programmer
 - [ ] bash:

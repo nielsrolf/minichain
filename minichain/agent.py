@@ -1,6 +1,8 @@
 import json
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Union
+from pprint import pprint
+
 
 from pydantic import BaseModel, Field
 
@@ -84,6 +86,7 @@ def make_return_function(openapi_json: BaseModel):
     return function_obj
 
 
+
 class Agent:
     def __init__(
         self,
@@ -99,6 +102,7 @@ class Agent:
         assistant_stream=None,
         keep_first_messages=1,
         keep_last_messages=20,
+        silent=False,
     ):
         functions = functions.copy()
         self.response_openapi = response_openapi
@@ -118,15 +122,30 @@ class Agent:
         def do_nothing(*args, **kwargs):
             pass
 
-        self.on_user_message = on_user_message or do_nothing
-        self.on_function_message = on_function_message or do_nothing
-        self.on_assistant_message = on_assistant_message or do_nothing
+        default_message_action = self.print_message if not silent else do_nothing
+        self.on_user_message = on_user_message or default_message_action
+        self.on_function_message = on_function_message or default_message_action
+        self.on_assistant_message = on_assistant_message or default_message_action
+
         self.function_stream = function_stream or do_nothing
         self.assistant_stream = assistant_stream or do_nothing
 
         self.functions_openai = [i.openapi_json for i in self.functions]
         for function in self.functions:
             function._register_stream(self.function_stream)
+    
+    def print_message(self, message):
+        print("-" * 120)
+        print(f"Message to Agent({self.system_message.content})")
+        print(message.role)
+        print(message.content)
+        try:
+            pprint(message.function_call)
+        except:
+            pass
+        print("-" * 120)
+        if input("Press enter to continue, or b to breakpoint") == "b":
+            breakpoint()
 
     def history_append(self, message):
         message.parent = self.history[-1]
@@ -210,6 +229,7 @@ class Agent:
                 )
             )
         except Exception as e:
+            breakpoint()
             self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
         self.on_function_message(self.history[-1])
         print(self.history[-1].content)

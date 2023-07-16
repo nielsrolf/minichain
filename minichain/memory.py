@@ -78,6 +78,10 @@ class VectorDB:
 
 class IngestQuery(BaseModel):
     url: str = Field(..., description="The url of the website to read and tag.")
+    question: Optional[str] = Field(
+        None,
+        description="The question you are trying to answer."
+    )
 
 
 class RecallQuery(BaseModel):
@@ -132,7 +136,7 @@ class SemanticParagraphMemory:
             for question in memory.memory.relevant_questions:
                 self.vector_db.add(question, memory)
         self.memories += memories
-        return self.get_available_tags(memories)
+        return memories
 
     def search_by_vector(self, question, num_results) -> List[MemoryWithMeta]:
         query_questions = self.generate_questions(question)
@@ -232,7 +236,7 @@ class SemanticParagraphMemory:
             return self.summarize(results, question)
 
     def summarize(self, results, question) -> str:
-        snippets = [self.format_as_snippet(memory) for memory in results]
+        snippets = [self.format_as_snippet(memory) for memory in results if memory.memory.type == "content"]
         document = "\n\n".join(snippets)
         print("-" * 80)
         print("-" * 80)
@@ -248,10 +252,29 @@ class SemanticParagraphMemory:
             content=memory.meta.content,
         )
 
-    def _read_website(self, query: IngestQuery):
-        text = markdown_browser(query.url)
-        available_tags = self.ingest(text, query.url)
-        return f"You now have new memories with the following tags: {available_tags}"
+    def _read_website(self, url: str, question: str = None):
+        text = markdown_browser(url)
+        new_memories = self.ingest(text, url)
+        queue = []
+        for memory in new_memories:
+            queue += memory.memory.links
+
+        content_summary = ""
+
+        if len(new_memories) > 0:
+            content_summary += f"New memories were created from the website {url}:\n"
+            content_summary += self.get_content_summary(new_memories)
+        
+        if len(queue) > 0:
+            content_summary += f"You encountered the following links that you can read next if needed:\n"
+            content_summary += self.get_queue_summary(queue)
+
+        if question is not None:
+            current_answer = self.answer_from_memory(question)
+            content_summary += f"A current answer to the question '{question}', based on the memories you have is: \n"
+            content_summary += f"{current_answer}"
+        
+        return content_summary
 
     def _recall(self, query: RecallQuery):
         results = self.answer_from_memory(query.question)
@@ -260,11 +283,28 @@ class SemanticParagraphMemory:
     def print(self):
         print(self.get_content_summary())
 
-    def get_content_summary(self):
-        summary = "======= MEMORIES =======\n"
-        for i in self.memories:
-            summary += i.memory.title + "\n"
-            summary += f"    {i.memory.tags}\n"
+    def get_content_summary(self, memories=None):
+        memories = memories or self.memories
+        summary = "======= MEMORY CONTENT =======\n"
+        # group by source
+        memories_by_source = {}
+        for memory in memories:
+            memories_by_source[memory.meta.source] = memories_by_source.get(
+                memory.meta.source, []
+            ) + [memory]
+        for source, memories in memories_by_source.items():
+            summary += f"# Memories from: {source} \n"
+            for i in memories:
+                summary += i.memory.title + "\n"
+                summary += f"    {i.memory.tags}\n"
+        return summary
+    
+    def get_queue_summary(self, queue):
+        queue = sorted(queue, reverse=True, key=lambda i: i.priority)
+        summary = "======= ENCOUNTERED LINKS =======\n"
+        for item in queue:
+            question_list = '\n  '.join(item.expected_answers)
+            summary += f"{item.url}: {question_list}  \n"
         return summary
 
     def search_by_content_scan(self, question, num_results) -> List[MemoryWithMeta]:
