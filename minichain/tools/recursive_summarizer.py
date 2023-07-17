@@ -70,12 +70,14 @@ def recursive_summarizer(text, question=None, max_words=500, instructions=[]):
     )
 
 
-def text_scan(text, response_openapi, system_message):
+def text_scan(text, response_openapi, system_message, on_add_output=None):
     """
     Splits the text into paragraphs and asks the document_to_json agent for outouts."""
     outputs = []
 
     def add_output(**output):
+        if on_add_output is not None:
+            on_add_output(output)
         print("adding output:", output)
         if output in outputs:
             return "Error: already added."

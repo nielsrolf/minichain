@@ -97,14 +97,13 @@ pip install -e .
     - [x] content_scan search:
         - Show a summary (titles, tags) of all memories. Use `scan_text` to select relevant memory titles
     - [x] tools to save and recall memories
-    - [ ] adjust `Agent` to automatically retrieve relevant memories
 
 ### WebGPT
 - [x] markdown browser
 - [x] google search
-- [ ] document_qa_scan
+- [x] document_qa_scan
 
-### DocsGPT
+### Expert
 - [x] Memory
 - [ ] init:
     - [x] generate subquestions -> 

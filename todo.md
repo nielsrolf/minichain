@@ -1,16 +1,5 @@
 # todo
-- save / load memory
-- webgpt alternative:
-    - scan_document with qa or read_link option, return as soon as website seems irrelevant or question is answered
-- separate document_qa from document_filter
-
-- use memory only for docs that should always be available and learned once initially
-    - docs_agent.init("Learn the python docs about elementary.audio")
-        - spend more time on preparation by eg
-            - scan infos and build a default context information for the qa's 
-    - docs_agent.run("how can i do xyz?")
-
-
+- perplexity api tool as webgpt alternative
 
 Random:
 - Function: use openai decorators
