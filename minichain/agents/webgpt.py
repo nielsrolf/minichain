@@ -27,6 +27,9 @@ class RelevantSectionOrClick(BaseModel):
     click: Optional[str]
 
 
+class Query(BaseModel):
+    query: str = Field(..., description="The query to search for.")
+
 
 class WebGPT(Agent):
     def __init__(self):
@@ -50,6 +53,11 @@ class WebGPT(Agent):
                 if output['relevant_section'] is not None
             ]
             clicks = [output['click'] for output in outputs if output['click'] is not None]
+            if not url.startswith("http"):
+                url = "https://" + url
+            domain = "/".join(url.split("/")[:3]) # e.g. https://www.google.com
+            clicks = [f"{domain}/{click}" for click in clicks if not click.startswith("http")]
+            print("clicks:", clicks)
             return {
                 "relevant_sections": sections,
                 "read_next": clicks,
@@ -64,7 +72,22 @@ class WebGPT(Agent):
         super().__init__(
             functions=[google_search_function, scan_website_function],
             system_message=SystemMessage(
-                "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
+                "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information to answer the question or fulfill the user request, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
+            ),
+            prompt_template="{query}".format,
+            response_openapi=AnswerWithCitations,
+        )
+
+
+class SmartWebGPT(Agent):
+    def __init__(self):
+        super().__init__(
+            functions=[WebGPT().as_function("research", "Research the web in order to answer a question.", Query)],
+            system_message=SystemMessage(
+                "You are SmartGPT. You get questions or requests by the user ans answer them in the following way: \n" +
+                "1. If the question or request is simple, answer it directly. \n" +
+                "2. If the question or request is complex, use the 'research' function available to you \n" +
+                "3. If the initial research was insufficient, use the 'research' function with new questions, until you are able to answer the question."
             ),
             prompt_template="{query}".format,
             response_openapi=AnswerWithCitations,
@@ -72,12 +95,14 @@ class WebGPT(Agent):
 
 
 if __name__ == "__main__":
-    webgpt = WebGPT()
+    # webgpt = WebGPT()
+    webgpt = SmartWebGPT()
     # response = webgpt.run(query="In elementary.audio, how can I play an audio file from s3 using the virtual file system?")
     # print(response['content'])
     # print(response['citations'])
+    # Using elementary.audio, can you implement a new React component called SyncedAudioStemPlayer that plays a list of stems in a synced loop? The stems are specified by a public URL and need to be loaded into the virtual file system first
 
     while query := input("query: "):
         response = webgpt.run(query=query)
-        print(response['conent'])
+        print(response['content'])
         print(response['citations'])

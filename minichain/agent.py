@@ -244,6 +244,17 @@ class Agent:
         self.history_append(user_message)
         self.on_user_message(self.history[-1])
         return self.run_until_done()
+    
+    def as_function(self, name, description, prompt_openapi):
+        def function(**arguments):
+            return self.run(**arguments)
+        function_tool = Function(
+            prompt_openapi,
+            name,
+            function,
+            description,
+        )
+        return function_tool
 
 
 class Function:
@@ -289,6 +300,7 @@ class Function:
             "description": self.description,
             "parameters": self.parameters_openapi,
         }
+    
 
 
 class Done(BaseModel):
