@@ -14,8 +14,7 @@ class BashQuery(BaseModel):
 
 class BashSession(Function):
     def __init__(self, stream=lambda i: i, image_name="nielsrolf/minichain:latest"):
-        self.name = "bash"
-        self.description = "Run bash commands"
+        super().__init__(name="bash", openapi=BashQuery, function=self, description="Run bash commands.")
         self.session = uuid.uuid4().hex
         self.image_name = image_name
         self.stream = stream

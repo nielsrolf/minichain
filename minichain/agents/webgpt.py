@@ -32,7 +32,7 @@ class Query(BaseModel):
 
 
 class WebGPT(Agent):
-    def __init__(self):
+    def __init__(self, silent=False, **kwargs):
         def scan_website(url, question):
             website = markdown_browser(url)
             lines = website.split("\n")
@@ -76,13 +76,15 @@ class WebGPT(Agent):
             ),
             prompt_template="{query}".format,
             response_openapi=AnswerWithCitations,
+            silent=silent,
+            **kwargs,
         )
 
 
 class SmartWebGPT(Agent):
-    def __init__(self):
+    def __init__(self, silent=False, **kwargs):
         super().__init__(
-            functions=[WebGPT().as_function("research", "Research the web in order to answer a question.", Query)],
+            functions=[WebGPT(silent=silent).as_function("research", "Research the web in order to answer a question.", Query)],
             system_message=SystemMessage(
                 "You are SmartGPT. You get questions or requests by the user ans answer them in the following way: \n" +
                 "1. If the question or request is simple, answer it directly. \n" +
@@ -91,18 +93,22 @@ class SmartWebGPT(Agent):
             ),
             prompt_template="{query}".format,
             response_openapi=AnswerWithCitations,
+            silent=silent,
+            **kwargs,
         )
 
 
 if __name__ == "__main__":
     # webgpt = WebGPT()
-    webgpt = SmartWebGPT()
-    # response = webgpt.run(query="In elementary.audio, how can I play an audio file from s3 using the virtual file system?")
-    # print(response['content'])
-    # print(response['citations'])
+    webgpt = SmartWebGPT(silent=True)
+    
     # Using elementary.audio, can you implement a new React component called SyncedAudioStemPlayer that plays a list of stems in a synced loop? The stems are specified by a public URL and need to be loaded into the virtual file system first
+    # Can you show me how to use this component in an example?
 
-    while query := input("query: "):
-        response = webgpt.run(query=query)
-        print(response['content'])
-        print(response['citations'])
+    while query := input("# User: \n"):
+        response = webgpt.run(query=query, keep_session=True)
+        print("# WebGPT:\n", response['content'])
+        if len(response['citations']) > 0:
+            print("Sources:", response['citations'])
+        webgpt = response['session']
+        print("")

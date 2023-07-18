@@ -119,6 +119,7 @@ class Agent:
         self.prompt_template = prompt_template
         self.keep_first_messages = keep_first_messages
         self.keep_last_messages = keep_last_messages
+        self.silent = silent
         self.keep_session = keep_session
 
         def do_nothing(*args, **kwargs):
@@ -166,6 +167,7 @@ class Agent:
             on_assistant_message=self.on_assistant_message,
             keep_first_messages=self.keep_first_messages,
             keep_last_messages=self.keep_last_messages,
+            silent=self.silent,
             keep_session=keep_session,
         )
         agent_session.task_to_history(arguments)
@@ -181,15 +183,24 @@ class Agent:
                 and assistant_message.content is not None
             ):
                 return assistant_message.content
+            elif self.has_structured_response and assistant_message.function_call is None:
+                # We simulate a return function call that will probably fail and hint GPT to correct it
+                assistant_message.function_call = FunctionCall(
+                    name="return", arguments=json.dumps({
+                        "content": assistant_message.content
+                    })
+                )
             function_call = assistant_message.function_call
             if function_call is not None:
                 output = self.execute_action(function_call)
-                if function_call.name == "return":
+                if function_call.name == "return" and output is not False:
                     if output is False:
                         breakpoint()
                     if self.keep_session:
-                        output.session = self
+                        output['session'] = self
+                        self.init_history = self.history
                     return output
+
 
     def task_to_history(self, arguments):
         self.history_append(UserMessage(self.prompt_template(**arguments)))
@@ -234,8 +245,13 @@ class Agent:
                 )
             )
         except Exception as e:
-            breakpoint()
-            self.history_append(FunctionMessage(f"{type(e)}: {e}", function.name))
+            try:
+                msg = f"{type(e)}: {e} - {e.msg}"
+            except AttributeError:
+                msg = f"{type(e)}: {e}"
+            if not self.silent:
+                breakpoint()
+            self.history_append(FunctionMessage(msg, function.name))
         self.on_function_message(self.history[-1])
         print(self.history[-1].content)
         return False
