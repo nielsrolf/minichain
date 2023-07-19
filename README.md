@@ -1,6 +1,5 @@
-
-![`{mini: ⛓}`](logo.png)
-<!-- # `{mini: ⛓}` -->
+<!-- # minichain -->
+![`minichain`](logo.png)
 
 `{mini: ⛓}` is a minimal langchain alternative for agents with structured data, and many tools for them. You only need one class: `Agent` - for chat, chat with tool usage, or acting as a function.
 

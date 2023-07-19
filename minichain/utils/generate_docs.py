@@ -141,7 +141,7 @@ def get_symbols(file):
                     methods = []
                 else:
                     methods = parse_functions(
-                        methods_code, file, id_prefix=f"{class_name}."
+                        methods_code, file, id_prefix=f"{class_name.split(':')[0]}."
                     )
                 for m in methods:
                     m["start"] += code_start_line
@@ -159,7 +159,7 @@ def get_symbols(file):
                     "fields": fields,
                     "start": class_start_line,
                     "end": end_line - 1,
-                    "id": f"{class_name}",
+                    "id": f"{class_name.split(':')[0]}",
                 }
             )
         else:

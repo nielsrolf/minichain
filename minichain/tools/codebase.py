@@ -9,14 +9,47 @@ from minichain.utils.generate_docs import get_symbols, summarize_python_file
 
 
 class RelevantSection(BaseModel):
-    start_line: int = Field(
+    start: int = Field(
         ...,
         description="The start line of this section (line numbers are provided in the beginning of each line).",
     )
-    end_line: int = Field(..., description="The end line of this section.")
+    end: int = Field(..., description="The end line of this section.")
 
 
-def get_inital_summary(
+def get_initial_summary(
+    root_dir=".",
+    extensions=[".py", ".js", ".ts", "README.md"],
+    ignore_files=[
+        ".git/",
+        ".vscode/",
+        "__pycache__/",
+        "node_modules/",
+        "dist/",
+        "build/",
+        "venv/",
+        "env/",
+    ],
+):
+    available_files = []
+    root_dir = root_dir or root_dir
+    for root, dirs, filenames in os.walk(root_dir):
+        for _filename in filenames:
+            filename = os.path.join(root, _filename)
+            for extension in extensions:
+                if not any(
+                    [ignore_file in filename for ignore_file in ignore_files]
+                ) and filename.endswith(extension):
+                    available_files.append(filename)
+    try:
+        with open("README.md") as f:
+            summary = "README:\n" + "\n".join(f.readlines()[:5]) + "...\n"
+    except:
+        summary = ""
+    summary += "Files:\n" + "\n".join(available_files)
+    return summary
+    
+
+def get_long_summary(
     root_dir=".",
     extensions=[".py", ".js", ".ts", "README.md"],
     ignore_files=[
@@ -49,7 +82,7 @@ def get_inital_summary(
         #     "The following is a summary a project's codebase. Your task is to find all sections that seem important to know for a programmer tasked to implement new features or answer questions about the project. The programmer can read specific section in detail, so this summary should mainly give an overview about where to find what. When you are done, call the return function - without an additional summary.",
         # )
         # summary = "\n".join(
-        #     "\n".join(summary.split("\n")[section["start_line"] : section["end_line"]])
+        #     "\n".join(summary.split("\n")[section["start"] : section["end"]])
         #     for section in sections
         # )
         summary = long_document_qa(
@@ -85,12 +118,16 @@ def view(
         True, description="Whether to include line numbers in the output."
     ),
 ):
+    """View a section of a file, specified by line range."""
+    if start < 0:
+        start = 0
     with open(path, "r") as f:
         lines = f.readlines()
         # add line numbers
         if with_line_numbers:
             lines = [f"{i+1} {line}" for i, line in enumerate(lines)]
-        return "\n".join(lines[start:end])
+        response = f"{path} {start}-{end}:\n" + "".join(lines[start:end])
+    return response
 
 
 @tool()
@@ -100,6 +137,7 @@ def edit(
     end: int = Field(..., description="The end line."),
     code: str = Field(..., description="The code to replace the lines with."),
 ):
+    """Edit a section of a file, specified by line range."""
     code = remove_line_numbers(code)
     with open(path, "r") as f:
         lines = f.readlines()
@@ -107,7 +145,7 @@ def edit(
     with open(path, "w") as f:
         f.write("\n".join(lines))
     updated_in_context = view(
-        path, start - 4, start + len(code.split("\n")) + 4, with_line_numbers=True
+        path=path, start=start - 4, end=start + len(code.split("\n")) + 4, with_line_numbers=True
     )
     return truncate_updated(updated_in_context)
 
@@ -133,26 +171,28 @@ def remove_line_numbers(code):
 @tool()
 def replace_symbol(
     path: str = Field(..., description="The path to the file."),
-    symbol_id: str = Field(
+    symbol: str = Field(
         ...,
         description="Either {function_name}, {class_name} or {class_name}.{method_name}",
     ),
     code: str = Field(..., description="The new code to replace the symbol with."),
     is_new: bool = Field(False, description="Whether a new symbol should be created."),
 ):
+    """Replace a symbol (function/class/method) in a file."""
+    symbol_id = symbol
     code = remove_line_numbers(code)
     all_symbols = get_symbols(path)
     for symbol in all_symbols:
         if symbol["id"] == symbol_id:
             with open(symbol["path"], "r") as f:
                 lines = f.readlines()
-                lines[symbol["start_line"] : symbol["end_line"]] = code.split("\n")
+                lines[symbol["start"] : symbol["end"]] = code.split("\n")
             with open(symbol["path"], "w") as f:
                 f.write("\n".join(lines))
             updated_in_context = view(
-                symbol["path"],
-                symbol["start_line"] - 4,
-                symbol["start_line"] + len(code.split("\n")) + 4,
+                path=symbol["path"],
+                start=symbol["start"] - 4,
+                end=symbol["start"] + len(code.split("\n")) + 4,
                 with_line_numbers=True,
             )
             return truncate_updated(updated_in_context)
@@ -163,36 +203,53 @@ def replace_symbol(
             class_name, method_name = symbol_id.split(".")
             for symbol in all_symbols:
                 if symbol["id"] == class_name:
-                    start_line = symbol["end_line"]
+                    start = symbol["end"]
                     break
         else:
             with open(symbol["path"], "r") as f:
                 lines = f.readlines()
-            start_line = len(lines)
-        end_line = start_line + len(code.split("\n"))
-        return edit(symbol["path"], start_line, end_line, code)
+            start = len(lines)
+        end = start + len(code.split("\n"))
+        return edit(path=symbol["path"], start=start, end=end, code=code)
     return "Symbol not found. Did you mean to create a new symbol?"
 
 
 @tool()
 def show_symbol(
     path: str = Field(..., description="The path to the file."),
-    symbol_id: str = Field(
+    symbol: str = Field(
         ...,
         description="Either {function_name}, {class_name} or {class_name}.{method_name}",
     ),
 ):
+    """Show the full implementation of a symbol (function/class/method) in a file."""
+    symbol_id = symbol
     all_symbols = get_symbols(path)
     for symbol in all_symbols:
-        if symbol.id == symbol_id:
+        all_symbols += symbol.get("methods", [])
+    for symbol in all_symbols:
+        if symbol["id"] == symbol_id:
             return view(
-                symbol.path,
-                symbol.start_line,
-                symbol.end_line,
+                path=symbol["path"],
+                start=symbol["start"],
+                end=symbol["end"],
                 with_line_numbers=True,
             )
 
+    for symbol in all_symbols:
+        if symbol['id'] == symbol_id:
+            return view(
+                path=symbol['path'],
+                start=symbol['start'],
+                end=symbol['end'],
+                with_line_numbers=True,
+            )
+    return "Symbol not found. Available symbols:\n" + "\n".join([symbol['id'] for symbol in all_symbols])
+
 
 if __name__ == "__main__":
-    print(get_inital_summary())
-    breakpoint()
+    print(get_initial_summary())
+    # out = replace_symbol(path="./minichain/tools/bla.py", symbol="foo", code="test\n", is_new=False)
+    print(show_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
+    print(show_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
+    print(show_symbol(path="./minichain/agent.py", symbol="doesntexist"))

@@ -331,7 +331,7 @@ class Function:
         }
 
 
-def tool(*args, **kwargs):
+def tool(name=None, description=None):
     """A decorator for tools.
     Example:
 
@@ -352,8 +352,8 @@ def tool(*args, **kwargs):
 
         pydantic_model = create_model(f.__name__, **fields)
         function = Function(
-            name=f.__name__ or kwargs.get("name"),
-            description=f.__doc__ or kwargs.get("description"),
+            name=name or f.__name__,
+            description= description or f.__doc__,
             openapi=pydantic_model,
             function=f,
         )
