@@ -104,27 +104,25 @@ pip install -e .
 ### Programmer
 - [x] bash
 - [x] python
-- [ ] Codebase
+- [x] Codebase
     - [x] util: generate_docs
     - tools
-        - [ ] view file
-        - [ ] edit file
-        - [ ] get_package_summary
+        - [x] view file
+        - [x] edit file
+        - [x] get_package_summary
             - generate_docs + summarize(file)
-        - [ ] lookup symbol (--show_full_code: False)
-        - [ ] update symbol: replaces the code
-        - [ ] code qa
-            - use SemanticParagraphMemory
-            - init it with symbol memories
+        - [x] lookup symbol (--show_full_code: False)
+        - [x] update symbol: replaces the code
+
+### UI
+- [ ] webui for local deployment
+- [ ] VSCode integration
 
 ### Multimodal replicate
 - [ ] replicate search tool
 - [ ] replicate import tool
 - [ ] replicate run tool
 
-### UI
-- [ ] webui for local deployment
-- [ ] VSCode integration
 
 ### Planning module
 - [ ] Agent: planner is called every n steps / seconds

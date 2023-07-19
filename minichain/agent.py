@@ -3,6 +3,7 @@ import json
 from dataclasses import asdict, dataclass
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Union
+import uuid
 
 from pydantic import BaseModel, Field, create_model
 
@@ -14,9 +15,19 @@ from minichain.utils.debug import debug
 class SystemMessage:
     content: str
     role: str = "system"
+    parent: str = None
+
+    # short uuid as default
+    id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4().hex[:5])
 
     def dict(self):
-        return asdict(self)
+        json = asdict(self)
+        json["parent"] = self.parent.id if self.parent else None
+        return json
 
     def __str__(self):
         return f"{self.role}: {self.content}"
@@ -29,9 +40,17 @@ class UserMessage:
     parent: Union[
         "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
     ] = None
+    # short uuid as default
+    id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4().hex[:5])
 
     def dict(self):
-        return asdict(self)
+        json = asdict(self)
+        json["parent"] = self.parent.id if self.parent else None
+        return json
 
     def __str__(self):
         return f"{self.role}: {self.content}"
@@ -54,9 +73,17 @@ class AssistantMessage:
     parent: Union[
         "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
     ] = None
+    # short uuid as default
+    id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4().hex[:5])
 
     def dict(self):
-        return asdict(self)
+        json = asdict(self)
+        json["parent"] = self.parent.id if self.parent else None
+        return json
 
     def __str__(self):
         return f"{self.role}: {self.content} {self.function_call}"
@@ -94,11 +121,10 @@ class Agent:
         prompt_template="{task}".format,
         response_openapi=None,
         init_history=None,
-        on_user_message=None,
-        on_function_message=None,
-        on_assistant_message=None,
-        function_stream=None,
-        assistant_stream=None,
+        on_message_send=None,
+        on_stream_starts=None,
+        on_stream_ends=None,
+        on_stream_message=None,
         keep_first_messages=1,
         keep_last_messages=20,
         silent=False,
@@ -125,16 +151,12 @@ class Agent:
             pass
 
         default_message_action = self.print_message if not silent else do_nothing
-        self.on_user_message = on_user_message or default_message_action
-        self.on_function_message = on_function_message or default_message_action
-        self.on_assistant_message = on_assistant_message or default_message_action
-
-        self.function_stream = function_stream or do_nothing
-        self.assistant_stream = assistant_stream or do_nothing
+        self.on_message_send = on_message_send or default_message_action
+        self.on_stream_starts = on_stream_starts or do_nothing
+        self.on_stream_ends = on_stream_ends or do_nothing
+        self.on_stream_message = on_stream_message or do_nothing
 
         self.functions_openai = [i.openapi_json for i in self.functions]
-        for function in self.functions:
-            function._register_stream(self.function_stream)
 
     def print_message(self, message):
         print("-" * 120)
@@ -161,9 +183,10 @@ class Agent:
             self.prompt_template,
             self.response_openapi,
             self.init_history,
-            on_user_message=self.on_user_message,
-            on_function_message=self.on_function_message,
-            on_assistant_message=self.on_assistant_message,
+            self.on_message_send,
+            self.on_stream_starts,
+            self.on_stream_ends,
+            self.on_stream_message,
             keep_first_messages=self.keep_first_messages,
             keep_last_messages=self.keep_last_messages,
             silent=self.silent,
@@ -176,7 +199,7 @@ class Agent:
         while True:
             assistant_message = self.get_next_action()
             self.history_append(assistant_message)
-            self.on_assistant_message(self.history[-1])
+            self.on_message_send(self.history[-1])
             # Check if we are done and should return content
             if (
                 not self.has_structured_response
@@ -208,7 +231,7 @@ class Agent:
 
     def task_to_history(self, arguments):
         self.history_append(UserMessage(self.prompt_template(**arguments)))
-        self.on_user_message(self.history[-1])
+        self.on_message_send(self.history[-1])
 
     def get_next_action(self):
         # do the openai call
@@ -249,7 +272,7 @@ class Agent:
                         function_output_str, function.name
                     )
                     self.history_append(function_message)
-                    self.on_function_message(self.history[-1])
+                    self.on_message_send(self.history[-1])
                     return function_output
             self.history_append(
                 FunctionMessage(
@@ -264,13 +287,13 @@ class Agent:
             if not self.silent:
                 breakpoint()
             self.history_append(FunctionMessage(msg, function.name))
-        self.on_function_message(self.history[-1])
+        self.on_message_send(self.history[-1])
         print(self.history[-1].content)
         return False
 
     def follow_up(self, user_message):
         self.history_append(user_message)
-        self.on_user_message(self.history[-1])
+        self.on_message_send(self.history[-1])
         return self.run_until_done()
 
     def as_function(self, name, description, prompt_openapi):

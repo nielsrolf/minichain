@@ -26,9 +26,11 @@ def get_openai_response(
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     messages = []
     for i in chat_history:
+        print(i)
         message = i.dict()
         # delete the parent field
         message.pop("parent", None)
+        message.pop("id", None)
         # delete all fields that are None
         message = {k: v for k, v in message.items() if v is not None or k == "content"}
         messages.append(message)

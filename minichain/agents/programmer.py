@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from minichain.agent import Agent, SystemMessage, UserMessage
 
 from minichain.tools import codebase
-from minichain.agents.webgpt import Query, WebGPT, scan_website_function
+from minichain.agents.webgpt import Query, WebGPT, scan_website
 from minichain.memory import SemanticParagraphMemory
 
 # from minichain.tools.code_interpreter import code_interpreter
@@ -17,9 +17,9 @@ class ProgrammerResponse(BaseModel):
     final_response: str = Field(..., description="The final response to the user.")
 
 
-class Brogrammer(Agent):
-    def __init__(self, silent=False, function_stream=lambda i: print(i), **kwargs):
-        interpreter = CodeInterpreter(stream=function_stream)
+class Programmer(Agent):
+    def __init__(self, silent=False, on_stream_message=lambda i: print(i), **kwargs):
+        interpreter = CodeInterpreter(stream=on_stream_message)
 
         super().__init__(
             functions=[
@@ -27,7 +27,7 @@ class Brogrammer(Agent):
                 interpreter.bash,
                 interpreter,
                 # google_search_function,
-                # scan_website_function,
+                # scan_website,
                 codebase.get_file_summary,
                 codebase.view,
                 codebase.edit,
@@ -53,9 +53,11 @@ class Brogrammer(Agent):
 
 
 if __name__ == "__main__":
-    model = Brogrammer(silent=False)
+    model = Programmer(silent=False)
 
     while query := input("# User: \n"):
         response, model = model.run(query=query, keep_session=True)
+        breakpoint()
         print("# Assistant:\n", response["final_response"])
+        # I want to implement a fastapi backend that acts as an interface to an agent, for example webgpt. The API should have endpoints to send a json object that is passed to agent.run(**payload), and stream back results using the streaming callbacks 
         breakpoint()

@@ -31,7 +31,6 @@ class BashSession(Function):
     # when the session is destroyed, stop the container
     def __del__(self):
         # stop the container with name self.session
-        breakpoint()
         client = docker.from_env()
         try:
             container = client.containers.get(self.session)

@@ -223,6 +223,10 @@ def view_symbol(
     ),
 ):
     """Show the full implementation of a symbol (function/class/method) in a file."""
+    if not os.path.exists(path):
+        # create the file
+        with open(path, "w") as f:
+            f.write("")
     symbol_id = symbol
     all_symbols = get_symbols(path)
     for symbol in all_symbols:
