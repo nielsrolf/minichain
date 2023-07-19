@@ -52,7 +52,7 @@ def parse_function(code, file, id_prefix=""):
         "code": code,
         "path": file,
         "start": 0,
-        "end": i,
+        "end": i - 1,
         "id": f"{id_prefix}{function_name}",
     }, i
 
@@ -94,11 +94,14 @@ def get_symbols(file):
                     break
             docstring = ""
             if lines[end_line].strip().startswith('"""'):
+                end_line += 1
                 for potential_docstring_end in lines[end_line:]:
                     end_line += 1
                     docstring += potential_docstring_end
                     if potential_docstring_end.strip().endswith('"""'):
+                        docstring = docstring.strip('"""')
                         break
+            code_start_line = end_line
             code = ""
             for line in lines[end_line:]:
                 if line.startswith(" ") or line.startswith("\t") or line == "":
@@ -108,7 +111,7 @@ def get_symbols(file):
                     break
             i = end_line
             # parse the methods from the code
-            code_start_line = i
+            
             # get the indention of the first line
             indention_str = ""
             for char in code.split("\n")[0]:
@@ -143,6 +146,8 @@ def get_symbols(file):
                 for m in methods:
                     m["start"] += code_start_line
                     m["end"] += code_start_line
+                    code_start_line = m["end"] + 1
+                methods[-1]["end"] -= 1
             symbols.append(
                 {
                     "name": class_name,
@@ -153,7 +158,7 @@ def get_symbols(file):
                     "methods": methods,
                     "fields": fields,
                     "start": class_start_line,
-                    "end": end_line,
+                    "end": end_line - 1,
                     "id": f"{class_name}",
                 }
             )

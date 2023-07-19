@@ -9,11 +9,17 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 from pydantic import BaseModel, Field
 
-from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
-                             FunctionMessage, SystemMessage, UserMessage)
+from minichain.agent import (
+    Agent,
+    AssistantMessage,
+    Function,
+    FunctionCall,
+    FunctionMessage,
+    SystemMessage,
+    UserMessage,
+)
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
-from minichain.tools.text_to_memory import (Memory, MemoryWithMeta,
-                                            text_to_memory)
+from minichain.tools.text_to_memory import Memory, MemoryWithMeta, text_to_memory
 from minichain.utils.cached_openai import get_embedding
 from minichain.utils.markdown_browser import markdown_browser
 

@@ -1,9 +1,11 @@
 from pydantic import BaseModel, Field
 
 from minichain.agent import Agent, SystemMessage, UserMessage
+
 # from minichain.tools.codebase import Codebase
 from minichain.agents.webgpt import Query, WebGPT, scan_website_function
 from minichain.memory import SemanticParagraphMemory
+
 # from minichain.tools.code_interpreter import code_interpreter
 from minichain.tools.bash import BashSession, CodeInterpreter
 from minichain.tools.google_search import google_search_function
