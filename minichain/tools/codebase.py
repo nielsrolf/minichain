@@ -170,10 +170,10 @@ def remove_line_numbers(code):
 
 @tool()
 def replace_symbol(
-    path: str = Field(..., description="The path to the file."),
+    path: str = Field(..., description="The path to the file"),
     symbol: str = Field(
         ...,
-        description="Either {function_name}, {class_name} or {class_name}.{method_name}",
+        description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only.",
     ),
     code: str = Field(..., description="The new code to replace the symbol with."),
     is_new: bool = Field(False, description="Whether a new symbol should be created."),
@@ -215,11 +215,11 @@ def replace_symbol(
 
 
 @tool()
-def show_symbol(
-    path: str = Field(..., description="The path to the file."),
+def view_symbol(
+    path: str = Field(..., description="The path to the file"),
     symbol: str = Field(
         ...,
-        description="Either {function_name}, {class_name} or {class_name}.{method_name}",
+        description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only.",
     ),
 ):
     """Show the full implementation of a symbol (function/class/method) in a file."""
@@ -250,6 +250,6 @@ def show_symbol(
 if __name__ == "__main__":
     print(get_initial_summary())
     # out = replace_symbol(path="./minichain/tools/bla.py", symbol="foo", code="test\n", is_new=False)
-    print(show_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
-    print(show_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
-    print(show_symbol(path="./minichain/agent.py", symbol="doesntexist"))
+    print(view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
+    print(view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
+    print(view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
