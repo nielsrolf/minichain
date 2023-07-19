@@ -1,9 +1,8 @@
+import inspect
 import json
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Union
 from pprint import pprint
-import inspect
-
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, create_model
 
@@ -87,7 +86,6 @@ def make_return_function(openapi_json: BaseModel):
     return function_obj
 
 
-
 class Agent:
     def __init__(
         self,
@@ -137,7 +135,7 @@ class Agent:
         self.functions_openai = [i.openapi_json for i in self.functions]
         for function in self.functions:
             function._register_stream(self.function_stream)
-    
+
     def print_message(self, message):
         print("-" * 120)
         print(f"Message to Agent({self.system_message.content})")
@@ -172,7 +170,7 @@ class Agent:
             keep_session=keep_session,
         )
         agent_session.task_to_history(arguments)
-        return agent_session.run_until_done()        
+        return agent_session.run_until_done()
 
     def run_until_done(self):
         while True:
@@ -189,12 +187,13 @@ class Agent:
                 else:
                     self.init_history = self.history
                     return assistant_message.content, self
-            elif self.has_structured_response and assistant_message.function_call is None:
+            elif (
+                self.has_structured_response and assistant_message.function_call is None
+            ):
                 # We simulate a return function call that will probably fail and hint GPT to correct it
                 assistant_message.function_call = FunctionCall(
-                    name="return", arguments=json.dumps({
-                        "content": assistant_message.content
-                    })
+                    name="return",
+                    arguments=json.dumps({"content": assistant_message.content}),
                 )
             function_call = assistant_message.function_call
             if function_call is not None:
@@ -203,10 +202,9 @@ class Agent:
                     if output is False:
                         breakpoint()
                     if self.keep_session:
-                        output['session'] = self
+                        output["session"] = self
                         self.init_history = self.history
                     return output
-
 
     def task_to_history(self, arguments):
         self.history_append(UserMessage(self.prompt_template(**arguments)))
@@ -274,10 +272,11 @@ class Agent:
         self.history_append(user_message)
         self.on_user_message(self.history[-1])
         return self.run_until_done()
-    
+
     def as_function(self, name, description, prompt_openapi):
         def function(**arguments):
             return self.run(**arguments)
+
         function_tool = Function(
             prompt_openapi,
             name,
@@ -319,7 +318,7 @@ class Function:
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments).dict()
         return self.function(**arguments)
-    
+
     def _register_stream(self, stream):
         self.stream = stream
 
@@ -340,16 +339,17 @@ def tool(*args, **kwargs):
     def my_tool(some_input: str = Field(..., description="Some input.")):
         return output
     """
+
     def wrapper(f):
         # Get the function's arguments
         argspec = inspect.getfullargspec(f)
-        
+
         # Create a Pydantic model from the function's arguments
         fields = {
             arg: (argspec.annotations[arg], Field(..., description=field.description))
             for arg, field in zip(argspec.args, argspec.defaults)
         }
-        
+
         pydantic_model = create_model(f.__name__, **fields)
         function = Function(
             name=f.__name__ or kwargs.get("name"),
@@ -358,6 +358,7 @@ def tool(*args, **kwargs):
             function=f,
         )
         return function
+
     return wrapper
 
 

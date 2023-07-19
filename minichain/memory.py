@@ -1,10 +1,10 @@
+import json
 import math
+import os
+import pickle
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
-import pickle
-import json
-import os
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -82,8 +82,7 @@ class VectorDB:
 class IngestQuery(BaseModel):
     url: str = Field(..., description="The url of the website to read and tag.")
     question: Optional[str] = Field(
-        None,
-        description="The question you are trying to answer."
+        None, description="The question you are trying to answer."
     )
 
 
@@ -239,7 +238,11 @@ class SemanticParagraphMemory:
             return self.summarize(results, question)
 
     def summarize(self, results, question) -> str:
-        snippets = [self.format_as_snippet(memory) for memory in results if memory.memory.type == "content"]
+        snippets = [
+            self.format_as_snippet(memory)
+            for memory in results
+            if memory.memory.type == "content"
+        ]
         document = "\n\n".join(snippets)
         print("-" * 80)
         print("-" * 80)
@@ -267,7 +270,7 @@ class SemanticParagraphMemory:
         if len(new_memories) > 0:
             content_summary += f"New memories were created from the website {url}:\n"
             content_summary += self.get_content_summary(new_memories)
-        
+
         if len(queue) > 0:
             content_summary += f"You encountered the following links that you can read next if needed:\n"
             content_summary += self.get_queue_summary(queue)
@@ -277,7 +280,7 @@ class SemanticParagraphMemory:
             content_summary += f"A current answer to the question '{question}', based on the memories you have is: \n"
             content_summary += f"{current_answer}\n\n"
             content_summary += "If this is a satisfactory answer, you can stop and respond to the user. If not, continue browsing."
-        
+
         return content_summary
 
     def _recall(self, query: RecallQuery):
@@ -302,12 +305,12 @@ class SemanticParagraphMemory:
                 summary += i.memory.title + "\n"
                 summary += f"    {i.memory.tags}\n"
         return summary
-    
+
     def get_queue_summary(self, queue):
         queue = sorted(queue, reverse=True, key=lambda i: i.priority)
         summary = "======= ENCOUNTERED LINKS =======\n"
         for item in queue:
-            question_list = '\n  '.join(item.expected_answers)
+            question_list = "\n  ".join(item.expected_answers)
             summary += f"{item.url}: {question_list}  \n"
         return summary
 
@@ -338,7 +341,7 @@ class SemanticParagraphMemory:
         query_embeddings = self.vector_db.encode([title])
         match = self.vector_db.search(query_embeddings, 1)[0]
         return match.value
-    
+
     def save(self, memory_dir):
         os.makedirs(memory_dir, exist_ok=True)
         # save the vector db
@@ -349,7 +352,7 @@ class SemanticParagraphMemory:
         # save the memories as json
         with open(os.path.join(memory_dir, "memories.json"), "w") as f:
             json.dump([i.dict() for i in self.memories], f)
-    
+
     def load(self, memory_dir):
         # load the vector db
         with open(os.path.join(memory_dir, "vector_db_keys.pkl"), "rb") as f:
@@ -381,5 +384,3 @@ if __name__ == "__main__":
         for i in retrieved:
             pprint(i.dict())
         breakpoint()
-
-        

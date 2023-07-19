@@ -1,10 +1,13 @@
-from minichain.utils.docker_sandbox import  run_in_container, bash
-from minichain.agent import Function
-from pydantic import BaseModel, Field
-from typing import Callable, List, Optional, Union
-import uuid
-import docker
 import os
+import uuid
+from typing import Callable, List, Optional, Union
+
+import docker
+from pydantic import BaseModel, Field
+
+from minichain.agent import Function
+from minichain.utils.docker_sandbox import bash, run_in_container
+
 
 class BashQuery(BaseModel):
     commands: List[str] = Field(..., description="A list of bash commands.")
@@ -12,14 +15,19 @@ class BashQuery(BaseModel):
 
 class BashSession(Function):
     def __init__(self, stream=lambda i: i, image_name="nielsrolf/minichain:latest"):
-        super().__init__(name="bash", openapi=BashQuery, function=self, description="Run bash commands. Each new command is run in the project root directory.")
+        super().__init__(
+            name="bash",
+            openapi=BashQuery,
+            function=self,
+            description="Run bash commands. Each new command is run in the project root directory.",
+        )
         self.session = uuid.uuid4().hex
         self.image_name = image_name
         self.stream = stream
 
     def __call__(self, commands: List[str]) -> str:
         return bash(commands, session=self.session, stream=self.stream)
-    
+
     # when the session is destroyed, stop the container
     def __del__(self):
         # stop the container with name self.session
@@ -30,7 +38,6 @@ class BashSession(Function):
             container.stop()
         except docker.errors.NotFound:
             pass
-
 
 
 class CodeInterpreterQuery(BaseModel):
@@ -46,7 +53,7 @@ class CodeInterpreter(Function):
             description="Create and run a temporary python file (non-interactively).",
         )
         self.bash = BashSession(stream=stream)
-    
+
     def __call__(self, code: str) -> str:
         filename = uuid.uuid4().hex
         with open(f"{filename}.py", "w") as f:
@@ -67,6 +74,3 @@ def test_bash_session():
 
 if __name__ == "__main__":
     test_bash_session()
-
-
-    

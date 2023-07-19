@@ -4,13 +4,10 @@ from minichain.tools.document_qa import AnswerWithCitations
 from minichain.tools.google_search import google_search_function
 
 
-
-
-
-class Expert():
+class Expert:
     """
     Expert agent that learns about topic using webgpt-memory and answers questions using the memory.
-    
+
     Example usage:
     ```
     from minichain.agents.expert import Expert
@@ -18,6 +15,7 @@ class Expert():
     expert = Expert()
     expert.learn("learn the javascript API of elementary.audio")
     """
+
     def __init__(self, load_memory=".memory/"):
         memory = SemanticParagraphMemory()
         if load_memory:
@@ -31,7 +29,7 @@ class Expert():
             response_openapi=AnswerWithCitations,
         )
         self.memory = memory
-    
+
     def learn(self, query):
         questions = self.memory.generate_questions(query)
         learned = []
@@ -39,16 +37,19 @@ class Expert():
         for question in questions:
             response = self.webgpt.run(query=question)
             if first_addition:
-                self.webgpt.system_message.content += "\n\nYou already learned the following:\n"
+                self.webgpt.system_message.content += (
+                    "\n\nYou already learned the following:\n"
+                )
                 first_addition = False
-            self.webgpt.system_message.content += "\n" + str(AnswerWithCitations(**response))
+            self.webgpt.system_message.content += "\n" + str(
+                AnswerWithCitations(**response)
+            )
             learned.append(response)
         return learned
-    
+
     def ask(self, question):
         response = self.webgpt.run(query=question)
         return response
-
 
 
 if __name__ == "__main__":

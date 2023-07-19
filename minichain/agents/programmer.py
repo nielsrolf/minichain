@@ -1,20 +1,19 @@
 from pydantic import BaseModel, Field
+
 from minichain.agent import Agent, SystemMessage, UserMessage
+# from minichain.tools.codebase import Codebase
+from minichain.agents.webgpt import Query, WebGPT, scan_website_function
 from minichain.memory import SemanticParagraphMemory
 # from minichain.tools.code_interpreter import code_interpreter
 from minichain.tools.bash import BashSession, CodeInterpreter
-# from minichain.tools.codebase import Codebase
-from minichain.agents.webgpt import WebGPT, Query, scan_website_function
 from minichain.tools.google_search import google_search_function
-
-
-
 
 memory = SemanticParagraphMemory()
 
 
 class ProgrammerResponse(BaseModel):
     final_response: str = Field(..., description="The final response to the user.")
+
 
 class Brogrammer(Agent):
     def __init__(self, silent=False, function_stream=lambda i: print(i), **kwargs):
@@ -40,16 +39,23 @@ class Brogrammer(Agent):
             prompt_template="{query}".format,
             silent=silent,
             response_openapi=ProgrammerResponse,
-            init_history=kwargs.get("init_history", [UserMessage(f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}")]),
+            init_history=kwargs.get(
+                "init_history",
+                [
+                    UserMessage(
+                        f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
+                    )
+                ],
+            ),
             **kwargs,
         )
         # self.codebase = codebase
-    
+
 
 if __name__ == "__main__":
     model = Brogrammer(silent=False)
 
     while query := input("# User: \n"):
         response, model = model.run(query=query, keep_session=True)
-        print("# Assistant:\n", response['final_response'])
+        print("# Assistant:\n", response["final_response"])
         breakpoint()

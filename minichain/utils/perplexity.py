@@ -1,4 +1,5 @@
 from perplexity_api import PerplexityAPI, TimeoutException
+
 ppl = PerplexityAPI()
 
 queries = [

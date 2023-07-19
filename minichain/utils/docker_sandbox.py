@@ -1,15 +1,16 @@
-import os
-from typing import List
 import asyncio
+import os
+import threading
+from time import sleep
+from typing import List
 
 import docker
 
 
-import threading
-from time import sleep
-
 def run_in_container(
-    commands: List[str], container_name: str = None, image_name="nielsrolf/minichain:latest"
+    commands: List[str],
+    container_name: str = None,
+    image_name="nielsrolf/minichain:latest",
 ):
     client = docker.from_env()
 
@@ -44,7 +45,6 @@ def run_in_container(
         result = container.exec_run(command, stream=True)
         for line in result.output:
             yield line.strip().decode() + "\n"
-
 
 
 def bash(commands, session=None, stream=lambda i: i):
@@ -95,8 +95,6 @@ def test_bash():
         "pip install --upgrade pip",
     ]
     outputs = bash(commands, stream=lambda i: print(i, end=""))
-
-
 
 
 if __name__ == "__main__":

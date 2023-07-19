@@ -20,7 +20,9 @@ class Citation(BaseModel):
 
 class AnswerWithCitations(BaseModel):
     content: str = Field(..., description="The answer to the question.")
-    citations: Optional[List[Citation]] = Field(default_factory=list, description="A list of citations.")
+    citations: Optional[List[Citation]] = Field(
+        default_factory=list, description="A list of citations."
+    )
 
     def __str__(self):
         repr = self.content
@@ -29,6 +31,7 @@ class AnswerWithCitations(BaseModel):
             repr += "\n".join(f"[{i.id}] {i.source}" for i in self.citations)
         return repr
 
+
 def qa(text, question, instructions=[]):
     """
     Returns: a dict {content: str, citations: List[Citation]}}"""
@@ -36,8 +39,8 @@ def qa(text, question, instructions=[]):
     system_message = (
         f"You are a document based QA system. Your task is to find all relevant information in the provided text related to the question: '{question}'.\n"
         + "When working with long documents, you work in a recursive way, meaning that your previous answers / summaries are provided as input to the next iteration. If the text contains relevant information regarding the question, but this information is not sufficient to answer the question, simply summarize the relevant information. When in doubt, don't skip - in particular if the text contains information that might be useful in conjunction with text you might summarize later.\n"
-        + "You may repeat sections of the text verbatim if they are very relevant, in particular when working with code. Do not start the summary with 'The text provided' or similar phrases. Don't speak about the text ('The document contains info about' etc.), instead tell the user the information directly. \n"  +
-        f"Question: {question}\n"
+        + "You may repeat sections of the text verbatim if they are very relevant, in particular when working with code. Do not start the summary with 'The text provided' or similar phrases. Don't speak about the text ('The document contains info about' etc.), instead tell the user the information directly. \n"
+        + f"Question: {question}\n"
     )
     system_message += (
         "\n"

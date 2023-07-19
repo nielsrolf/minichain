@@ -53,7 +53,7 @@ def parse_function(code, file, id_prefix=""):
         "path": file,
         "start": 0,
         "end": i,
-        "id": f"{id_prefix}{function_name}"
+        "id": f"{id_prefix}{function_name}",
     }, i
 
 
@@ -137,7 +137,9 @@ def get_symbols(file):
                 if methods_code.strip() == "":
                     methods = []
                 else:
-                    methods = parse_functions(methods_code, file, id_prefix=f"{class_name}.")
+                    methods = parse_functions(
+                        methods_code, file, id_prefix=f"{class_name}."
+                    )
                 for m in methods:
                     m["start"] += code_start_line
                     m["end"] += code_start_line
@@ -176,9 +178,11 @@ def generate_docs(src):
 
 def symbol_as_markdown(symbol, prefix=""):
     response = ""
+
     def print(*args, **kwargs):
         nonlocal response
         response += " ".join([str(i) for i in args]) + "\n"
+
     try:
         print(f"{prefix}{symbol['signature']} {symbol['start']}-{symbol['end']}")
     except:
