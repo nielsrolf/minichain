@@ -15,17 +15,33 @@ Chat models are agents without structured output and end their turn by respondin
 
 # Getting started
 
+
+## Defining a tool
+
+Define a tool using the `@tool()` decorator:
+```python
+from minichain.agent import Agent, SystemMessage, tool
+
+@tool()
+def scan_website(
+    url: str = Field(..., description="The url to read.", ),
+    question: str = Field(..., description="The question to answer.")
+):
+    ...
+    return answer
+```
+
+
 ## Defining an agent
 ```python
 from minichain.agent import Agent, SystemMessage
-from minichain.memory import SemanticParagraphMemory
 from minichain.tools.document_qa import AnswerWithCitations
 from minichain.tools.google_search import google_search_function
 
+...
 
-memory = SemanticParagraphMemory()
 webgpt = Agent(
-    functions=[google_search_function, memory.read_website, memory.recall],
+    functions=[google_search_function, scan_website],
     system_message=SystemMessage(
         "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
     ),
@@ -38,31 +54,7 @@ webgpt = Agent(
 response = webgpt.run(query="What is the largest publicly known language model in terms of parameters?")
 print(response['content'], response['sources'])
 ```
-## Defining a tool
 
-There are many use cases for wrapping agents inside of a function. This is currently a bit ugly and often looks like this:
-```python
-def tool(**inputs like schema): -> dict
-    return outputs
-
-tool_function = Function(
-    name="tool",
-    openapi=PydanticModel.schema()
-) # dict like schema-> any dict
-
-agent_with_tool = Agent(
-    functions=[tool_dunction],
-    response_format=PydanticResponseModel
-) # .run(): dict like prompt_template_inputs -> dict like response_format
-```
-
-Longterm fixes:
-- merge tool and tool_function via decorators
-    ```
-    @openai_function(description, ...)
-    @input_field(type, ...)
-    ```
-- give function input and output schema
 
 
 ## Install
@@ -111,15 +103,13 @@ pip install -e .
     - [ ] document_qa_scan: build a general context
 
 ### Programmer
-- [x] bash:
-    - [x] tool
-    - x ] use in agent
-- [ ] python:
-    - [ ] tool
-    - [ ] use in agent
-- [ ] CodeMemory
+- [x] bash
+- [x] python
+- [ ] Codebase
     - [x] util: generate_docs
     - tools
+        - [ ] view file
+        - [ ] edit file
         - [ ] get_package_summary
             - generate_docs + summarize(file)
         - [ ] lookup symbol (--show_full_code: False)

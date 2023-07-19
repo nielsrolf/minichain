@@ -11,7 +11,7 @@ from pprint import pprint
 import click
 
 
-def parse_function(code, file):
+def parse_function(code, file, id_prefix=""):
     lines = code.split("\n")
     end_line = 0
     try:
@@ -53,13 +53,14 @@ def parse_function(code, file):
         "path": file,
         "start": 0,
         "end": i,
+        "id": f"{id_prefix}{function_name}"
     }, i
 
 
-def parse_functions(code, file):
+def parse_functions(code, file, id_prefix=""):
     functions = []
     while code:
-        function, i = parse_function(code, file)
+        function, i = parse_function(code, file, id_prefix=id_prefix)
         if function is not None:
             functions.append(function)
         code = "\n".join(code.split("\n")[i:])
@@ -136,7 +137,7 @@ def get_symbols(file):
                 if methods_code.strip() == "":
                     methods = []
                 else:
-                    methods = parse_functions(methods_code, file)
+                    methods = parse_functions(methods_code, file, id_prefix=f"{class_name}.")
                 for m in methods:
                     m["start"] += code_start_line
                     m["end"] += code_start_line
@@ -151,6 +152,7 @@ def get_symbols(file):
                     "fields": fields,
                     "start": class_start_line,
                     "end": end_line,
+                    "id": f"{class_name}",
                 }
             )
         else:
@@ -172,7 +174,11 @@ def generate_docs(src):
     return symbols
 
 
-def print_symbol_as_markdown(symbol, prefix=""):
+def symbol_as_markdown(symbol, prefix=""):
+    response = ""
+    def print(*args, **kwargs):
+        nonlocal response
+        response += " ".join([str(i) for i in args]) + "\n"
     try:
         print(f"{prefix}{symbol['signature']} {symbol['start']}-{symbol['end']}")
     except:
@@ -183,8 +189,14 @@ def print_symbol_as_markdown(symbol, prefix=""):
         print(symbol["fields"])
     if symbol.get("methods"):
         for method in symbol["methods"]:
-            print_symbol_as_markdown(method, prefix=f"    ")
+            print(symbol_as_markdown(method, prefix=f"    "))
     print()
+    return response
+
+
+def summarize_python_file(path):
+    symbols = get_symbols(path)
+    return "\n\n".join([symbol_as_markdown(i) for i in symbols])
 
 
 @click.command()
@@ -199,7 +211,7 @@ def main(src):
     for file, symbols in symbols_by_file.items():
         print(f"## {file}")
         for i in symbols:
-            print_symbol_as_markdown(i)
+            print(symbol_as_markdown(i))
 
 
 if __name__ == "__main__":

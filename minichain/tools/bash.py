@@ -10,9 +10,6 @@ class BashQuery(BaseModel):
     commands: List[str] = Field(..., description="A list of bash commands.")
 
 
-
-
-
 class BashSession(Function):
     def __init__(self, stream=lambda i: i, image_name="nielsrolf/minichain:latest"):
         super().__init__(name="bash", openapi=BashQuery, function=self, description="Run bash commands. Each new command is run in the project root directory.")

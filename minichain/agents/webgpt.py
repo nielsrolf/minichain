@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Function, SystemMessage
+from minichain.agent import Agent, Function, SystemMessage, tool
 from minichain.tools.document_qa import AnswerWithCitations
 from minichain.tools.google_search import google_search_function
 from minichain.tools.recursive_summarizer import text_scan
@@ -28,7 +28,12 @@ class Query(BaseModel):
     query: str = Field(..., description="The query to search for.")
 
 
-def scan_website(url, question):
+@tool()
+def scan_website(
+    url: str = Field(..., description="The url to read.", ),
+    question: str = Field(..., description="The question to answer.")
+):
+    """Read a website and collect information relevant to the question, and suggest a link to read next."""
     website = markdown_browser(url)
     lines = website.split("\n")
     website_with_line_numbers = "\n".join(
@@ -59,18 +64,18 @@ def scan_website(url, question):
     }
 
 
-scan_website_function = Function(
-    name="scan_website",
-    openapi=ScanWebsiteRequest,
-    function=scan_website,
-    description="Read a website and collect information relevant to the question, and suggest a link to read next.",
-)
+# scan_website_function = Function(
+#     name="scan_website",
+#     openapi=ScanWebsiteRequest,
+#     function=scan_website,
+#     description="Read a website and collect information relevant to the question, and suggest a link to read next.",
+# )
 
 
 class WebGPT(Agent):
     def __init__(self, silent=False, **kwargs):
         super().__init__(
-            functions=[google_search_function, scan_website_function],
+            functions=[google_search_function, scan_website],
             system_message=SystemMessage(
                 "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information to answer the question or fulfill the user request, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
             ),
@@ -99,8 +104,8 @@ class SmartWebGPT(Agent):
 
 
 if __name__ == "__main__":
-    # webgpt = WebGPT()
-    webgpt = SmartWebGPT(silent=True)
+    webgpt = WebGPT()
+    # webgpt = SmartWebGPT(silent=True)
     
     # Using elementary.audio, can you implement a new React component called SyncedAudioStemPlayer that plays a list of stems in a synced loop? The stems are specified by a public URL and need to be loaded into the virtual file system first
     # Can you show me how to use this component in an example?

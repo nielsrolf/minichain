@@ -2,9 +2,10 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Union
 from pprint import pprint
+import inspect
 
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from minichain.utils.cached_openai import get_openai_response
 from minichain.utils.debug import debug
@@ -329,7 +330,35 @@ class Function:
             "description": self.description,
             "parameters": self.parameters_openapi,
         }
-    
+
+
+def tool(*args, **kwargs):
+    """A decorator for tools.
+    Example:
+
+    @tool()
+    def my_tool(some_input: str = Field(..., description="Some input.")):
+        return output
+    """
+    def wrapper(f):
+        # Get the function's arguments
+        argspec = inspect.getfullargspec(f)
+        
+        # Create a Pydantic model from the function's arguments
+        fields = {
+            arg: (argspec.annotations[arg], Field(..., description=field.description))
+            for arg, field in zip(argspec.args, argspec.defaults)
+        }
+        
+        pydantic_model = create_model(f.__name__, **fields)
+        function = Function(
+            name=f.__name__ or kwargs.get("name"),
+            description=f.__doc__ or kwargs.get("description"),
+            openapi=pydantic_model,
+            function=f,
+        )
+        return function
+    return wrapper
 
 
 class Done(BaseModel):

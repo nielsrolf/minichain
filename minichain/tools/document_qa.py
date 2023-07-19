@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ class Citation(BaseModel):
 
 class AnswerWithCitations(BaseModel):
     content: str = Field(..., description="The answer to the question.")
-    citations: List[Citation] = Field(..., description="A list of citations.")
+    citations: Optional[List[Citation]] = Field(default_factory=list, description="A list of citations.")
 
     def __str__(self):
         repr = self.content

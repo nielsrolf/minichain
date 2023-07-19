@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from minichain.agent import Agent, SystemMessage
+from minichain.agent import Agent, SystemMessage, UserMessage
 from minichain.memory import SemanticParagraphMemory
 # from minichain.tools.code_interpreter import code_interpreter
 from minichain.tools.bash import BashSession, CodeInterpreter
@@ -18,15 +18,17 @@ class ProgrammerResponse(BaseModel):
 
 class Brogrammer(Agent):
     def __init__(self, silent=False, function_stream=lambda i: print(i), **kwargs):
-        # codebase = Codebase()
+        codebase = Codebase()
+        interpreter = CodeInterpreter(stream=function_stream)
+
         super().__init__(
             functions=[
                 # WebGPT(silent=silent).as_function("webgpt", "Research the web in order to answer a question.", Query),
-                BashSession(stream=function_stream),
-                CodeInterpreter(stream=function_stream),
+                interpreter.bash,
+                interpreter,
                 # google_search_function,
                 # scan_website_function,
-                # codebase.get_context_about_project, # Should be called in the first step and provide general context about the codebase
+                # codebase.get_initial_summary, # Should be called in the first step and provide general context about the codebase
                 # codebase.qa, # Can be asked in the second step to find the right file
                 # codebase.find_symbol, # Can be asked in the next step to get the type description etc of a symbol
                 # codebase.replace_symbol, # Edit the codebase - full symbol replacement avoids errors due to wrong start and end positions
@@ -38,6 +40,7 @@ class Brogrammer(Agent):
             prompt_template="{query}".format,
             silent=silent,
             response_openapi=ProgrammerResponse,
+            init_history=kwargs.get("init_history", [UserMessage(f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}")]),
             **kwargs,
         )
         # self.codebase = codebase
