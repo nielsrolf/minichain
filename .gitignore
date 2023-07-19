@@ -182,3 +182,5 @@ pyrightconfig.json
 .DS_Store
 
 .memory
+
+example.md

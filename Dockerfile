@@ -27,8 +27,12 @@ RUN node -v
 RUN npm -v
 
 # Install tree
-RUN apt-get install -y tree
+RUN apt-get install -y tree ffmpeg
 
-# Clean up
-RUN apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# # # Clean up
+# RUN apt-get clean \
+#     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN pip install --upgrade pip
+RUN pip install numpy pandas matplotlib seaborn plotly scikit-learn requests beautifulsoup4
+RUN pip install librosa pydub yt-dlp soundfile

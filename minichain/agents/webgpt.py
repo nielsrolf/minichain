@@ -10,9 +10,6 @@ from minichain.tools.text_to_memory import Memory
 from minichain.utils.markdown_browser import markdown_browser
 
 
-
-
-
 class ScanWebsiteRequest(BaseModel):
     url: str = Field(..., description="The url to read.")
     question: str = Field(..., description="The question to answer.")
@@ -31,44 +28,47 @@ class Query(BaseModel):
     query: str = Field(..., description="The query to search for.")
 
 
+def scan_website(url, question):
+    website = markdown_browser(url)
+    lines = website.split("\n")
+    website_with_line_numbers = "\n".join(
+        f"{i+1} {line}" for i, line in enumerate(lines)
+    )
+
+    outputs = text_scan(
+        website_with_line_numbers,
+        RelevantSectionOrClick,
+        f"Scan the text provided by the user for sections relevant to the question: {question}. Save sections that contain a partial answer to the question. If the answer is not in the text, click on the link that is most likely to contain the answer and then return in the next turn. If no link is promising, return immediately.")
+    sections = [
+        {
+            "content": "\n".join(lines[output['relevant_section']['start_line'] : output['relevant_section']['end_line']]),
+            "source": url,
+        }
+        for output in outputs
+        if output['relevant_section'] is not None
+    ]
+    clicks = [output['click'] for output in outputs if output['click'] is not None]
+    if not url.startswith("http"):
+        url = "https://" + url
+    domain = "/".join(url.split("/")[:3]) # e.g. https://www.google.com
+    clicks = [f"{domain}/{click}" for click in clicks if not click.startswith("http")]
+    print("clicks:", clicks)
+    return {
+        "relevant_sections": sections,
+        "read_next": clicks,
+    }
+
+
+scan_website_function = Function(
+    name="scan_website",
+    openapi=ScanWebsiteRequest,
+    function=scan_website,
+    description="Read a website and collect information relevant to the question, and suggest a link to read next.",
+)
+
+
 class WebGPT(Agent):
     def __init__(self, silent=False, **kwargs):
-        def scan_website(url, question):
-            website = markdown_browser(url)
-            lines = website.split("\n")
-            website_with_line_numbers = "\n".join(
-                f"{i+1} {line}" for i, line in enumerate(lines)
-            )
-
-            outputs = text_scan(
-                website_with_line_numbers,
-                RelevantSectionOrClick,
-                f"Scan the text provided by the user for sections relevant to the question: {question}. Save sections that contain a partial answer to the question. If the answer is not in the text, click on the link that is most likely to contain the answer and then return in the next turn. If no link is promising, return immediately.")
-            sections = [
-                {
-                    "content": "\n".join(lines[output['relevant_section']['start_line'] : output['relevant_section']['end_line']]),
-                    "source": url,
-                }
-                for output in outputs
-                if output['relevant_section'] is not None
-            ]
-            clicks = [output['click'] for output in outputs if output['click'] is not None]
-            if not url.startswith("http"):
-                url = "https://" + url
-            domain = "/".join(url.split("/")[:3]) # e.g. https://www.google.com
-            clicks = [f"{domain}/{click}" for click in clicks if not click.startswith("http")]
-            print("clicks:", clicks)
-            return {
-                "relevant_sections": sections,
-                "read_next": clicks,
-            }
-
-        scan_website_function = Function(
-            name="scan_website",
-            openapi=ScanWebsiteRequest,
-            function=scan_website,
-            description="Read a website and collect information relevant to the question, and suggest a link to read next.",
-        )
         super().__init__(
             functions=[google_search_function, scan_website_function],
             system_message=SystemMessage(

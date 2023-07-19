@@ -2,7 +2,7 @@
 ![`{mini: ⛓}`](logo.png)
 <!-- # `{mini: ⛓}` -->
 
-`{mini: ⛓}` is yet another langchain alternative: agents that understand and return structured data.
+`{mini: ⛓}` is a minimal langchain alternative for agents with structured data, and many tools for them. You only need one class: `Agent` - for chat, chat with tool usage, or acting as a function.
 
 **Why?**
 - structured output should be the default. Always converting to text is often a bottleneck
@@ -111,9 +111,9 @@ pip install -e .
     - [ ] document_qa_scan: build a general context
 
 ### Programmer
-- [ ] bash:
+- [x] bash:
     - [x] tool
-    - [ ] use in agent
+    - x ] use in agent
 - [ ] python:
     - [ ] tool
     - [ ] use in agent
@@ -145,5 +145,3 @@ pip install -e .
 - [ ] output of the planner appears as a function message in the chat
 
 
----
-`{mini: ⛓}`

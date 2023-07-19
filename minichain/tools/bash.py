@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from typing import Callable, List, Optional, Union
 import uuid
 import docker
+import os
 
 class BashQuery(BaseModel):
     commands: List[str] = Field(..., description="A list of bash commands.")
@@ -14,7 +15,7 @@ class BashQuery(BaseModel):
 
 class BashSession(Function):
     def __init__(self, stream=lambda i: i, image_name="nielsrolf/minichain:latest"):
-        super().__init__(name="bash", openapi=BashQuery, function=self, description="Run bash commands.")
+        super().__init__(name="bash", openapi=BashQuery, function=self, description="Run bash commands. Each new command is run in the project root directory.")
         self.session = uuid.uuid4().hex
         self.image_name = image_name
         self.stream = stream
@@ -25,6 +26,7 @@ class BashSession(Function):
     # when the session is destroyed, stop the container
     def __del__(self):
         # stop the container with name self.session
+        breakpoint()
         client = docker.from_env()
         try:
             container = client.containers.get(self.session)
@@ -32,6 +34,29 @@ class BashSession(Function):
         except docker.errors.NotFound:
             pass
 
+
+
+class CodeInterpreterQuery(BaseModel):
+    code: str = Field(..., description="Python code to run.")
+
+
+class CodeInterpreter(Function):
+    def __init__(self, stream=lambda i: i):
+        super().__init__(
+            name="python",
+            openapi=CodeInterpreterQuery,
+            function=self,
+            description="Create and run a temporary python file (non-interactively).",
+        )
+        self.bash = BashSession(stream=stream)
+    
+    def __call__(self, code: str) -> str:
+        filename = uuid.uuid4().hex
+        with open(f"{filename}.py", "w") as f:
+            f.write(code)
+        output = self.bash(commands=[f"python {filename}.py"])
+        os.remove(f"{filename}.py")
+        return output
 
 
 def test_bash_session():

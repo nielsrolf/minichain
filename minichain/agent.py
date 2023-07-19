@@ -178,11 +178,16 @@ class Agent:
             assistant_message = self.get_next_action()
             self.history_append(assistant_message)
             self.on_assistant_message(self.history[-1])
+            # Check if we are done and should return content
             if (
                 not self.has_structured_response
                 and assistant_message.content is not None
             ):
-                return assistant_message.content
+                if not self.keep_session:
+                    return assistant_message.content
+                else:
+                    self.init_history = self.history
+                    return assistant_message.content, self
             elif self.has_structured_response and assistant_message.function_call is None:
                 # We simulate a return function call that will probably fail and hint GPT to correct it
                 assistant_message.function_call = FunctionCall(
@@ -229,7 +234,15 @@ class Agent:
         try:
             for function in self.functions:
                 if function.name == function_call.name:
-                    function_output = function(**json.loads(function_call.arguments))
+                    if function_call.name == "python":
+                        # Somehow with python we get a string instead of a dict, which is probably easier for the model to handle, so we support it
+                        try:
+                            arguments = json.loads(function_call.arguments)
+                        except:
+                            arguments = {"code": function_call.arguments}
+                    else:
+                        arguments = json.loads(function_call.arguments)
+                    function_output = function(**arguments)
                     function_output_str = function_output
                     if not isinstance(function_output, str):
                         function_output_str = json.dumps(function_output)

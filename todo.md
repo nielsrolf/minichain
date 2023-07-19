@@ -1,15 +1,33 @@
 # todo
+- codebase tool
+
+# small things
+- always return response, self in run_until_done
+- code_interpreter: run files in /tmp and return files from /tmp/ ./outputs as structured data
+- add ask_for_permission callback to Function
+- make model configurable
+- document how to override default logger for all agents
+
+
+# bigger things
+
+- Function: use openai decorators
+- minichain.yml
+
+
+# Maybe
+- two step processes
+    -examples:
+        - edit (range) -> see current value -> write code in content -> function call returns
+        - 
+- give models the option to pipe the previous function result to the user to save tokens
 - perplexity api tool as webgpt alternative
 
-Random:
-- Function: use openai decorators
 
-- summarize code: add instruction to use symbol identifiers as tags
 
-- add ask_for_permission callback to Function
-- add with minichain.default_logging(logging_function) context manager
 
-- add `keep_session` for agents that should not create a session clone for follow up conversation. On follow up, respond without structured response (via `.chat` method)
+
+
 
 
 
