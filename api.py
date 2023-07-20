@@ -6,19 +6,7 @@ from minichain.agents.webgpt import SmartWebGPT
 from minichain.agents.programmer import Programmer
 from fastapi import WebSocket
 from collections import defaultdict
-
-
-app = FastAPI()
-
-
-class Payload(BaseModel):
-    query: str
-    response_to: str = None
-
-agents = {
-    "WebGPT": SmartWebGPT,
-    "yopilot": Programmer
-}
+from typing import Optional
 
 
 class MessageDB:
@@ -26,35 +14,49 @@ class MessageDB:
         self.messages = []
 
     def add_message(self, message):
-        self.messages.append(message)
+        if not isinstance(message, dict):
+            self.messages.append(message)
     
     def get_history(self, message_id):
-        # We want to get the history from the session of the message, up to the message itself
-        history = []
-        # find the session that contains the message
-        for session in self.sessions.values():
-            if message_id in [m.id for m in session]:
-                break
-        # Now, get the history
-        for message in session:
-            history.append(message)
-            if message.id == message_id:
-                break
-        if len(history) == 0:
+        if message_id is None:
             return None
-        return history
+        for message in self.messages:
+            if message["id"] == message_id:
+                if message["parent"] is None:
+                    return [message]
+                else:
+                    return self.get_history(message["parent"]) + [message]
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+
+app = FastAPI()
+
+
+class Payload(BaseModel):
+    query: str
+    response_to: Optional[str] = None
+
+
+agents = {
+    "webgpt": SmartWebGPT,
+    "yopilot": Programmer
+}
 
 
 message_db = MessageDB()
 
 
+
+
+
 @app.websocket("/ws/{agent_name}")
 async def websocket_endpoint(websocket: WebSocket, agent_name: str):
-     """Create a websocket that sends:
+    """Create a websocket that sends:
     {...message, id: 1},
-    {...message, id: 2},
-    {...message, id: 3}
-    {type: "start", id: 4}
+    {...message, id: 2, parent: 1},
+    {...message, id: 3, parent: 2}
+    {type: start, conversation_id: 4}
+    {type: "start", id: 5, parent=4}
     h
     e
     r
@@ -63,12 +65,15 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
     c
     o
     ...
-    {...message, id: 4} # message finished
+    {...message, conversation_id: 4} # message finished
     """
     await websocket.accept()
 
     async def add_message_to_db_and_send(message: dict):
+        print("add_message_to_db_and_send", message)
         message_db.add_message(message)
+        if not isinstance(message, dict):
+            message = message.dict()
         await websocket.send_json(message)
 
     async def on_stream_starts(message: dict):
@@ -90,17 +95,27 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
             continue
         
         init_history = message_db.get_history(payload.response_to)
-        
-        try:
-            agent = agents[agent_name](
-                init_history=init_history,
-                on_message_send=add_message_to_db_and_send, 
-                on_stream_starts=on_stream_starts,
-                on_stream_ends=on_stream_ends,
-                on_stream_message=on_stream_message,
-            )
-            response = agent.run(query=payload.query)
-            await websocket.send_json(response)
-        except Exception as e:
-            await websocket.send_text(str(e))
-            continue
+
+        # try:
+        agent = agents[agent_name](
+            init_history=init_history,
+            on_message_send=add_message_to_db_and_send, 
+            on_stream_starts=on_stream_starts,
+            on_stream_ends=on_stream_ends,
+            on_stream_message=on_stream_message,
+        )
+        response = await agent.run(query=payload.query)
+        # await websocket.send_json(response.dict())
+        # except Exception as e:
+        #     await websocket.send_text(str(e))
+        #     continue
+
+
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="localhost", port=8000)

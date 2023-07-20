@@ -63,7 +63,7 @@ class MemoryWithMeta(BaseModel):
     )
 
 
-def text_to_memory(text, source=None, max_num_memories=None) -> List[MemoryWithMeta]:
+async def text_to_memory(text, source=None, max_num_memories=None) -> List[MemoryWithMeta]:
     """
     Turn a text into a list of semantic paragraphs.
     - add line numbers to the text
@@ -139,5 +139,5 @@ def text_to_memory(text, source=None, max_num_memories=None) -> List[MemoryWithM
         current_paragraph_start = int(paragraph.split("\n")[0].split(":")[0])
         current_paragraph_end = int(paragraph.split("\n")[-2].split(":")[0]) + 1
         print("num_memories:", len(memories))
-        agent.run(text=paragraph)
+        await agent.run(text=paragraph)
     return memories.copy()

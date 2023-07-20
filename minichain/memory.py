@@ -134,8 +134,8 @@ class SemanticParagraphMemory:
             description="Recall memories based on a question.",
         )
 
-    def ingest(self, content, source):
-        memories = text_to_memory(content, source)
+    async def ingest(self, content, source):
+        memories = await text_to_memory(content, source)
         # Add memories to vector db
         for memory in memories:
             # title
@@ -164,8 +164,8 @@ class SemanticParagraphMemory:
         results = [i for i in self.memories if i.id in memory_ids]
         return results[:num_results]
 
-    def search_by_keywords(self, question, num_results) -> List[MemoryWithMeta]:
-        keywords = self.generate_keywords(question)
+    async def search_by_keywords(self, question, num_results) -> List[MemoryWithMeta]:
+        keywords = await self.generate_keywords(question)
         scores = [len(set(keywords) & set(i.memory.tags)) for i in self.memories]
         highest_scoring_memories = sorted(
             zip(scores, self.memories), reverse=True, key=lambda i: i[0]
@@ -178,7 +178,7 @@ class SemanticParagraphMemory:
             memories = self.memories
         return list(set([i for i in memories for i in i.memory.tags]))
 
-    def generate_keywords(self, question) -> List[str]:
+    async def generate_keywords(self, question) -> List[str]:
         # Use gpt to generate keywords
         available_tags = self.get_available_tags()
         keyword_agent = Agent(
@@ -192,11 +192,11 @@ class SemanticParagraphMemory:
             functions=[],
             response_openapi=KeywordList,
         )
-        keywords = keyword_agent.run(available_tags=available_tags)["keywords"]
+        keywords = await keyword_agent.run(available_tags=available_tags)["keywords"]
         print("looking for keywords", keywords)
         return keywords
 
-    def generate_questions(self, question: str) -> List[str]:
+    async def generate_questions(self, question: str) -> List[str]:
         # Use gpt to generate questions
         question_agent = Agent(
             system_message=SystemMessage(
@@ -206,22 +206,22 @@ class SemanticParagraphMemory:
             functions=[],
             response_openapi=RelatedQuestionList,
         )
-        questions = question_agent.run(question=question)["sub_questions"]
+        questions = await question_agent.run(question=question)["sub_questions"]
         print("Question: ", question)
         print("Sub-questions: ", questions)
         if question not in questions:
             questions = [question] + questions
         return questions
 
-    def retrieve(self, question: str, num_results=8) -> List[MemoryWithMeta]:
+    async def retrieve(self, question: str, num_results=8) -> List[MemoryWithMeta]:
         results = []
         num_results_per_search = math.ceil(num_results / self.num_search_methods)
         if self.use_keywords_search:
-            results += self.search_by_keywords(question, num_results_per_search)
+            results += await self.search_by_keywords(question, num_results_per_search)
         if self.use_vector_search:
-            results += self.search_by_vector(question, num_results_per_search)
+            results += await self.search_by_vector(question, num_results_per_search)
         if self.use_content_scan_search:
-            results += self.search_by_content_scan(question, num_results_per_search)
+            results += await self.search_by_content_scan(question, num_results_per_search)
         # filter duplicates by id
         results = [
             i
@@ -230,20 +230,20 @@ class SemanticParagraphMemory:
         ]
         return results
 
-    def answer_from_memory(self, question: str):
-        results = self.retrieve(question)
-        result = self.rank_or_summarize(results, question)
+    async def answer_from_memory(self, question: str):
+        results = await self.retrieve(question)
+        result = await self.rank_or_summarize(results, question)
         return result
 
-    def rank_or_summarize(self, results, question) -> str:
+    async def rank_or_summarize(self, results, question) -> str:
         if len(results) == 0:
             return "No relevant memories found."
         elif len(results) == 1:
             return results[0]
         else:
-            return self.summarize(results, question)
+            return await self.summarize(results, question)
 
-    def summarize(self, results, question) -> str:
+    async def summarize(self, results, question) -> str:
         snippets = [
             self.format_as_snippet(memory)
             for memory in results
@@ -253,7 +253,7 @@ class SemanticParagraphMemory:
         print("-" * 80)
         print("-" * 80)
         print(document)
-        summary = long_document_qa(text=document, question=question)
+        summary = await long_document_qa(text=document, question=question)
         return summary
 
     def format_as_snippet(self, memory) -> str:
@@ -264,9 +264,9 @@ class SemanticParagraphMemory:
             content=memory.meta.content,
         )
 
-    def _read_website(self, url: str, question: str = None):
+    async def _read_website(self, url: str, question: str = None):
         text = markdown_browser(url)
-        new_memories = self.ingest(text, url)
+        new_memories = await self.ingest(text, url)
         queue = []
         for memory in new_memories:
             queue += memory.memory.links
@@ -289,8 +289,8 @@ class SemanticParagraphMemory:
 
         return content_summary
 
-    def _recall(self, query: RecallQuery):
-        results = self.answer_from_memory(query.question)
+    async def _recall(self, query: RecallQuery):
+        results = await self.answer_from_memory(query.question)
         return results
 
     def print(self):
@@ -320,10 +320,10 @@ class SemanticParagraphMemory:
             summary += f"{item.url}: {question_list}  \n"
         return summary
 
-    def search_by_content_scan(self, question, num_results) -> List[MemoryWithMeta]:
+    async def search_by_content_scan(self, question, num_results) -> List[MemoryWithMeta]:
         content_summary = self.get_content_summary()
         # Use long document qa to generate a list of titles to search for
-        titles = text_scan(
+        titles = await text_scan(
             text=content_summary,
             response_openapi=TitleScore,
             system_message=f"List all titles related to the question: {question}.",

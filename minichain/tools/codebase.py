@@ -49,7 +49,7 @@ def get_initial_summary(
     return summary
     
 
-def get_long_summary(
+async def get_long_summary(
     root_dir=".",
     extensions=[".py", ".js", ".ts", "README.md"],
     ignore_files=[
@@ -85,7 +85,7 @@ def get_long_summary(
         #     "\n".join(summary.split("\n")[section["start"] : section["end"]])
         #     for section in sections
         # )
-        summary = long_document_qa(
+        summary = await long_document_qa(
             text=summary,
             question="Summarize the following codebase in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important code.",
         )
@@ -94,7 +94,7 @@ def get_long_summary(
 
 
 @tool()
-def get_file_summary(path: str = Field(..., description="The path to the file.")):
+async def get_file_summary(path: str = Field(..., description="The path to the file.")):
     """Summarize a file."""
     if path.endswith(".py"):
         summary = summarize_python_file(path)
@@ -102,7 +102,7 @@ def get_file_summary(path: str = Field(..., description="The path to the file.")
         print("Summary:", path)
         with open(path, "r") as f:
             text = f.read()
-        summary = long_document_qa(
+        summary = await long_document_qa(
             text=text,
             question="Summarize the following file in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important sections. When referencing files, always use the path (rather than the filename).",
         )

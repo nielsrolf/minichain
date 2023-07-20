@@ -8,7 +8,7 @@ from minichain.memory import SemanticParagraphMemory
 
 # from minichain.tools.code_interpreter import code_interpreter
 from minichain.tools.bash import BashSession, CodeInterpreter
-from minichain.tools.google_search import google_search_function
+from minichain.tools.google_search import web_search
 
 memory = SemanticParagraphMemory()
 
@@ -26,8 +26,8 @@ class Programmer(Agent):
                 # WebGPT(silent=silent).as_function("webgpt", "Research the web in order to answer a question.", Query),
                 interpreter.bash,
                 interpreter,
-                # google_search_function,
-                # scan_website,
+                # web_search,
+                # tool(**kwargs)(scan_website),
                 codebase.get_file_summary,
                 codebase.view,
                 codebase.edit,

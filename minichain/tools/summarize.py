@@ -1,13 +1,11 @@
+from typing import List, Optional, Union
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
+from minichain.agent import Agent, Function, FunctionMessage, SystemMessage, tool
 
 
-class SummarizeQuery(BaseModel):
-    text: str = Field(..., description="The text to summarize.")
 
-
-def summarize(text, instructions=[]):
+async def summarize(text, instructions=[]):
     system_message = f"Summarize the the text provided by the user. Do not start the summary with 'The text provided by the user' or similar phrases. Summarize by generating a shorter text that has the most important information from the text provided by the user."
     system_message += (
         "\n\n"
@@ -20,15 +18,8 @@ def summarize(text, instructions=[]):
         system_message=SystemMessage(system_message),
         prompt_template="{text}".format,
     )
-    summary = summarizer.run(text=text)
+    summary = await summarizer.run(text=text)
     if summary.lower() == "skip":
         summary = ""
     return summary
 
-
-summarizer_function = Function(
-    name="summarizer",
-    openapi=SummarizeQuery,
-    function=summarize,
-    description="Summarize the the text provided by the user.",
-)
