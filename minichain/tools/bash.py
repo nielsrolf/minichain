@@ -29,14 +29,14 @@ class BashSession(Function):
         return bash(commands, session=self.session, stream=self.stream)
 
     # when the session is destroyed, stop the container
-    def __del__(self):
-        # stop the container with name self.session
-        client = docker.from_env()
-        try:
-            container = client.containers.get(self.session)
-            container.stop()
-        except docker.errors.NotFound:
-            pass
+    # def __del__(self):
+    #     # stop the container with name self.session
+    #     client = docker.from_env()
+    #     try:
+    #         container = client.containers.get(self.session)
+    #         container.stop()
+    #     except docker.errors.NotFound:
+    #         pass
 
 
 class CodeInterpreterQuery(BaseModel):

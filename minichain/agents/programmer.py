@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+import asyncio
 
 from minichain.agent import Agent, SystemMessage, UserMessage
 
@@ -52,12 +53,44 @@ class Programmer(Agent):
         )
 
 
-if __name__ == "__main__":
+async def cli():
     model = Programmer(silent=False)
+    await model.on_message_send({"hello": "world"})
+
+    query = """I have a websocket in api.py that sends the following:
+{type: start, conversation_id: 123}
+{...message, id: 1},
+{...message, id: 2, parent: 1},
+{...message, id: 3, parent: 2}
+{type: start, conversation_id: 4}
+{type: "start", id: 5, parent=4}
+h
+e
+r
+e
+
+c
+o
+...
+{...message, conversation_id: 4} # message finished
+{...message, conversation_id: 123} # message finished
+
+I need you to create a react frontend for this, which works in the following way:
+- on initial load, it shows only one large input field and a send button
+- on send, it sends the message to the websocket. from then on, it renders the main history, but also saves the sub-histories (messages between start: 4 and end: 4 belong to conversation 4, which is a sub conversation of message 3, which belongs to the main conversation 123.
+- when a message has a sub conversation, I want the sub conversation to show on the screen"""
+    response = await model.run(query=query, keep_session=True)
+    print(response["final_response"])
 
     while query := input("# User: \n"):
-        response, model = model.run(query=query, keep_session=True)
+        response, model = await model.run(query=query, keep_session=True)
         breakpoint()
         print("# Assistant:\n", response["final_response"])
         # I want to implement a fastapi backend that acts as an interface to an agent, for example webgpt. The API should have endpoints to send a json object that is passed to agent.run(**payload), and stream back results using the streaming callbacks 
+
         breakpoint()
+
+
+if __name__ == "__main__":
+    asyncio.run(cli())
+    

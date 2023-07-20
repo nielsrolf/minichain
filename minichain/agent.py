@@ -159,7 +159,7 @@ class Agent:
         self.silent = silent
         self.keep_session = keep_session
 
-        def do_nothing(*args, **kwargs):
+        async def do_nothing(*args, **kwargs):
             pass
 
         default_message_action = self.print_message if not silent else do_nothing
@@ -170,7 +170,7 @@ class Agent:
 
         self.functions_openai = [i.openapi_json for i in self.functions]
 
-    def print_message(self, message):
+    async def print_message(self, message):
         print("-" * 120)
         print(f"Message to Agent({self.system_message.content})")
         if isinstance(message, dict):
