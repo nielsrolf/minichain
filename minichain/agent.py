@@ -1,3 +1,4 @@
+import dataclasses
 import inspect
 import json
 from dataclasses import asdict, dataclass
@@ -228,7 +229,7 @@ class Agent:
             response.get("content", None), function_call=function_call
         )
 
-    @debug
+    
     def execute_action(self, function_call):
         try:
             for function in self.functions:
@@ -244,7 +245,7 @@ class Agent:
                     function_output = function(**arguments)
                     function_output_str = function_output
                     if not isinstance(function_output, str):
-                        function_output_str = json.dumps(function_output)
+                        function_output_str = json.dumps([dataclasses.asdict(i) for i in function_output])
                     function_message = FunctionMessage(
                         function_output_str, function.name
                     )
@@ -257,6 +258,7 @@ class Agent:
                 )
             )
         except Exception as e:
+            raise e
             try:
                 msg = f"{type(e)}: {e} - {e.msg}"
             except AttributeError:
