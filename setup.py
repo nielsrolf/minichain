@@ -9,15 +9,16 @@ setup(
     package_data={},
     scripts=[],
     install_requires=[
-        "click",
-        "python-dotenv",
-        "openai",
-        "replicate",
-        "selenium",
-        "html2text",
-        "webdriver_manager"
-        "retry",
-        "google-search-results",
+        "click==8.1.6",
+        "python-dotenv==1.0.0",
+        "openai==0.27.8",
+        "replicate==0.9.0",
+        "selenium==4.10.0",
+        "html2text==2020.1.16",
+        "webdriver_manager==3.9.1",
+        "retry==0.9.2",
+        "google-search-results==2.4.2",
+        "duckduckgo_search==3.8.4"
     ],
     extras_require={
         "test": [
