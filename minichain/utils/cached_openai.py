@@ -1,4 +1,5 @@
 import json
+import os 
 
 import numpy as np
 import openai
@@ -22,7 +23,7 @@ def validate_message(message):
 @retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
 @debug
 def get_openai_response(
-    chat_history, functions, model="gpt-4-0613"
+    chat_history, functions, model= os.getenv("DEFAULT_OPENAI_MODEL","gpt-3.5-turbo-16k") 
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     messages = []
     for i in chat_history:

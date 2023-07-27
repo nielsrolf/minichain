@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 from minichain.agent import Agent, Function, SystemMessage, tool
 from minichain.tools.document_qa import AnswerWithCitations
 from minichain.tools.google_search import google_search_function
+from minichain.tools.duckduckgo_search import duckduckgo_search_function
 from minichain.tools.recursive_summarizer import text_scan
 from minichain.tools.text_to_memory import Memory
 from minichain.utils.markdown_browser import markdown_browser
@@ -86,10 +88,24 @@ def scan_website(
 # )
 
 
+def get_available_functions():
+    functions = [scan_website]
+    if os.getenv("SERP_API_KEY") is not None:
+        functions.append(google_search_function)
+    else:
+        # Even though duckduckgo is a different service than google, I decided to keep
+        # "google" term in the function name.
+        functions.append(duckduckgo_search_function)
+    return functions
+
+
+
 class WebGPT(Agent):
     def __init__(self, silent=False, **kwargs):
+        
+
         super().__init__(
-            functions=[google_search_function, scan_website],
+            functions=get_available_functions(),
             system_message=SystemMessage(
                 "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information to answer the question or fulfill the user request, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
             ),
