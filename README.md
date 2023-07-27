@@ -57,8 +57,13 @@ print(response['content'], response['sources'])
 
 
 ## Install
+
+Clone this repository. Then install the package in editable mode.
+
+Navigate to the root of the project you'd like to install minichain to and run:
+
 ```
-pip install -e .
+pip install -e "path/to/minichain"
 ```
 
 
