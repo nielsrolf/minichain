@@ -13,6 +13,9 @@ setup(
         "python-dotenv",
         "openai",
         "replicate",
+        "selenium",
+        "html2text",
+        "webdriver_manager"
         "retry",
         "google-search-results",
     ],
