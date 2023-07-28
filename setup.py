@@ -17,8 +17,8 @@ setup(
         "retry==0.9.2",
         "google-search-results==2.4.2",
         "duckduckgo_search==3.8.4",
+        "playwright==1.36.0",
         "numpy",
-        "pytest-playwright",
     ],
     extras_require={
         "test": [

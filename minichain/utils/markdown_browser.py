@@ -40,7 +40,7 @@ def markdown_browser(url):
         page = browser.new_page()
         page.goto(url)
         markdown = html2text.html2text(page.content())
-        print(markdown)
+        # Wait for user input in terminal
         browser.close()
         return markdown
 
