@@ -1,6 +1,7 @@
 import json
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from pydantic.error_wrappers import ValidationError
 from typing import Any, Dict
 from minichain.agents.webgpt import SmartWebGPT
 from minichain.agents.programmer import Programmer
@@ -90,12 +91,15 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
         await websocket.send_text(char)
 
 
-    while True:
-        try:
+    try:
+        while True:
             data = await websocket.receive_text()
             print("received data", data)
-            payload = Payload(**json.loads(data))
-            
+            try:
+                payload = Payload(**json.loads(data))
+            except ValidationError as e:
+                # probably a heart beat
+                continue        
             if agent_name not in agents:
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
@@ -111,8 +115,8 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 on_stream_message=on_stream_message,
             )
             response = await agent.run(query=payload.query)
-        except Exception as e:
-            traceback.print_exc()
+    except Exception as e:
+        traceback.print_exc()
 
         # await websocket.send_json(response.dict())
         # except Exception as e:

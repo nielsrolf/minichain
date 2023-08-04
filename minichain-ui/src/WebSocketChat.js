@@ -14,51 +14,60 @@ const WebSocketChat = () => {
 
     const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl);
 
+    
+
+    
+
     useEffect(() => {
+        const handleMessage = (message) => {
+            console.log({ message })
+            // let message = JSON.parse(data);
+            // Parse the incoming message and update the state based on its contents
+            if (message.type === 'start') {
+                // Initialize a new conversation
+                const previousMsgId = conversations[currentConversationId]?.id || 'main';
+                setConversations({
+                    ...conversations,
+                    [message.conversation_id]: {
+                        messages: [],
+                    },
+                });
+                setSubConversations({
+                    ...subConversations,
+                    [previousMsgId]: message.conversation_id,
+                });
+                console.log({
+                    ...conversations,
+                    [message.conversation_id]: {
+                        messages: [],
+                    },
+                })
+                setCurrentConversationId(message.conversation_id);
+            } else if (message.type === 'end') {
+                // set current conversation to parrent conversation: key of the value of the current conversation
+                const parent = Object.keys(subConversations).find(key => subConversations[key].includes(currentConversationId));
+                setCurrentConversationId(parent);
+            } else {
+                // Add a new message to the current conversation
+                console.log({ message, currentConversationId, conversations })
+                console.log(conversations[currentConversationId])
+                setConversations({
+                    ...conversations,
+                    [currentConversationId]: {
+                        ...conversations[currentConversationId],
+                        messages: [
+                            ...conversations[currentConversationId].messages,
+                            message,
+                        ],
+                    },
+                });
+            }
+        };
         if (lastMessage !== null) {
             const data = JSON.parse(lastMessage.data);
             handleMessage(data);
         }
-    }, [lastMessage]);
-
-    const handleMessage = (message) => {
-        console.log({ message })
-        // let message = JSON.parse(data);
-        // Parse the incoming message and update the state based on its contents
-        if (message.type === 'start') {
-            // Initialize a new conversation
-            setSubConversations({
-                ...subConversations,
-                [currentConversationId]: [
-                    ...(subConversations[currentConversationId] || []),
-                    message.conversationId,
-                ]
-            });
-            setConversations({
-                ...conversations,
-                [message.conversationId]: {
-                    messages: [],
-                },
-            });
-            setCurrentConversationId(message.conversationId);
-        } else if (message.type === 'end') {
-            // set current conversation to parrent conversation: key of the value of the current conversation
-            const parent = Object.keys(subConversations).find(key => subConversations[key].includes(currentConversationId));
-            setCurrentConversationId(parent);
-        } else {
-            // Add a new message to the current conversation
-            setConversations({
-                ...conversations,
-                [currentConversationId]: {
-                    ...conversations[currentConversationId],
-                    messages: [
-                        ...conversations[currentConversationId].messages,
-                        message,
-                    ],
-                },
-            });
-        }
-    };
+    }, [lastMessage, conversations, currentConversationId, subConversations]);
 
     const handleInputChange = (event) => {
         setInputValue(event.target.value);
@@ -82,14 +91,20 @@ const WebSocketChat = () => {
         }
     }, [readyState, sendMessage]);
 
+    console.log({ conversations, currentConversationId, "selected": conversations[currentConversationId] });
+
     return (
         <div>
             <div>
                 <button onClick={() => setCurrentConversationId('main')}>Back to main</button>
-                <ChatConversation
-                    conversation={conversations[currentConversationId]}
-                    onSubConversationOpen={setCurrentConversationId}
-                />
+                {
+                    conversations[currentConversationId] && (
+                        <ChatConversation
+                            conversation={conversations[currentConversationId]}
+                            onSubConversationOpen={setCurrentConversationId}
+                        />
+                    )
+                }
                 <input type="text" value={inputValue} onChange={handleInputChange} />
                 <button onClick={handleSubmit}>Send</button>
             </div>
@@ -225,7 +240,7 @@ const ChatConversation = ({ conversation, onSubConversationOpen }) => {
                 <ChatMessage
                     key={message.id}
                     message={message}
-                    onSubConversationOpen={onSubConversationOpen}
+                    onSubConversationOpen={onSubConversationOpen(message.id)}
                 />
             ))}
         </div>
