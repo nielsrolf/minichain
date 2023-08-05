@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { w3cwebsocket as W3CWebSocket } from "websocket";
+import './ChatApp.css';
+import DisplayJson from './DisplayJson';
+
+
+
+
 
 const ChatApp = () => {
     const [client, setClient] = useState(null);
@@ -121,27 +127,21 @@ const ChatApp = () => {
         setInputValue("");
     };
 
-    if (connectionStatus !== "CONNECTED") {
-        return (
-            <div>
-                WebSocket connection status: {connectionStatus}
-            </div>
-        )
-    }
-
     return (
-        <div>
+        <div className="main">
+            <p>Connection: {connectionStatus}</p>
             <div>
                 {conversationTree.conversations[displayConversationId] && conversationTree.conversations[displayConversationId].map((message, index) =>
-                    <div key={index} onClick={() => handleSubConversationClick(message.id)}>
-                        <div>{message.role}: {message.content}</div>
+                    <div className={`message-${message.role}`} key={index} onClick={() => handleSubConversationClick(message.id)}>
+                        {message.function_call && <DisplayJson data={message.function_call} />}
+                        <DisplayJson data={message.content} />
                         {conversationTree.subConversations[message.id] && <div>Click to view sub conversation</div>}
                     </div>
                 )}
             </div>
-            <div>
-                <textarea value={inputValue} onChange={e => setInputValue(e.target.value)}></textarea>
-                <button onClick={sendMessage}>Send</button>
+            <div className="input-area">
+                <textarea className="user-input" value={inputValue} onChange={e => setInputValue(e.target.value)}></textarea>
+                <button className="send-button" onClick={sendMessage}>Send</button>
             </div>
         </div>
     );
