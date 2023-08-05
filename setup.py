@@ -15,6 +15,7 @@ setup(
         "replicate",
         "retry",
         "google-search-results",
+        "fastapi",
     ],
     extras_require={
         "test": [

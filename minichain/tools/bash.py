@@ -25,7 +25,7 @@ class BashSession(Function):
         self.image_name = image_name
         self.stream = stream
 
-    def __call__(self, commands: List[str]) -> str:
+    async def __call__(self, commands: List[str]) -> str:
         return bash(commands, session=self.session, stream=self.stream)
 
     # when the session is destroyed, stop the container
@@ -44,7 +44,7 @@ class CodeInterpreterQuery(BaseModel):
 
 
 class CodeInterpreter(Function):
-    def __init__(self, stream=lambda i: i):
+    def __init__(self, stream=lambda i: i, **kwargs):
         super().__init__(
             name="python",
             openapi=CodeInterpreterQuery,
@@ -53,7 +53,7 @@ class CodeInterpreter(Function):
         )
         self.bash = BashSession(stream=stream)
 
-    def __call__(self, code: str) -> str:
+    async def __call__(self, code: str) -> str:
         filename = uuid.uuid4().hex
         with open(f"{filename}.py", "w") as f:
             f.write(code)
@@ -62,14 +62,15 @@ class CodeInterpreter(Function):
         return output
 
 
-def test_bash_session():
+async def test_bash_session():
     bash = BashSession(stream=lambda i: print(i, end=""))
     # response = bash(commands=["echo hello world", "pip install librosa"])
-    response = bash(commands=["touch testfile", "echo hello world"])
+    response = await bash(commands=["touch testfile", "echo hello world"])
     assert response.split("\n") == "hello world"
     response = bash(commands=["ls"])
     assert "testfile" in response.split("\n")
 
 
 if __name__ == "__main__":
-    test_bash_session()
+    import asyncio
+    asyncio.run(test_bash_session())

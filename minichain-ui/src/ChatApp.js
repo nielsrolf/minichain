@@ -2,9 +2,18 @@ import React, { useState, useEffect } from "react";
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import './ChatApp.css';
 import DisplayJson from './DisplayJson';
+import CodeBlock from "./CodeBlock";
 
 
 
+const functionsToRenderAsCode = [
+    "bash",
+    "python",
+    "view",
+    "edit",
+    "view_symbol",
+    "replace_symbol",
+];
 
 
 const ChatApp = () => {
@@ -21,7 +30,9 @@ const ChatApp = () => {
     });
 
     useEffect(() => {
-        const client = new W3CWebSocket('ws://localhost:8000/ws/webgpt');
+        // get the agent name from the URL
+        const agentName = window.location.pathname.split("/").pop();
+        const client = new W3CWebSocket(`ws://localhost:8000/ws/${agentName}`);
 
         client.onopen = () => {
             console.log('WebSocket Client Connected');
@@ -39,6 +50,7 @@ const ChatApp = () => {
         };
 
         client.onmessage = (message) => {
+            console.log("message received", message);
             const data = JSON.parse(message.data);
             console.log({ data })
             switch (data.type) {
@@ -82,7 +94,12 @@ const ChatApp = () => {
                         });
                         setConversationTree(prevConversationTree => {
                             const { conversations, subConversations, parents } = prevConversationTree;
-                            const lastParentMessageId = conversations[parents[data.conversation_id]].slice(-1)[0].id;
+                            let lastParentMessageId = null;
+                            try {
+                                lastParentMessageId = conversations[parents[data.conversation_id]].slice(-1)[0].id;
+                            } catch (error) {
+                                // we are at the root, we leave it as null
+                            }
                             return {
                                 conversations: conversations,
                                 subConversations: subConversations,
@@ -189,7 +206,8 @@ const ChatApp = () => {
                 {conversationTree.conversations[path[path.length - 1]] && conversationTree.conversations[path[path.length - 1]].map((message, index) =>
                     <div className={`message-${message.role}`} key={index} onClick={() => handleSubConversationClick(message.id)}>
                         {message.function_call && <DisplayJson data={message.function_call} />}
-                        <DisplayJson data={message.content} />
+                        {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
+                        
                         {conversationTree.subConversations[message.id] && <div>Click to view sub conversation {conversationTree.subConversations[message.id]}</div>}
                     </div>
                 )}

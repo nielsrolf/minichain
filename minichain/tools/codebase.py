@@ -42,7 +42,7 @@ def get_initial_summary(
                     available_files.append(filename)
     try:
         with open("README.md") as f:
-            summary = "README:\n" + "\n".join(f.readlines()[:5]) + "...\n"
+            summary = "\n".join(f.readlines()[:5]) + "...\n"
     except:
         summary = ""
     summary += "Files:\n" + "\n".join(available_files)
@@ -109,8 +109,28 @@ async def get_file_summary(path: str = Field(..., description="The path to the f
     return f"# {path}\n{summary}\n\n"
 
 
+
 @tool()
-def view(
+async def scan_file_for_info(
+    path: str = Field(..., description="The path to the file."),
+    question: str = Field(..., description="The question to ask.")
+):
+    """Search a file for specific information"""
+    if path.endswith(".py"):
+        summary = summarize_python_file(path)
+    else:
+        print("Summary:", path)
+        with open(path, "r") as f:
+            text = f.read()
+        summary = await long_document_qa(
+            text=text,
+            question=question,
+        )
+    return f"# {path}\n{summary}\n\n"
+
+
+@tool()
+async def view(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
     end: int = Field(..., description="The end line."),
@@ -131,7 +151,7 @@ def view(
 
 
 @tool()
-def edit(
+async def edit(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
     end: int = Field(..., description="The end line."),
@@ -169,7 +189,7 @@ def remove_line_numbers(code):
 
 
 @tool()
-def replace_symbol(
+async def replace_symbol(
     path: str = Field(..., description="The path to the file"),
     symbol: str = Field(
         ...,
@@ -215,7 +235,7 @@ def replace_symbol(
 
 
 @tool()
-def view_symbol(
+async def view_symbol(
     path: str = Field(..., description="The path to the file"),
     symbol: str = Field(
         ...,
@@ -251,9 +271,14 @@ def view_symbol(
     return "Symbol not found. Available symbols:\n" + "\n".join([symbol['id'] for symbol in all_symbols])
 
 
-if __name__ == "__main__":
+async def test_codebase():
     print(get_initial_summary())
     # out = replace_symbol(path="./minichain/tools/bla.py", symbol="foo", code="test\n", is_new=False)
     print(view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
     print(view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
     print(view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_codebase())    

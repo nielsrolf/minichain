@@ -4,6 +4,7 @@ import './DisplayJson.css';
 import CodeBlock from './CodeBlock';
 
 
+
 const DisplayJson = ({ data }) => {
   const [isFolded, setIsFolded] = useState({});
 
@@ -69,6 +70,11 @@ const DisplayJson = ({ data }) => {
 
     return Object.entries(data).map(([key, value]) => {
       const newKey = `${parentKey}.${key}`;
+      if (key === 'code') {
+        return (
+            <CodeBlock key={newKey} code={removeLineNumbers(value)} />
+        );
+      }
       return (
         <div key={newKey} style={{ marginLeft: '20px' }}>
           <b style={{ cursor: 'pointer' }} onClick={() => toggleFold(newKey)}>
