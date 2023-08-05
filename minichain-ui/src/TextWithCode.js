@@ -27,11 +27,14 @@ const TextWithCode = ({ text }) => {
     setTextParts(newParts);
   }, [text]);
 
+
   return (
     <div>
       {textParts.map((part, index) => part.isCode
         ? <CodeBlock key={index} code={part.text} />
-        : <ReactMarkdown key={index}>{part.text}</ReactMarkdown>)}
+        : <ReactMarkdown key={index}>{part.text.replace(/\n/g, '  \n')}</ReactMarkdown>)}
+        {/* // : <ReactMarkdown key={index}>{handleNewlines(part.text)}</ReactMarkdown>)} */}
+
     </div>
   );
 };

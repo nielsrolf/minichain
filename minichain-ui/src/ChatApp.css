@@ -3,7 +3,7 @@
 .main {
   margin: auto;
   max-width: 1000px;
-  background-color: rgb(50, 50, 70);
+  background-color: rgba(50, 50, 70, 0.2);
   color: white;
   height: 100vh;
 }
@@ -13,7 +13,7 @@
   height: auto;
   min-height: 10em;
   position: relative;
-  background-color: rgb(68, 68, 108);
+  background-color: rgba(68, 68, 108, 1);
   color: white;
 }
 
@@ -39,19 +39,19 @@
 }
 
 .message-system {
-  background-color: rgb(69, 93, 69)
+  background-color: rgba(69, 93, 69)
 }
 
 .message-user {
-  background-color: rgb(68, 68, 108);
+  background-color: rgba(68, 68, 108, 0.2);
 }
 
 .message-assistant {
-  background-color: rgb(72, 72, 72);
+  background-color: rgba(72, 72, 72, 0.2);
 }
 
 .message-function {
-  background-color: rgb(40, 71, 40);
+  background-color: rgba(40, 71, 40, 0.2);
 }
 
 .input-area {
@@ -65,4 +65,13 @@
 .spacer {
     /* push the input area to the bottom of the page */
     height: 50vh;
+}
+
+.header {
+    padding: 10px;
+    position: fixed;
+    top: 0;
+    background-color: rgba(50, 50, 70, 1);
+    width: 100%;
+    border-bottom: 1px solid black;
 }

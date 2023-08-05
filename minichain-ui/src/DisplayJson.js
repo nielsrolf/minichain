@@ -35,6 +35,10 @@ const DisplayJson = ({ data }) => {
       }
     }
 
+    if (typeof data === 'number' || typeof data === 'boolean') {
+        return data.toString();
+    }
+
     if (Array.isArray(data)) {
       return (
         <div>

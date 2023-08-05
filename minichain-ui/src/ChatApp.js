@@ -11,6 +11,7 @@ const ChatApp = () => {
     const [client, setClient] = useState(null);
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
     const [inputValue, setInputValue] = useState("");
+    const [path, setPath] = useState([]);
 
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
@@ -47,10 +48,9 @@ const ChatApp = () => {
                     if (data.conversation_id) {
                         console.log("Starting new conversation: " + data.conversation_id);
                         setConversationTree(prevConversationTree => {
-                            const { conversations, subConversations, activeConversationId, lastMessageId } = prevConversationTree;
-                            const newConversation = conversations[activeConversationId] || [];
+                            const { conversations, subConversations, lastMessageId } = prevConversationTree;
                             return {
-                                conversations: { ...conversations, [data.conversation_id]: newConversation },
+                                conversations: { ...conversations, [data.conversation_id]: [] },
                                 subConversations: { ...subConversations, [lastMessageId]: data.conversation_id },
                                 activeConversationId: data.conversation_id,
                                 lastMessageId: lastMessageId
@@ -112,7 +112,7 @@ const ChatApp = () => {
     const handleSubConversationClick = (messageId) => {
         const subConversationId = conversationTree.subConversations[messageId];
         if (subConversationId) {
-            setDisplayConversationId(subConversationId);
+            _setDisplayConversationId(subConversationId);
         }
     };
 
@@ -127,9 +127,30 @@ const ChatApp = () => {
         setInputValue("");
     };
 
+    const _setDisplayConversationId = (id) => {
+        setPath(prevPath => [...prevPath, displayConversationId]);
+        setDisplayConversationId(id);
+        console.log("Setting display conversation id to " + id);
+    };
+
+
     return (
         <div className="main">
-            <p>Connection: {connectionStatus}</p>
+            {connectionStatus !== "CONNECTED" && <p>Connection: {connectionStatus}</p>}
+            <div className="header">
+                <button onClick={() => _setDisplayConversationId("root")}>Back to root</button>
+                <button onClick={() => {
+                    console.log({ path, displayConversationId });
+                    if (path.length > 0) {
+                        const previousConversationId = path.pop();
+                        console.log("Going back", path, previousConversationId)
+                        setPath(path);
+                        setDisplayConversationId(previousConversationId);
+                    }
+                }}>Back </button>
+            </div>
+            <div style={{ height: "50px" }}></div>
+
             <div>
                 {conversationTree.conversations[displayConversationId] && conversationTree.conversations[displayConversationId].map((message, index) =>
                     <div className={`message-${message.role}`} key={index} onClick={() => handleSubConversationClick(message.id)}>
