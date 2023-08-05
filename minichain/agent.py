@@ -16,7 +16,7 @@ from minichain.utils.debug import debug
 class SystemMessage:
     content: str
     role: str = "system"
-    parent: str = None
+    conversation_id: str = None
 
     # short uuid as default
     id: Optional[str] = None
@@ -27,7 +27,6 @@ class SystemMessage:
 
     def dict(self):
         json = asdict(self)
-        json["parent"] = self.parent.id if self.parent else None
         return json
 
     def __str__(self):
@@ -38,9 +37,8 @@ class SystemMessage:
 class UserMessage:
     content: str
     role: str = "user"
-    parent: Union[
-        "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
-    ] = None
+    conversation_id: str = None
+
     # short uuid as default
     id: Optional[str] = None
 
@@ -50,7 +48,6 @@ class UserMessage:
 
     def dict(self):
         json = asdict(self)
-        json["parent"] = self.parent.id if self.parent else None
         return json
 
     def __str__(self):
@@ -71,9 +68,7 @@ class AssistantMessage:
     content: str
     function_call: Optional[FunctionCall] = None
     role: str = "assistant"
-    parent: Union[
-        "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
-    ] = None
+    conversation_id: str = None
     # short uuid as default
     id: Optional[str] = None
 
@@ -83,7 +78,6 @@ class AssistantMessage:
 
     def dict(self):
         json = asdict(self)
-        json["parent"] = self.parent.id if self.parent else None
         return json
 
     def __str__(self):
@@ -95,7 +89,8 @@ class FunctionMessage:
     content: str
     name: str
     role: str = "function"
-    parent: Optional[AssistantMessage] = None
+    conversation_id: str = None
+
     # short uuid as default
     id: Optional[str] = None
 
@@ -105,7 +100,6 @@ class FunctionMessage:
 
     def dict(self):
         json = asdict(self)
-        json["parent"] = self.parent.id if self.parent else None
         return json
 
     def __str__(self):
@@ -169,6 +163,7 @@ class Agent:
         self.on_stream_message = on_stream_message or do_nothing
 
         self.functions_openai = [i.openapi_json for i in self.functions]
+        self.conversation_id = str(uuid.uuid4().hex[:5])
 
     async def print_message(self, message):
         print("-" * 120)
@@ -188,7 +183,7 @@ class Agent:
 
     async def history_append(self, message):
         print("history append", message)
-        message.parent = self.history[-1]
+        message.conversation_id = self.conversation_id
         await self.on_message_send(message)
         self.history.append(message)
 
@@ -214,11 +209,12 @@ class Agent:
         return response
 
     async def run_until_done(self):
-        conversation_id = str(uuid.uuid4().hex[:5])
-        await self.on_message_send({"type": "start", "conversation_id": conversation_id})
-        for i in self.init_history or []:
-            await self.on_message_send(i)
+        await self.on_message_send({"type": "start", "conversation_id": self.conversation_id})
+        self.system_message.conversation_id = self.conversation_id
         await self.on_message_send(self.system_message)
+        for i in self.init_history or []:
+            i.conversation_id = self.conversation_id
+            await self.on_message_send(i)
         while True:
             assistant_message = self.get_next_action()
             await self.history_append(assistant_message)
@@ -227,7 +223,7 @@ class Agent:
                 not self.has_structured_response
                 and assistant_message.content is not None
             ):
-                await self.on_message_send({"type": "end", "conversation_id": conversation_id})
+                await self.on_message_send({"type": "end", "conversation_id": self.conversation_id})
                 if not self.keep_session:
                     return assistant_message.content
                 else:
@@ -250,12 +246,11 @@ class Agent:
                     if self.keep_session:
                         output["session"] = self
                         self.init_history = self.history
-                    await self.on_message_send({"type": "end", "conversation_id": conversation_id})
+                    await self.on_message_send({"type": "end", "conversation_id": self.conversation_id})
                     return output
 
     async def task_to_history(self, arguments):
         await self.history_append(UserMessage(self.prompt_template(**arguments)))
-        self.on_message_send(self.history[-1])
 
     def get_next_action(self):
         # do the openai call
@@ -266,7 +261,12 @@ class Agent:
             + indizes[-self.keep_last_messages :]
         )
         keep = sorted(list(set(keep)))
-        history = [self.history[i] for i in keep]
+        history = []
+        for i in keep:
+            msg = self.history[i].dict()
+            msg.pop("conversation_id", None)
+            msg.pop("id", None)
+            history.append(msg)
         response = get_openai_response(history, self.functions_openai)
         function_call = response.get("function_call", None)
         if function_call is not None:
@@ -312,13 +312,13 @@ class Agent:
                 # breakpoint()
 
             await self.history_append(FunctionMessage(msg, function.name))
-        self.on_message_send(self.history[-1])
+        # self.on_message_send(self.history[-1])
         print(self.history[-1].content)
         return False
 
     async def follow_up(self, user_message):
         await self.history_append(user_message)
-        self.on_message_send(self.history[-1])
+        # self.on_message_send(self.history[-1])
         return await self.run_until_done()
 
     def as_function(self, name, description, prompt_openapi):

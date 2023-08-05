@@ -75,3 +75,11 @@
     width: 100%;
     border-bottom: 1px solid black;
 }
+
+.disconnected {
+    color: red;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 100;
+}

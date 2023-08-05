@@ -104,6 +104,7 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
             
+            breakpoint()
             init_history = message_db.get_history(payload.response_to)
 
             # try:

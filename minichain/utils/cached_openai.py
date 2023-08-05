@@ -25,15 +25,18 @@ def get_openai_response(
     chat_history, functions, model="gpt-4-0613"
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     messages = []
-    for i in chat_history:
-        print(i)
-        message = i.dict()
-        # delete the parent field
-        message.pop("parent", None)
-        message.pop("id", None)
-        # delete all fields that are None
-        message = {k: v for k, v in message.items() if v is not None or k == "content"}
-        messages.append(message)
+    if not isinstance(chat_history[0], dict):
+        for i in chat_history:
+            print(i)
+            message = i.dict()
+            # delete the parent field
+            message.pop("parent", None)
+            message.pop("id", None)
+            # delete all fields that are None
+            message = {k: v for k, v in message.items() if v is not None or k == "content"}
+            messages.append(message)
+    else:
+        messages = chat_history
     # print(messages[-2])
     # print("=====================================")
     if len(functions) > 0:

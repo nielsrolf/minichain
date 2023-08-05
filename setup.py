@@ -25,6 +25,7 @@ setup(
             "flake8",
             "pytest-cov",
             "httpx",
+            "playwright"
         ],
     },
     entry_points={

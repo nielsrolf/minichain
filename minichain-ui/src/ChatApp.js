@@ -11,7 +11,7 @@ const ChatApp = () => {
     const [client, setClient] = useState(null);
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
     const [inputValue, setInputValue] = useState("");
-    const [path, setPath] = useState([]);
+    const [path, setPath] = useState(["root"]);
 
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
@@ -19,7 +19,6 @@ const ChatApp = () => {
         activeConversationId: "root",
         lastMessageId: null,
     });
-    const [displayConversationId, setDisplayConversationId] = useState("root");
 
     useEffect(() => {
         const client = new W3CWebSocket('ws://localhost:8000/ws/webgpt');
@@ -40,7 +39,6 @@ const ChatApp = () => {
         };
 
         client.onmessage = (message) => {
-            console.log({ conversationTree, message })
             const data = JSON.parse(message.data);
             console.log({ data })
             switch (data.type) {
@@ -56,7 +54,7 @@ const ChatApp = () => {
                                 lastMessageId: lastMessageId
                             };
                         });
-                        //   setDisplayConversationId(data.conversation_id);
+                        //   setpath[path.length - 1](data.conversation_id);
                         //   setActiveConversationId(data.conversation_id);
                         //   setConversations({...conversations, [data.conversation_id]: []});
                         //   setSubConversations({...subConversations, [lastMessageId]: data.conversation_id});
@@ -67,37 +65,38 @@ const ChatApp = () => {
                     }
                     break;
                 case "end":
-                    if (data.conversation_id) {
-                        // set active conversation to parent conversation
-                        setConversationTree(prevConversationTree => {
-                            const { conversations, subConversations, activeConversationId, lastMessageId } = prevConversationTree;
-                            const parent = Object.keys(subConversations).find(key => subConversations[key].includes(data.conversation_id));
-                            return {
-                                conversations: conversations,
-                                subConversations: subConversations,
-                                activeConversationId: parent,
-                                lastMessageId: lastMessageId
-                            };
-                        });
-                    } else {
-                        // we are ending a stream of messages.
-                        // TODO
-                        console.log("Ending a stream of messages - not implemented", data);
-                    }
+                    // if (data.conversation_id) {
+                    //     // set active conversation to parent conversation
+                    //     setConversationTree(prevConversationTree => {
+                    //         const { conversations, subConversations, lastMessageId } = prevConversationTree;
+                    //         const parent = Object.keys(subConversations).find(key => subConversations[key].includes(data.conversation_id));
+                    //         return {
+                    //             conversations: conversations,
+                    //             subConversations: subConversations,
+                    //             activeConversationId: parent,
+                    //             lastMessageId: lastMessageId
+                    //         };
+                    //     });
+                    // } else {
+                    //     // we are ending a stream of messages.
+                    //     // TODO
+                    //     console.log("Ending a stream of messages - not implemented", data);
+                    // }
                     break;
                 default:
                     console.log("Adding to conv tree: " + message.data);
                     const { id } = data;
                     setConversationTree(prevConversationTree => {
-                        const { conversations, subConversations, activeConversationId } = prevConversationTree;
-                        const newConversation = conversations[activeConversationId] || [];
+                        const { conversations, subConversations } = prevConversationTree;
+                        const newConversation = conversations[data.conversation_id] || [];
                         return {
-                            conversations: { ...conversations, [activeConversationId]: [...newConversation, data] },
+                            conversations: { ...conversations, [data.conversation_id]: [...newConversation, data] },
                             subConversations: subConversations,
-                            activeConversationId: activeConversationId,
+                            activeConversationId: data.conversation_id,
                             lastMessageId: id
                         };
                     });
+                    pusToPath(data.conversation_id);
             }
         };
 
@@ -112,7 +111,7 @@ const ChatApp = () => {
     const handleSubConversationClick = (messageId) => {
         const subConversationId = conversationTree.subConversations[messageId];
         if (subConversationId) {
-            _setDisplayConversationId(subConversationId);
+            pusToPath(subConversationId);
         }
     };
 
@@ -127,32 +126,38 @@ const ChatApp = () => {
         setInputValue("");
     };
 
-    const _setDisplayConversationId = (id) => {
-        setPath(prevPath => [...prevPath, displayConversationId]);
-        setDisplayConversationId(id);
+    const pusToPath = (id) => {
+        setPath(prevPath => {
+            // if we are already on that path, do nothing
+            if (prevPath[prevPath.length - 1] === id) {
+                return prevPath;
+            }
+            // otherwise push the path to the stack
+            return [...prevPath, id]
+        });
+        // setpath[path.length - 1](id);
         console.log("Setting display conversation id to " + id);
     };
+
+    console.log({ conversationTree });
 
 
     return (
         <div className="main">
-            {connectionStatus !== "CONNECTED" && <p>Connection: {connectionStatus}</p>}
+            {connectionStatus !== "CONNECTED" && <div className="disconnected">Connection: {connectionStatus}</div>}
             <div className="header">
-                <button onClick={() => _setDisplayConversationId("root")}>Back to root</button>
+                <button onClick={() => pusToPath("root")}>Back to root</button>
                 <button onClick={() => {
-                    console.log({ path, displayConversationId });
-                    if (path.length > 0) {
-                        const previousConversationId = path.pop();
-                        console.log("Going back", path, previousConversationId)
-                        setPath(path);
-                        setDisplayConversationId(previousConversationId);
+                    if (path.length > 1) {
+                        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
                     }
                 }}>Back </button>
+                {path[path.length - 1]} {JSON.stringify(path)}
             </div>
             <div style={{ height: "50px" }}></div>
 
             <div>
-                {conversationTree.conversations[displayConversationId] && conversationTree.conversations[displayConversationId].map((message, index) =>
+                {conversationTree.conversations[path[path.length - 1]] && conversationTree.conversations[path[path.length - 1]].map((message, index) =>
                     <div className={`message-${message.role}`} key={index} onClick={() => handleSubConversationClick(message.id)}>
                         {message.function_call && <DisplayJson data={message.function_call} />}
                         <DisplayJson data={message.content} />
@@ -160,7 +165,7 @@ const ChatApp = () => {
                     </div>
                 )}
             </div>
-            <div class="spacer"></div>
+            <div className="spacer"></div>
             <div className="input-area">
                 <textarea className="user-input" value={inputValue} onChange={e => setInputValue(e.target.value)}></textarea>
                 <button className="send-button" onClick={sendMessage}>Send</button>
