@@ -16,6 +16,7 @@ const ChatApp = () => {
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
         subConversations: {},
+        parents: {},
         lastMessageId: null,
     });
 
@@ -42,13 +43,21 @@ const ChatApp = () => {
             console.log({ data })
             switch (data.type) {
                 case "start":
+                    console.log("Starting new conversation: " + data.conversation_id);
                     if (data.conversation_id) {
                         console.log("Starting new conversation: " + data.conversation_id);
                         setConversationTree(prevConversationTree => {
-                            const { conversations, subConversations, lastMessageId } = prevConversationTree;
+                            const { conversations, subConversations, lastMessageId, parents } = prevConversationTree;
+                            let activeConversationId = "root";
+                            if (lastMessageId) {
+                                // get the conversation if of the last message
+                                activeConversationId = Object.keys(conversations).find(conversationId => conversations[conversationId].map(message => message.id).includes(lastMessageId));
+                            }
+                            console.log(`New conversation ${data.conversation_id} jas parent ${activeConversationId}`);
                             return {
                                 conversations: { ...conversations, [data.conversation_id]: [] },
                                 subConversations: { ...subConversations, [lastMessageId]: data.conversation_id },
+                                parents: { ...parents, [data.conversation_id]: activeConversationId },
                                 lastMessageId: lastMessageId
                             };
                         });
@@ -71,6 +80,15 @@ const ChatApp = () => {
                             }
                             return newPath;
                         });
+                        setConversationTree(prevConversationTree => {
+                            const { conversations, subConversations, parents } = prevConversationTree;
+                            return {
+                                conversations: conversations,
+                                subConversations: subConversations,
+                                parents: parents,
+                                lastMessageId: null
+                            };
+                        });
                     } else {
                         // we are ending a stream of messages.
                         // TODO
@@ -81,11 +99,12 @@ const ChatApp = () => {
                     console.log("Adding to conv tree: " + message.data);
                     const { id } = data;
                     setConversationTree(prevConversationTree => {
-                        const { conversations, subConversations } = prevConversationTree;
+                        const { conversations, subConversations, parents } = prevConversationTree;
                         const newConversation = conversations[data.conversation_id] || [];
                         return {
                             conversations: { ...conversations, [data.conversation_id]: [...newConversation, data] },
                             subConversations: subConversations,
+                            parents: parents,
                             lastMessageId: id
                         };
                     });
@@ -114,8 +133,13 @@ const ChatApp = () => {
             console.error("Client is not connected");
             return;
         }
+        let response_to = null;
+        const currentConversationId = path[path.length - 1];
+        if (currentConversationId !== "root") {
+            response_to = currentConversationId;
+        }
 
-        const messagePayload = JSON.stringify({ query: inputValue, response_to: conversationTree.lastMessageId });
+        const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to });
         client.send(messagePayload);
         setInputValue("");
     };
@@ -159,6 +183,26 @@ const ChatApp = () => {
                         <DisplayJson data={message.content} />
                         {conversationTree.subConversations[message.id] && <div>Click to view sub conversation {conversationTree.subConversations[message.id]}</div>}
                     </div>
+                )}
+                {path[path.length - 1] === "root" && (
+                    // get the first messages of all sub conversations of root
+                    Object.keys(conversationTree.parents).map(subConversationId => {
+                        const parent = conversationTree.parents[subConversationId];
+                        const message = conversationTree.conversations[subConversationId]?.find(i => i.role==="user");
+                        if (parent !== "root") {
+                            console.log("not root", subConversationId, parent, message);
+                            return null;
+                        }
+                        console.log({ subConversationId, message });
+                        if (!message) {
+                            return null;
+                        }
+                        return (
+                            <div className={`message-${message.role}`} key={subConversationId} onClick={() => pusToPath(subConversationId)}>
+                                <DisplayJson data={message.content} />
+                            </div>
+                        );
+                    })
                 )}
             </div>
             <div className="spacer"></div>

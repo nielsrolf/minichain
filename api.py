@@ -9,6 +9,8 @@ from fastapi import WebSocket
 from collections import defaultdict
 from typing import Optional
 import traceback
+import uuid
+
 
 class MessageDB:
     def __init__(self):
@@ -18,11 +20,7 @@ class MessageDB:
         if not isinstance(message, dict):
             self.messages.append(message)
     
-    def get_history(self, message_id):
-        if message_id is None:
-            return None
-        message = self.get_message(message_id)
-        conversation_id = message.conversation_id
+    def get_history(self, conversation_id):
         return self.get_conversation(conversation_id)
 
     def get_message(self, message_id):
@@ -114,6 +112,13 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 continue
             
             init_history = message_db.get_history(payload.response_to)
+            rootId = payload.response_to # TODO get the conv id of the response_to message
+            if payload.response_to is None:
+                rootId = uuid.uuid4().hex[:5]
+                await websocket.send_json({"type": "start", "conversation_id": rootId})
+                init_message = {"role": "user", "content": payload.query, "conversation_id": rootId, "id": uuid.uuid4().hex[:5]}
+                message_db.add_message(init_message)
+                await websocket.send_json(init_message)
 
             # try:
             agent = agents[agent_name](
@@ -124,6 +129,12 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 on_stream_message=on_stream_message,
             )
             response = await agent.run(query=payload.query)
+            final_message = {"role": "assistant", "conversation_id": rootId, "id": uuid.uuid4().hex[:5], "content": response}
+            # db
+            message_db.add_message(final_message)
+            await websocket.send_json(final_message)
+            await websocket.send_json({"type": "end", "conversation_id": rootId})
+
     except Exception as e:
         traceback.print_exc()
 
