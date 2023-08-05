@@ -7,10 +7,12 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
+import asyncio
 
 
 warnings.filterwarnings("ignore")
-from minichain.utils.disk_cache import disk_cache
+from minichain.utils.disk_cache import async_disk_cache
 
 
 # @disk_cache
@@ -34,15 +36,16 @@ from minichain.utils.disk_cache import disk_cache
 #     return markdown
 
 
-@disk_cache
-def markdown_browser(url):
+@async_disk_cache
+async def markdown_browser(url):
     print("markdown_browser_playwright", url)
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(url)
-        markdown = html2text.html2text(page.content())
+    # with sync_playwright() as p:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await page.goto(url)
+        markdown = html2text.html2text(await page.content())
         # Wait for user input in terminal
         browser.close()
         return markdown
@@ -52,7 +55,9 @@ def markdown_browser(url):
 @click.argument("url")
 def main(url):
     print(url)
-    print(markdown_browser(url))
+    async def run_and_print():
+        print(await markdown_browser(url))
+    asyncio.run(run_and_print())
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ class DiskCache:
                 except:
                     pass
                 return output
-        except FileNotFoundError:
+        except:
             return None
 
     def save_to_cache(self, key, args, kwargs, value):
@@ -62,3 +62,21 @@ class DiskCache:
 
 
 disk_cache = DiskCache()
+
+
+class AsyncDiskCache(DiskCache):
+    def cache(self, func):
+        async def wrapper(*args, **kwargs):
+            key = str(repr({"args": args, "kwargs": kwargs, "f": func.__name__}))
+            cached_value = self.load_from_cache(key)
+            if cached_value is not None:
+                return cached_value
+            else:
+                print(f"Cache miss")
+                result = await func(*args, **kwargs)
+                self.save_to_cache(key, args, kwargs, result)
+                return result
+
+        return wrapper
+
+async_disk_cache = AsyncDiskCache()

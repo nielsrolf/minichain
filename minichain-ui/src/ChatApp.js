@@ -110,6 +110,7 @@ const ChatApp = () => {
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (messageId) => {
         const subConversationId = conversationTree.subConversations[messageId];
+        console.log("clicked on sub conversation: " + subConversationId + " for message: " + messageId + "")
         if (subConversationId) {
             pusToPath(subConversationId);
         }

@@ -21,13 +21,22 @@ class MessageDB:
     def get_history(self, message_id):
         if message_id is None:
             return None
+        message = self.get_message(message_id)
+        conversation_id = message.conversation_id
+        return self.get_conversation(conversation_id)
+
+    def get_message(self, message_id):
         for message in self.messages:
-            if message["id"] == message_id:
-                if message["parent"] is None:
-                    return [message]
-                else:
-                    return self.get_history(message["parent"]) + [message]
-        raise HTTPException(status_code=404, detail="Message not found")
+            if message.id == message_id:
+                return message
+        raise Exception(f"Message {message_id} not found")
+    
+    def get_conversation(self, conversation_id):
+        conversation = []
+        for message in self.messages:
+            if message.conversation_id == conversation_id:
+                conversation.append(message)
+        return conversation
     
 
 app = FastAPI()
@@ -104,7 +113,6 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
             
-            breakpoint()
             init_history = message_db.get_history(payload.response_to)
 
             # try:

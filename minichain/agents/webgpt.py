@@ -42,7 +42,7 @@ async def scan_website(
     **kwargs,
 ):
     """Read a website and collect information relevant to the question, and suggest a link to read next."""
-    website = markdown_browser(url)
+    website = await markdown_browser(url)
     lines = website.split("\n")
     website_with_line_numbers = "\n".join(
         f"{i+1} {line}" for i, line in enumerate(lines)
