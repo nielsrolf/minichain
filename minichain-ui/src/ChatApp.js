@@ -139,6 +139,7 @@ const ChatApp = () => {
                     </div>
                 )}
             </div>
+            <div class="spacer"></div>
             <div className="input-area">
                 <textarea className="user-input" value={inputValue} onChange={e => setInputValue(e.target.value)}></textarea>
                 <button className="send-button" onClick={sendMessage}>Send</button>

@@ -13,6 +13,8 @@
   height: auto;
   min-height: 10em;
   position: relative;
+  background-color: rgb(68, 68, 108);
+  color: white;
 }
 
 .send-button {
@@ -58,4 +60,9 @@
     bottom: 0;
     width: 100%;
     max-width: 1000px;
+}
+
+.spacer {
+    /* push the input area to the bottom of the page */
+    height: 50vh;
 }
