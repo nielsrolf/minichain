@@ -164,15 +164,23 @@ const ChatApp = () => {
         <div className="main">
             {connectionStatus !== "CONNECTED" && <div className="disconnected">Connection: {connectionStatus}</div>}
             <div className="header">
-                <button onClick={() => pusToPath("root")}>Back to root</button>
+                <button onClick={() => pusToPath("root")}>Main</button>
                 <button onClick={() => {
                     if (path.length > 1) {
                         setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
                     }
                 }}>Back </button>
-                {Object.keys(conversationTree.conversations).map(conversationId => 
+                <button onClick={() => {
+                    // parent
+                    const currentConversationId = path[path.length - 1];
+                    if (currentConversationId !== "root") {
+                        pusToPath(conversationTree.parents[currentConversationId]);
+                    }
+                }}>Parent</button>
+
+                {/* {Object.keys(conversationTree.conversations).map(conversationId => 
                     <button onClick={() => pusToPath(conversationId)}>{conversationId}</button>
-                )}
+                )} */}
             </div>
             <div style={{ height: "50px" }}></div>
 
