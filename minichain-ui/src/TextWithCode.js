@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import CodeBlock from './CodeBlock';
+import ReactMarkdown from 'react-markdown';
 
 const TextWithCode = ({ text }) => {
   const [textParts, setTextParts] = useState([]);
@@ -30,7 +31,7 @@ const TextWithCode = ({ text }) => {
     <div>
       {textParts.map((part, index) => part.isCode
         ? <CodeBlock key={index} code={part.text} />
-        : <p key={index}>{part.text}</p>)}
+        : <ReactMarkdown key={index}>{part.text}</ReactMarkdown>)}
     </div>
   );
 };
