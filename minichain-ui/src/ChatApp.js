@@ -82,11 +82,12 @@ const ChatApp = () => {
                         });
                         setConversationTree(prevConversationTree => {
                             const { conversations, subConversations, parents } = prevConversationTree;
+                            const lastParentMessageId = conversations[parents[data.conversation_id]].slice(-1)[0].id;
                             return {
                                 conversations: conversations,
                                 subConversations: subConversations,
                                 parents: parents,
-                                lastMessageId: null
+                                lastMessageId: lastParentMessageId
                             };
                         });
                     } else {
