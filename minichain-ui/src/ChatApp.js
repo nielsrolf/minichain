@@ -16,7 +16,6 @@ const ChatApp = () => {
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
         subConversations: {},
-        activeConversationId: "root",
         lastMessageId: null,
     });
 
@@ -50,12 +49,10 @@ const ChatApp = () => {
                             return {
                                 conversations: { ...conversations, [data.conversation_id]: [] },
                                 subConversations: { ...subConversations, [lastMessageId]: data.conversation_id },
-                                activeConversationId: data.conversation_id,
                                 lastMessageId: lastMessageId
                             };
                         });
                         //   setpath[path.length - 1](data.conversation_id);
-                        //   setActiveConversationId(data.conversation_id);
                         //   setConversations({...conversations, [data.conversation_id]: []});
                         //   setSubConversations({...subConversations, [lastMessageId]: data.conversation_id});
                     } else {
@@ -65,23 +62,20 @@ const ChatApp = () => {
                     }
                     break;
                 case "end":
-                    // if (data.conversation_id) {
-                    //     // set active conversation to parent conversation
-                    //     setConversationTree(prevConversationTree => {
-                    //         const { conversations, subConversations, lastMessageId } = prevConversationTree;
-                    //         const parent = Object.keys(subConversations).find(key => subConversations[key].includes(data.conversation_id));
-                    //         return {
-                    //             conversations: conversations,
-                    //             subConversations: subConversations,
-                    //             activeConversationId: parent,
-                    //             lastMessageId: lastMessageId
-                    //         };
-                    //     });
-                    // } else {
-                    //     // we are ending a stream of messages.
-                    //     // TODO
-                    //     console.log("Ending a stream of messages - not implemented", data);
-                    // }
+                    if (data.conversation_id) {
+                        // set active conversation to parent conversation
+                        setPath(prevPath => {
+                            const newPath = [...prevPath];
+                            if (newPath[newPath.length - 1] === data.conversation_id) {
+                                newPath.pop();
+                            }
+                            return newPath;
+                        });
+                    } else {
+                        // we are ending a stream of messages.
+                        // TODO
+                        console.log("Ending a stream of messages - not implemented", data);
+                    }
                     break;
                 default:
                     console.log("Adding to conv tree: " + message.data);
@@ -92,7 +86,6 @@ const ChatApp = () => {
                         return {
                             conversations: { ...conversations, [data.conversation_id]: [...newConversation, data] },
                             subConversations: subConversations,
-                            activeConversationId: data.conversation_id,
                             lastMessageId: id
                         };
                     });
@@ -153,7 +146,9 @@ const ChatApp = () => {
                         setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
                     }
                 }}>Back </button>
-                {path[path.length - 1]} {JSON.stringify(path)}
+                {Object.keys(conversationTree.conversations).map(conversationId => 
+                    <button onClick={() => pusToPath(conversationId)}>{conversationId}</button>
+                )}
             </div>
             <div style={{ height: "50px" }}></div>
 
@@ -162,7 +157,7 @@ const ChatApp = () => {
                     <div className={`message-${message.role}`} key={index} onClick={() => handleSubConversationClick(message.id)}>
                         {message.function_call && <DisplayJson data={message.function_call} />}
                         <DisplayJson data={message.content} />
-                        {conversationTree.subConversations[message.id] && <div>Click to view sub conversation</div>}
+                        {conversationTree.subConversations[message.id] && <div>Click to view sub conversation {conversationTree.subConversations[message.id]}</div>}
                     </div>
                 )}
             </div>

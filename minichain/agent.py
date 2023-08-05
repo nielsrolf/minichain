@@ -204,13 +204,13 @@ class Agent:
             silent=self.silent,
             keep_session=keep_session,
         )
-        await self.on_message_send({"type": "start", "conversation_id": self.conversation_id})
         await agent_session.send_initial_messages()
         await agent_session.task_to_history(arguments)
         response = await agent_session.run_until_done()
         return response
     
     async def send_initial_messages(self):
+        await self.on_message_send({"type": "start", "conversation_id": self.conversation_id})
         self.system_message.conversation_id = self.conversation_id
         await self.on_message_send(self.system_message)
         for i in self.init_history or []:
