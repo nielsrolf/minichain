@@ -18,12 +18,13 @@
 }
 
 .send-button {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 30px;
-  height: 30px;
+  /* position: float; */
+  /* right: 0px;
+  bottom: 10px; */
+  width: 80px;
+  padding: 10px;
   border: none;
+  background-color: rgb(10, 10, 10);
   /* background: url('path_to_icon') no-repeat center; */
   cursor: pointer;
 }
@@ -72,6 +73,8 @@
     position: fixed;
     top: 0;
     background-color: rgba(50, 50, 70, 1);
+    max-width: 1000px;
+    /* if possible, grow to 1000px width */
     width: 100%;
     border-bottom: 1px solid black;
 }

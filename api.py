@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 from typing import Any, Dict
-from minichain.agents.webgpt import SmartWebGPT
+from minichain.agents.webgpt import WebGPT, SmartWebGPT
 from minichain.agents.programmer import Programmer
 from fastapi import WebSocket
 from collections import defaultdict
@@ -46,7 +46,8 @@ class Payload(BaseModel):
 
 
 agents = {
-    "webgpt": SmartWebGPT,
+    "webgpt": WebGPT,
+    "smartgpt": SmartWebGPT,
     "yopilot": Programmer
 }
 
