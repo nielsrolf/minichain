@@ -19,19 +19,24 @@ def validate_message(message):
 
 
 @disk_cache
-@retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
-@debug
+# @retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
+# @debug
 def get_openai_response(
     chat_history, functions, model="gpt-4-0613"
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     messages = []
-    for i in chat_history:
-        message = i.dict()
-        # delete the parent field
-        message.pop("parent", None)
-        # delete all fields that are None
-        message = {k: v for k, v in message.items() if v is not None or k == "content"}
-        messages.append(message)
+    if not isinstance(chat_history[0], dict):
+        for i in chat_history:
+            print(i)
+            message = i.dict()
+            # delete the parent field
+            message.pop("parent", None)
+            message.pop("id", None)
+            # delete all fields that are None
+            message = {k: v for k, v in message.items() if v is not None or k == "content"}
+            messages.append(message)
+    else:
+        messages = chat_history
     # print(messages[-2])
     # print("=====================================")
     if len(functions) > 0:
@@ -51,7 +56,7 @@ def get_openai_response(
     response = message.to_dict_recursive()
     # if not validate_message(message):
     #     breakpoint()
-    if "error" in messages[-1]["content"].lower():
+    if "error" in (messages[-1].get("content") or "").lower():
         print("ERROR detected")
         print(messages[-1])
     return response

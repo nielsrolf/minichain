@@ -1,8 +1,10 @@
 import inspect
 import json
+import traceback
 from dataclasses import asdict, dataclass
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Union
+import uuid
 
 from pydantic import BaseModel, Field, create_model
 
@@ -14,9 +16,18 @@ from minichain.utils.debug import debug
 class SystemMessage:
     content: str
     role: str = "system"
+    conversation_id: str = None
+
+    # short uuid as default
+    id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4().hex[:5])
 
     def dict(self):
-        return asdict(self)
+        json = asdict(self)
+        return json
 
     def __str__(self):
         return f"{self.role}: {self.content}"
@@ -26,12 +37,18 @@ class SystemMessage:
 class UserMessage:
     content: str
     role: str = "user"
-    parent: Union[
-        "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
-    ] = None
+    conversation_id: str = None
+
+    # short uuid as default
+    id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4().hex[:5])
 
     def dict(self):
-        return asdict(self)
+        json = asdict(self)
+        return json
 
     def __str__(self):
         return f"{self.role}: {self.content}"
@@ -51,12 +68,17 @@ class AssistantMessage:
     content: str
     function_call: Optional[FunctionCall] = None
     role: str = "assistant"
-    parent: Union[
-        "UserMessage", "SystemMessage", "AssistantMessage", "FunctionMessage"
-    ] = None
+    conversation_id: str = None
+    # short uuid as default
+    id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4().hex[:5])
 
     def dict(self):
-        return asdict(self)
+        json = asdict(self)
+        return json
 
     def __str__(self):
         return f"{self.role}: {self.content} {self.function_call}"
@@ -67,14 +89,25 @@ class FunctionMessage:
     content: str
     name: str
     role: str = "function"
-    parent: Optional[AssistantMessage] = None
+    conversation_id: str = None
+
+    # short uuid as default
+    id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4().hex[:5])
 
     def dict(self):
-        return asdict(self)
+        json = asdict(self)
+        return json
+
+    def __str__(self):
+        return f"{self.name}: {self.content}"
 
 
 def make_return_function(openapi_json: BaseModel):
-    def return_function(**arguments):
+    async def return_function(**arguments):
         return arguments
 
     function_obj = Function(
@@ -94,11 +127,10 @@ class Agent:
         prompt_template="{task}".format,
         response_openapi=None,
         init_history=None,
-        on_user_message=None,
-        on_function_message=None,
-        on_assistant_message=None,
-        function_stream=None,
-        assistant_stream=None,
+        on_message_send=None,
+        on_stream_starts=None,
+        on_stream_ends=None,
+        on_stream_message=None,
         keep_first_messages=1,
         keep_last_messages=20,
         silent=False,
@@ -121,24 +153,24 @@ class Agent:
         self.silent = silent
         self.keep_session = keep_session
 
-        def do_nothing(*args, **kwargs):
+        async def do_nothing(*args, **kwargs):
             pass
 
         default_message_action = self.print_message if not silent else do_nothing
-        self.on_user_message = on_user_message or default_message_action
-        self.on_function_message = on_function_message or default_message_action
-        self.on_assistant_message = on_assistant_message or default_message_action
-
-        self.function_stream = function_stream or do_nothing
-        self.assistant_stream = assistant_stream or do_nothing
+        self.on_message_send = on_message_send or default_message_action
+        self.on_stream_starts = on_stream_starts or do_nothing
+        self.on_stream_ends = on_stream_ends or do_nothing
+        self.on_stream_message = on_stream_message or do_nothing
 
         self.functions_openai = [i.openapi_json for i in self.functions]
-        for function in self.functions:
-            function._register_stream(self.function_stream)
+        self.conversation_id = str(uuid.uuid4().hex[:5])
 
-    def print_message(self, message):
+    async def print_message(self, message):
         print("-" * 120)
         print(f"Message to Agent({self.system_message.content})")
+        if isinstance(message, dict):
+            print(message)
+            return
         print(message.role)
         print(message.content)
         try:
@@ -149,11 +181,13 @@ class Agent:
         # if input("Press enter to continue, or b to breakpoint") == "b":
         #     breakpoint()
 
-    def history_append(self, message):
-        message.parent = self.history[-1]
+    async def history_append(self, message):
+        print("history append", message)
+        message.conversation_id = self.conversation_id
+        await self.on_message_send(message)
         self.history.append(message)
 
-    def run(self, keep_session=False, **arguments):
+    async def run(self, keep_session=False, **arguments):
         """arguments: dict with values mentioned in the prompt template"""
         agent_session = Agent(
             self.functions,
@@ -161,27 +195,38 @@ class Agent:
             self.prompt_template,
             self.response_openapi,
             self.init_history,
-            on_user_message=self.on_user_message,
-            on_function_message=self.on_function_message,
-            on_assistant_message=self.on_assistant_message,
+            self.on_message_send,
+            self.on_stream_starts,
+            self.on_stream_ends,
+            self.on_stream_message,
             keep_first_messages=self.keep_first_messages,
             keep_last_messages=self.keep_last_messages,
             silent=self.silent,
             keep_session=keep_session,
         )
-        agent_session.task_to_history(arguments)
-        return agent_session.run_until_done()
+        await agent_session.send_initial_messages()
+        await agent_session.task_to_history(arguments)
+        response = await agent_session.run_until_done()
+        return response
+    
+    async def send_initial_messages(self):
+        await self.on_message_send({"type": "start", "conversation_id": self.conversation_id})
+        self.system_message.conversation_id = self.conversation_id
+        await self.on_message_send(self.system_message)
+        for i in self.init_history or []:
+            i.conversation_id = self.conversation_id
+            await self.on_message_send(i)
 
-    def run_until_done(self):
+    async def run_until_done(self):
         while True:
             assistant_message = self.get_next_action()
-            self.history_append(assistant_message)
-            self.on_assistant_message(self.history[-1])
+            await self.history_append(assistant_message)
             # Check if we are done and should return content
             if (
                 not self.has_structured_response
                 and assistant_message.content is not None
             ):
+                await self.on_message_send({"type": "end", "conversation_id": self.conversation_id})
                 if not self.keep_session:
                     return assistant_message.content
                 else:
@@ -197,18 +242,18 @@ class Agent:
                 )
             function_call = assistant_message.function_call
             if function_call is not None:
-                output = self.execute_action(function_call)
+                output = await self.execute_action(function_call)
                 if function_call.name == "return" and output is not False:
                     if output is False:
                         breakpoint()
                     if self.keep_session:
                         output["session"] = self
                         self.init_history = self.history
+                    await self.on_message_send({"type": "end", "conversation_id": self.conversation_id})
                     return output
 
-    def task_to_history(self, arguments):
-        self.history_append(UserMessage(self.prompt_template(**arguments)))
-        self.on_user_message(self.history[-1])
+    async def task_to_history(self, arguments):
+        await self.history_append(UserMessage(self.prompt_template(**arguments)))
 
     def get_next_action(self):
         # do the openai call
@@ -219,7 +264,12 @@ class Agent:
             + indizes[-self.keep_last_messages :]
         )
         keep = sorted(list(set(keep)))
-        history = [self.history[i] for i in keep]
+        history = []
+        for i in keep:
+            msg = self.history[i].dict()
+            msg.pop("conversation_id", None)
+            msg.pop("id", None)
+            history.append(msg)
         response = get_openai_response(history, self.functions_openai)
         function_call = response.get("function_call", None)
         if function_call is not None:
@@ -228,8 +278,8 @@ class Agent:
             response.get("content", None), function_call=function_call
         )
 
-    @debug
-    def execute_action(self, function_call):
+    # @debug
+    async def execute_action(self, function_call):
         try:
             for function in self.functions:
                 if function.name == function_call.name:
@@ -241,17 +291,16 @@ class Agent:
                             arguments = {"code": function_call.arguments}
                     else:
                         arguments = json.loads(function_call.arguments)
-                    function_output = function(**arguments)
+                    function_output = await function(**arguments)
                     function_output_str = function_output
                     if not isinstance(function_output, str):
                         function_output_str = json.dumps(function_output)
                     function_message = FunctionMessage(
                         function_output_str, function.name
                     )
-                    self.history_append(function_message)
-                    self.on_function_message(self.history[-1])
+                    await self.history_append(function_message)
                     return function_output
-            self.history_append(
+            await self.history_append(
                 FunctionMessage(
                     f"Error: this function does not exist", function_call.name
                 )
@@ -262,16 +311,18 @@ class Agent:
             except AttributeError:
                 msg = f"{type(e)}: {e}"
             if not self.silent:
-                breakpoint()
-            self.history_append(FunctionMessage(msg, function.name))
-        self.on_function_message(self.history[-1])
+                traceback.print_exc()
+                # breakpoint()
+
+            await self.history_append(FunctionMessage(msg, function.name))
+        # self.on_message_send(self.history[-1])
         print(self.history[-1].content)
         return False
 
-    def follow_up(self, user_message):
-        self.history_append(user_message)
-        self.on_user_message(self.history[-1])
-        return self.run_until_done()
+    async def follow_up(self, user_message):
+        await self.history_append(user_message)
+        # self.on_message_send(self.history[-1])
+        return await self.run_until_done()
 
     def as_function(self, name, description, prompt_openapi):
         def function(**arguments):
@@ -314,10 +365,12 @@ class Function:
         self.function = function
         self.description = description
 
-    def __call__(self, **arguments):
+    async def __call__(self, **arguments):
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments).dict()
-        return self.function(**arguments)
+        response = await self.function(**arguments)
+        print("response", response)
+        return response
 
     def _register_stream(self, stream):
         self.stream = stream
@@ -331,7 +384,7 @@ class Function:
         }
 
 
-def tool(name=None, description=None):
+def tool(name=None, description=None, **kwargs):
     """A decorator for tools.
     Example:
 
@@ -344,6 +397,11 @@ def tool(name=None, description=None):
         # Get the function's arguments
         argspec = inspect.getfullargspec(f)
 
+        def f_with_args(**inner_kwargs):
+            # merge the arguments from the decorator with the arguments from the function
+            merged = {**kwargs, **inner_kwargs}
+            return f(**merged)
+
         # Create a Pydantic model from the function's arguments
         fields = {
             arg: (argspec.annotations[arg], Field(..., description=field.description))
@@ -355,7 +413,7 @@ def tool(name=None, description=None):
             name=name or f.__name__,
             description= description or f.__doc__,
             openapi=pydantic_model,
-            function=f,
+            function=f_with_args,
         )
         return function
 

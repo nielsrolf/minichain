@@ -1,0 +1,19 @@
+body {
+  background-color: rgb(50, 50, 70);
+
+}
+
+a {
+    color: white;
+}
+
+
+button {
+    background-color: rgb(68, 68, 108);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px;
+    margin: 5px;
+    cursor: pointer;
+}

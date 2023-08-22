@@ -1,0 +1,62 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+
+.main {
+  margin: auto;
+  max-width: 1000px;
+}
+
+.user-input {
+  width: 100%;
+  height: auto;
+  min-height: 10em;
+  position: relative;
+}
+
+.send-button {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  /* background: url('path_to_icon') no-repeat center; */
+  cursor: pointer;
+}
+
+.message-system,
+.message-user,
+.message-assistant,
+.message-function {
+  border: 1px solid black;
+  padding: 5px;
+  margin-bottom: 10px;
+}
+
+.message-system {
+  background-color: #f2f2f2;
+}
+
+.message-user {
+  background-color: #d8d8d8;
+}
+
+.message-assistant {
+  background-color: #bdbdbd;
+}
+
+.message-function {
+  background-color: #a3a3a3;
+}

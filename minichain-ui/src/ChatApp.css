@@ -1,0 +1,88 @@
+
+
+.main {
+  margin: auto;
+  max-width: 1000px;
+  background-color: rgba(50, 50, 70, 0.2);
+  color: white;
+  height: 100vh;
+}
+
+.user-input {
+  width: 100%;
+  height: auto;
+  min-height: 10em;
+  position: relative;
+  background-color: rgba(68, 68, 108, 1);
+  color: white;
+}
+
+.send-button {
+  /* position: float; */
+  /* right: 0px;
+  bottom: 10px; */
+  width: 80px;
+  padding: 10px;
+  border: none;
+  background-color: rgb(10, 10, 10);
+  /* background: url('path_to_icon') no-repeat center; */
+  cursor: pointer;
+}
+
+.message-system,
+.message-user,
+.message-assistant,
+.message-function {
+  border: 1px solid black;
+  padding: 10px;
+  margin-bottom: 10px;
+    border-radius: 5px;
+}
+
+.message-system {
+  background-color: rgba(69, 93, 69)
+}
+
+.message-user {
+  background-color: rgba(68, 68, 108, 0.2);
+}
+
+.message-assistant {
+  background-color: rgba(72, 72, 72, 0.2);
+}
+
+.message-function {
+  background-color: rgba(40, 71, 40, 0.2);
+}
+
+.input-area {
+    /* position at the bottom of the parent element */
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    max-width: 1000px;
+}
+
+.spacer {
+    /* push the input area to the bottom of the page */
+    height: 50vh;
+}
+
+.header {
+    padding: 10px;
+    position: fixed;
+    top: 0;
+    background-color: rgba(50, 50, 70, 1);
+    max-width: 1000px;
+    /* if possible, grow to 1000px width */
+    width: 100%;
+    border-bottom: 1px solid black;
+}
+
+.disconnected {
+    color: red;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 100;
+}

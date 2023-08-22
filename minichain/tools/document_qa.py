@@ -5,10 +5,6 @@ from pydantic import BaseModel, Field
 from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
 
 
-class QuestionAnsweringQuery(BaseModel):
-    text: str = Field(..., description="The text to scan for relevant information.")
-    question: str = Field(..., description="The question to answer.")
-
 
 class Citation(BaseModel):
     id: int = Field(
@@ -32,7 +28,7 @@ class AnswerWithCitations(BaseModel):
         return repr
 
 
-def qa(text, question, instructions=[]):
+async def qa(text, question, instructions=[]):
     """
     Returns: a dict {content: str, citations: List[Citation]}}"""
     # system_message = f"Scan the text provided by the user for relevant information related to the question: '{question}'. Summarize long passages if needed. You may repeat sections of the text verbatim if they are very relevant. Do not start the summary with 'The text provided by the user' or similar phrases. Only respond with informative text relevant to the question. Summarize by generating a shorter text that has the most important information from the text provided by the user."
@@ -55,15 +51,7 @@ def qa(text, question, instructions=[]):
         prompt_template="{text}".format,
         response_openapi=AnswerWithCitations,
     )
-    summary = summarizer.run(text=text)
+    summary = await summarizer.run(text=text)
     if summary["content"].lower() == "skip":
         summary["content"] = ""
     return summary
-
-
-qa_function = Function(
-    name="document_qa",
-    openapi=QuestionAnsweringQuery,
-    function=qa,
-    description="Scan a text for relevant information related to a question.",
-)

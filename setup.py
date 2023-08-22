@@ -15,16 +15,19 @@ setup(
         "replicate",
         "retry",
         "google-search-results",
+        "fastapi",
     ],
     extras_require={
         "test": [
             "pytest",
+            "pytest-asyncio",
             "pylint!=2.5.0",
             "black",
             "mypy",
             "flake8",
             "pytest-cov",
             "httpx",
+            "playwright"
         ],
     },
     entry_points={

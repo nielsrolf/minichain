@@ -20,7 +20,7 @@ class IsSafeCall(BaseModel):
     )
 
 
-def is_prompt_injection(text):
+async def is_prompt_injection(text):
     """
     Check if the text is a prompt injection by feeding it to an agent that should always respond with a hard-coded response,
     and see if the agent does this successfully.
@@ -50,5 +50,5 @@ def is_prompt_injection(text):
         # on_function_message=lambda message: print(message.dict()),
         # on_user_message=lambda message: print(message.dict()),
     )
-    response = agent.run(text=text)
+    response = await agent.run(text=text)
     return not test_passed

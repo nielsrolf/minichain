@@ -42,14 +42,14 @@ def get_initial_summary(
                     available_files.append(filename)
     try:
         with open("README.md") as f:
-            summary = "README:\n" + "\n".join(f.readlines()[:5]) + "...\n"
+            summary = "\n".join(f.readlines()[:5]) + "...\n"
     except:
         summary = ""
     summary += "Files:\n" + "\n".join(available_files)
     return summary
     
 
-def get_long_summary(
+async def get_long_summary(
     root_dir=".",
     extensions=[".py", ".js", ".ts", "README.md"],
     ignore_files=[
@@ -85,7 +85,7 @@ def get_long_summary(
         #     "\n".join(summary.split("\n")[section["start"] : section["end"]])
         #     for section in sections
         # )
-        summary = long_document_qa(
+        summary = await long_document_qa(
             text=summary,
             question="Summarize the following codebase in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important code.",
         )
@@ -94,7 +94,7 @@ def get_long_summary(
 
 
 @tool()
-def get_file_summary(path: str = Field(..., description="The path to the file.")):
+async def get_file_summary(path: str = Field(..., description="The path to the file.")):
     """Summarize a file."""
     if path.endswith(".py"):
         summary = summarize_python_file(path)
@@ -102,15 +102,35 @@ def get_file_summary(path: str = Field(..., description="The path to the file.")
         print("Summary:", path)
         with open(path, "r") as f:
             text = f.read()
-        summary = long_document_qa(
+        summary = await long_document_qa(
             text=text,
             question="Summarize the following file in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important sections. When referencing files, always use the path (rather than the filename).",
         )
     return f"# {path}\n{summary}\n\n"
 
 
+
 @tool()
-def view(
+async def scan_file_for_info(
+    path: str = Field(..., description="The path to the file."),
+    question: str = Field(..., description="The question to ask.")
+):
+    """Search a file for specific information"""
+    if path.endswith(".py"):
+        summary = summarize_python_file(path)
+    else:
+        print("Summary:", path)
+        with open(path, "r") as f:
+            text = f.read()
+        summary = await long_document_qa(
+            text=text,
+            question=question,
+        )
+    return f"# {path}\n{summary}\n\n"
+
+
+@tool()
+async def view(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
     end: int = Field(..., description="The end line."),
@@ -131,20 +151,21 @@ def view(
 
 
 @tool()
-def edit(
+async def edit(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
     end: int = Field(..., description="The end line."),
     code: str = Field(..., description="The code to replace the lines with."),
 ):
     """Edit a section of a file, specified by line range."""
+    breakpoint()
     code = remove_line_numbers(code)
     with open(path, "r") as f:
-        lines = f.readlines()
-        lines[start:end] = code.split("\n")
+        lines = f.read().split("\n")
+        lines[start-1:end] = code.split("\n")
     with open(path, "w") as f:
         f.write("\n".join(lines))
-    updated_in_context = view(
+    updated_in_context = await view(
         path=path, start=start - 4, end=start + len(code.split("\n")) + 4, with_line_numbers=True
     )
     return truncate_updated(updated_in_context)
@@ -152,7 +173,7 @@ def edit(
 
 def truncate_updated(updated_in_context):
     if len(updated_in_context.split("\n")) > 20:
-        # keep firstand last 9 lines with "..." in between
+        # keep first and last 9 lines with "..." in between
         updated_in_context = (
             updated_in_context.split("\n")[:9]
             + ["..."]
@@ -169,7 +190,7 @@ def remove_line_numbers(code):
 
 
 @tool()
-def replace_symbol(
+async def replace_symbol(
     path: str = Field(..., description="The path to the file"),
     symbol: str = Field(
         ...,
@@ -189,7 +210,7 @@ def replace_symbol(
                 lines[symbol["start"] : symbol["end"]] = code.split("\n")
             with open(symbol["path"], "w") as f:
                 f.write("\n".join(lines))
-            updated_in_context = view(
+            updated_in_context = await view(
                 path=symbol["path"],
                 start=symbol["start"] - 4,
                 end=symbol["start"] + len(code.split("\n")) + 4,
@@ -215,21 +236,27 @@ def replace_symbol(
 
 
 @tool()
-def view_symbol(
+async def view_symbol(
     path: str = Field(..., description="The path to the file"),
     symbol: str = Field(
         ...,
-        description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only.",
+        description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only, use view for other files.",
     ),
 ):
     """Show the full implementation of a symbol (function/class/method) in a file."""
+    if not path.endswith(".py"):
+        raise ValueError("Only python files are supported.")
+    if not os.path.exists(path):
+        # create the file
+        with open(path, "w") as f:
+            f.write("")
     symbol_id = symbol
     all_symbols = get_symbols(path)
     for symbol in all_symbols:
         all_symbols += symbol.get("methods", [])
     for symbol in all_symbols:
         if symbol["id"] == symbol_id:
-            return view(
+            return await view(
                 path=symbol["path"],
                 start=symbol["start"],
                 end=symbol["end"],
@@ -238,7 +265,7 @@ def view_symbol(
 
     for symbol in all_symbols:
         if symbol['id'] == symbol_id:
-            return view(
+            return await view(
                 path=symbol['path'],
                 start=symbol['start'],
                 end=symbol['end'],
@@ -247,9 +274,14 @@ def view_symbol(
     return "Symbol not found. Available symbols:\n" + "\n".join([symbol['id'] for symbol in all_symbols])
 
 
-if __name__ == "__main__":
+async def test_codebase():
     print(get_initial_summary())
     # out = replace_symbol(path="./minichain/tools/bla.py", symbol="foo", code="test\n", is_new=False)
-    print(view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
-    print(view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
-    print(view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
+    print(await view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
+    print(await view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
+    print(await view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_codebase())    

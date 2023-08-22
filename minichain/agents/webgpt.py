@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from minichain.agent import Agent, Function, SystemMessage, tool
 from minichain.tools.document_qa import AnswerWithCitations
-from minichain.tools.google_search import google_search_function
+from minichain.tools.google_search import web_search
 from minichain.tools.recursive_summarizer import text_scan
 from minichain.tools.text_to_memory import Memory
 from minichain.utils.markdown_browser import markdown_browser
@@ -32,25 +32,27 @@ class Query(BaseModel):
     query: str = Field(..., description="The query to search for.")
 
 
-@tool()
-def scan_website(
+
+async def scan_website(
     url: str = Field(
         ...,
         description="The url to read.",
     ),
     question: str = Field(..., description="The question to answer."),
+    **kwargs,
 ):
     """Read a website and collect information relevant to the question, and suggest a link to read next."""
-    website = markdown_browser(url)
+    website = await markdown_browser(url)
     lines = website.split("\n")
     website_with_line_numbers = "\n".join(
         f"{i+1} {line}" for i, line in enumerate(lines)
     )
 
-    outputs = text_scan(
+    outputs = await text_scan(
         website_with_line_numbers,
         RelevantSectionOrClick,
         f"Scan the text provided by the user for sections relevant to the question: {question}. Save sections that contain a partial answer to the question. If the answer is not in the text, click on the link that is most likely to contain the answer and then return in the next turn. If no link is promising, return immediately.",
+        **kwargs,
     )
     sections = [
         {
@@ -78,18 +80,12 @@ def scan_website(
     }
 
 
-# scan_website_function = Function(
-#     name="scan_website",
-#     openapi=ScanWebsiteRequest,
-#     function=scan_website,
-#     description="Read a website and collect information relevant to the question, and suggest a link to read next.",
-# )
-
 
 class WebGPT(Agent):
     def __init__(self, silent=False, **kwargs):
+        # check if on_message callbacks exist
         super().__init__(
-            functions=[google_search_function, scan_website],
+            functions=[web_search, tool(**kwargs)(scan_website)],
             system_message=SystemMessage(
                 "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information to answer the question or fulfill the user request, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
             ),
@@ -104,12 +100,12 @@ class SmartWebGPT(Agent):
     def __init__(self, silent=False, **kwargs):
         super().__init__(
             functions=[
-                WebGPT(silent=silent).as_function(
+                WebGPT(silent=silent, **kwargs).as_function(
                     "research", "Research the web in order to answer a question.", Query
                 )
             ],
             system_message=SystemMessage(
-                "You are SmartGPT. You get questions or requests by the user ans answer them in the following way: \n"
+                "You are SmartGPT. You get questions or requests by the user and answer them in the following way: \n"
                 + "1. If the question or request is simple, answer it directly. \n"
                 + "2. If the question or request is complex, use the 'research' function available to you \n"
                 + "3. If the initial research was insufficient, use the 'research' function with new questions, until you are able to answer the question."

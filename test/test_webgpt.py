@@ -1,8 +1,10 @@
-from minichain.agents.webgpt import webgpt
+import pytest
+from minichain.agents.webgpt import WebGPT
 
 
-def test_webgpt():
+@pytest.mark.asyncio
+async def test_webgpt():
     query = "How can I play an audio file from s3 using https://www.elementary.audio/docs in the web using the virtual filesystem?"
-    result = webgpt.run(query=query)
+    result = await WebGPT().run(query=query)
     print(result["content"])
     print(result["citations"])

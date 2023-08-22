@@ -3,28 +3,28 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 from minichain.agent import Agent, Done, Function, SystemMessage
-from minichain.tools.document_qa import qa_function
-from minichain.tools.summarize import summarizer_function
+from minichain.tools.document_qa import qa
+from minichain.tools.summarize import summarize
 from minichain.utils.document_splitter import split_document
 from minichain.utils.markdown_browser import markdown_browser
 
 
-def summarize_until_word_limit_is_okay(
+async def summarize_until_word_limit_is_okay(
     text, question=None, max_words=500, summarize_at_least_once=False
 ):
     if len(text.split()) < max_words and not summarize_at_least_once:
         return text
     else:
         if question is None:
-            summary = summarizer_function(text=text)
+            summary = await summarize(text=text)
         else:
-            summary = qa_function(text=text, question=question)
+            summary = await qa(text=text, question=question)
             summary = (
                 summary["content"]
                 + "\nSources: "
                 + "\n".join(f"[{i['id']}] {i['source']}" for i in summary["citations"])
             )
-        summary = summarize_until_word_limit_is_okay(
+        summary = await summarize_until_word_limit_is_okay(
             summary, max_words=max_words, question=question
         )
         print(len(text.split()), "->", len(summary.split()))
@@ -46,13 +46,13 @@ class DocumentSummaryRequest(BaseModel):
     )
 
 
-def recursive_summarizer(text, question=None, max_words=500, instructions=[]):
+async def recursive_summarizer(text, question=None, max_words=500, instructions=[]):
     paragraphs = split_document(text)
     summarize_at_least_once = True
     while len(paragraphs) > 1:
         # print("splitting paragraphs:", [len(i.split()) for i in paragraphs])
         summaries = [
-            recursive_summarizer(
+            await recursive_summarizer(
                 i, max_words=max_words, question=question, instructions=instructions
             )
             for i in paragraphs
@@ -62,7 +62,7 @@ def recursive_summarizer(text, question=None, max_words=500, instructions=[]):
         summarize_at_least_once = len(summaries) > 1
         joint_summary = joint_summary.strip()
         paragraphs = split_document(joint_summary)
-    return summarize_until_word_limit_is_okay(
+    return await summarize_until_word_limit_is_okay(
         paragraphs[0],
         max_words=max_words,
         question=question,
@@ -70,12 +70,12 @@ def recursive_summarizer(text, question=None, max_words=500, instructions=[]):
     )
 
 
-def text_scan(text, response_openapi, system_message, on_add_output=None):
+async def text_scan(text, response_openapi, system_message, on_add_output=None, **kwargs):
     """
     Splits the text into paragraphs and asks the document_to_json agent for outouts."""
     outputs = []
 
-    def add_output(**output):
+    async def add_output(**output):
         if on_add_output is not None:
             on_add_output(output)
         print("adding output:", output)
@@ -97,15 +97,16 @@ def text_scan(text, response_openapi, system_message, on_add_output=None):
         prompt_template="{text}".format,
         response_openapi=Done,
         keep_last_messages=20,
+        **kwargs,
     )
 
     paragraphs = split_document(text)
     for paragraph in paragraphs:
-        document_to_json.run(text=paragraph)
+        await document_to_json.run(text=paragraph)
     return outputs
 
 
-def recursive_web_summarizer(url, question=None, max_words=500):
+async def recursive_web_summarizer(url, question=None, max_words=500):
     text = markdown_browser(url)
     if question is None:
         document_request = DocumentSummaryRequest(text=text, max_words=max_words)
@@ -113,7 +114,7 @@ def recursive_web_summarizer(url, question=None, max_words=500):
         document_request = DocumentQARequest(
             text=text, question=question, max_words=max_words
         )
-    return recursive_summarizer(document_request)
+    return await recursive_summarizer(document_request)
 
 
 long_document_qa = Function(

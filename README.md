@@ -22,7 +22,7 @@ Define a tool using the `@tool()` decorator:
 from minichain.agent import Agent, SystemMessage, tool
 
 @tool()
-def scan_website(
+async def scan_website(
     url: str = Field(..., description="The url to read.", ),
     question: str = Field(..., description="The question to answer.")
 ):
@@ -57,80 +57,27 @@ print(response['content'], response['sources'])
 
 
 ## Install
+In order to install the core python package, run:
 ```
 pip install -e .
 ```
 
+## Running tests
+```
+pytest test
+```
 
----
-## Roadmap
-### Basics
-- [x] `Agent` that uses tools and returns structured outputs 
-- [x] utils:
-    - `disk_cache`
-    - `cached_openai`: for predictable and cheaper development
-    - `docker_sandbox`
-    - `markdown_browser`
-    - `search`
-    - `generate_docs`
-    - `document_splitter`
-### Memory
-- [x] tools for long documents
-    - [x] recursive summary
-    - [x] recursive qa-summary
-    - [x] `scan_text` to feed chunked text into agent
-- [x] Semantic Paragraph Memory
-    - [x] split documents into semantic paragraphs
-    - [x] VectorDB search:
-        - generate subquestions, embed them, compare with embeddings of `memory.relevant_questions`
-    - [x] keyword search:
-        - show list of memorized tags, generate list of tags to retrieve memories
-    - [x] content_scan search:
-        - Show a summary (titles, tags) of all memories. Use `scan_text` to select relevant memory titles
-    - [x] tools to save and recall memories
+## UI dev setup
+The UI requires the backend to run:
+```
+python api.py
+```
+Then, install and start the frontend:
+```
+cd minichain-ui
+npm install
+npm run start
+```
 
-### WebGPT
-- [x] markdown browser
-- [x] google search
-- [x] document_qa_scan
-
-### Expert
-- [x] Memory
-- [ ] init:
-    - [x] generate subquestions -> 
-    - [x] current webgpt
-    - [ ] document_qa_scan: build a general context
-
-### Programmer
-- [x] bash
-- [x] python
-- [ ] Codebase
-    - [x] util: generate_docs
-    - tools
-        - [ ] view file
-        - [ ] edit file
-        - [ ] get_package_summary
-            - generate_docs + summarize(file)
-        - [ ] lookup symbol (--show_full_code: False)
-        - [ ] update symbol: replaces the code
-        - [ ] code qa
-            - use SemanticParagraphMemory
-            - init it with symbol memories
-
-### Multimodal replicate
-- [ ] replicate search tool
-- [ ] replicate import tool
-- [ ] replicate run tool
-
-### UI
-- [ ] webui for local deployment
-- [ ] VSCode integration
-
-### Planning module
-- [ ] Agent: planner is called every n steps / seconds
-- [ ] Planner: tool to give feedback for a conversation
-    - task board
-    - return: {all good / message to refocus}
-- [ ] output of the planner appears as a function message in the chat
 
 
