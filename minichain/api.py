@@ -1,5 +1,6 @@
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 from typing import Any, Dict
@@ -36,8 +37,15 @@ class MessageDB:
                 conversation.append(message)
         return conversation
     
-
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+    expose_headers=['*'],
+)
 
 
 class Payload(BaseModel):
@@ -53,7 +61,6 @@ agents = {
 
 
 message_db = MessageDB()
-
 
 
 

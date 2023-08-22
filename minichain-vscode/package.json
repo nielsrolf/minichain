@@ -1,0 +1,25 @@
+{
+  "name": "minichain-vscode",
+  "displayName": "Minichain",
+  "description": "VSCode extension for Minichain",
+  "version": "0.0.1",
+  "publisher": "minichain",
+  "engines": {
+    "vscode": "^1.50.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:extension.openMinichain"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.openMinichain",
+        "title": "Open Minichain"
+      }
+    ]
+  }
+}
