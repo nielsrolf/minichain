@@ -7,8 +7,6 @@ function activate(context) {
 
 
     let disposable = vscode.commands.registerCommand('extension.openMinichain', function () {
-        // make an info box for debugging with context.extensionPath
-        vscode.window.showInformationMessage(context.extensionPath);
         let panel = vscode.window.createWebviewPanel(
             'minichain',
             'Minichain',
