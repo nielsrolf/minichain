@@ -150,6 +150,10 @@ async def root():
     return {"message": "Hello World"}
 
 
-if __name__ == "__main__":
+def start():
     import uvicorn
     uvicorn.run(app, host="localhost", port=8000)
+
+# We want to run this via python -m minichain.api
+if __name__ == "__main__":
+    start()

@@ -24,9 +24,13 @@ class BashSession(Function):
         self.session = uuid.uuid4().hex
         self.image_name = image_name
         self.stream = stream
+        self.cwd = os.getcwd()
 
     async def __call__(self, commands: List[str]) -> str:
-        return bash(commands, session=self.session, stream=self.stream)
+        outputs = await bash([f"cd {self.cwd}"] + commands + ["pwd"], session=self.session, stream=self.stream)
+        self.cwd = outputs[-1].strip()
+        response = "".join(outputs[2:-2])
+        return response
 
     # when the session is destroyed, stop the container
     # def __del__(self):
@@ -65,10 +69,12 @@ class CodeInterpreter(Function):
 async def test_bash_session():
     bash = BashSession(stream=lambda i: print(i, end=""))
     # response = bash(commands=["echo hello world", "pip install librosa"])
-    response = await bash(commands=["touch testfile", "echo hello world"])
-    assert response.split("\n") == "hello world"
-    response = bash(commands=["ls"])
+    response = await bash(commands=["mkdir bla123", "cd bla123", "touch testfile", "echo hello world"])
+    response = await bash(commands=["ls"])
     assert "testfile" in response.split("\n")
+    response = await bash(commands=["pwd"])
+    assert "bla123" in response
+    response = await bash(commands=["cd ..", "rm -rf bla123"])
 
 
 if __name__ == "__main__":
