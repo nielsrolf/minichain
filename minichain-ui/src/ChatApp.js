@@ -65,17 +65,15 @@ const ChatApp = () => {
                                 // get the conversation if of the last message
                                 activeConversationId = Object.keys(conversations).find(conversationId => conversations[conversationId].map(message => message.id).includes(lastMessageId));
                             }
+                            const siblings = subConversations[activeConversationId] || [];
                             console.log(`New conversation ${data.conversation_id} jas parent ${activeConversationId}`);
                             return {
                                 conversations: { ...conversations, [data.conversation_id]: [] },
-                                subConversations: { ...subConversations, [lastMessageId]: data.conversation_id },
+                                subConversations: { ...subConversations, [lastMessageId]: [...siblings, data.conversation_id] },
                                 parents: { ...parents, [data.conversation_id]: activeConversationId },
                                 lastMessageId: lastMessageId
                             };
                         });
-                        //   setpath[path.length - 1](data.conversation_id);
-                        //   setConversations({...conversations, [data.conversation_id]: []});
-                        //   setSubConversations({...subConversations, [lastMessageId]: data.conversation_id});
                     } else {
                         // we are starting to stream a message. 
                         // TODO
@@ -138,9 +136,8 @@ const ChatApp = () => {
     }, []);
 
     // Function to handle when a message with a sub conversation is clicked
-    const handleSubConversationClick = (messageId) => {
-        const subConversationId = conversationTree.subConversations[messageId];
-        console.log("clicked on sub conversation: " + subConversationId + " for message: " + messageId + "")
+    const handleSubConversationClick = (subConversationId) => {
+        console.log("clicked on sub conversation: " + subConversationId)
         if (subConversationId) {
             pusToPath(subConversationId);
         }
@@ -204,11 +201,14 @@ const ChatApp = () => {
 
             <div>
                 {conversationTree.conversations[path[path.length - 1]] && conversationTree.conversations[path[path.length - 1]].map((message, index) =>
-                    <div className={`message-${message.role}`} key={index} onClick={() => handleSubConversationClick(message.id)}>
+                    <div className={`message-${message.role}`} key={index}>
                         {message.function_call && <DisplayJson data={message.function_call} />}
                         {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
-                        
-                        {conversationTree.subConversations[message.id] && <div>Click to view sub conversation {conversationTree.subConversations[message.id]}</div>}
+                        {(conversationTree.subConversations[message.id] || []).map(subConversationId => {
+                            return (
+                                <div onClick={() => handleSubConversationClick(subConversationId)}>View thread</div>
+                            );
+                        })}
                     </div>
                 )}
                 {path[path.length - 1] === "root" && (

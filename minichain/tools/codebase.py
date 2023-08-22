@@ -158,13 +158,14 @@ async def edit(
     code: str = Field(..., description="The code to replace the lines with."),
 ):
     """Edit a section of a file, specified by line range."""
+    breakpoint()
     code = remove_line_numbers(code)
     with open(path, "r") as f:
-        lines = f.readlines()
-        lines[start:end] = code.split("\n")
+        lines = f.read().split("\n")
+        lines[start-1:end] = code.split("\n")
     with open(path, "w") as f:
         f.write("\n".join(lines))
-    updated_in_context = view(
+    updated_in_context = await view(
         path=path, start=start - 4, end=start + len(code.split("\n")) + 4, with_line_numbers=True
     )
     return truncate_updated(updated_in_context)
@@ -172,7 +173,7 @@ async def edit(
 
 def truncate_updated(updated_in_context):
     if len(updated_in_context.split("\n")) > 20:
-        # keep firstand last 9 lines with "..." in between
+        # keep first and last 9 lines with "..." in between
         updated_in_context = (
             updated_in_context.split("\n")[:9]
             + ["..."]
@@ -209,7 +210,7 @@ async def replace_symbol(
                 lines[symbol["start"] : symbol["end"]] = code.split("\n")
             with open(symbol["path"], "w") as f:
                 f.write("\n".join(lines))
-            updated_in_context = view(
+            updated_in_context = await view(
                 path=symbol["path"],
                 start=symbol["start"] - 4,
                 end=symbol["start"] + len(code.split("\n")) + 4,
@@ -239,10 +240,12 @@ async def view_symbol(
     path: str = Field(..., description="The path to the file"),
     symbol: str = Field(
         ...,
-        description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only.",
+        description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only, use view for other files.",
     ),
 ):
     """Show the full implementation of a symbol (function/class/method) in a file."""
+    if not path.endswith(".py"):
+        raise ValueError("Only python files are supported.")
     if not os.path.exists(path):
         # create the file
         with open(path, "w") as f:
@@ -253,7 +256,7 @@ async def view_symbol(
         all_symbols += symbol.get("methods", [])
     for symbol in all_symbols:
         if symbol["id"] == symbol_id:
-            return view(
+            return await view(
                 path=symbol["path"],
                 start=symbol["start"],
                 end=symbol["end"],
@@ -262,7 +265,7 @@ async def view_symbol(
 
     for symbol in all_symbols:
         if symbol['id'] == symbol_id:
-            return view(
+            return await view(
                 path=symbol['path'],
                 start=symbol['start'],
                 end=symbol['end'],
@@ -274,9 +277,9 @@ async def view_symbol(
 async def test_codebase():
     print(get_initial_summary())
     # out = replace_symbol(path="./minichain/tools/bla.py", symbol="foo", code="test\n", is_new=False)
-    print(view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
-    print(view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
-    print(view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
+    print(await view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
+    print(await view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
+    print(await view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
 
 
 if __name__ == "__main__":

@@ -40,8 +40,8 @@ class Programmer(Agent):
                 codebase.get_file_summary,
                 codebase.view,
                 codebase.edit,
-                codebase.view_symbol,
-                codebase.replace_symbol,
+                # codebase.view_symbol,
+                # codebase.replace_symbol,
                 codebase.scan_file_for_info
             ],
             system_message=SystemMessage(
