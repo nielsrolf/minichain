@@ -57,7 +57,7 @@ class CodeInterpreter(Function):
         filename = uuid.uuid4().hex
         with open(f"{filename}.py", "w") as f:
             f.write(code)
-        output = self.bash(commands=[f"python {filename}.py"])
+        output = await self.bash(commands=[f"python {filename}.py"])
         os.remove(f"{filename}.py")
         return output
 

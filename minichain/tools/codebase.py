@@ -158,7 +158,6 @@ async def edit(
     code: str = Field(..., description="The code to replace the lines with."),
 ):
     """Edit a section of a file, specified by line range."""
-    breakpoint()
     code = remove_line_numbers(code)
     with open(path, "r") as f:
         lines = f.read().split("\n")
