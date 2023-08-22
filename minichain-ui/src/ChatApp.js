@@ -21,6 +21,7 @@ const ChatApp = () => {
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
     const [inputValue, setInputValue] = useState("");
     const [path, setPath] = useState(["root"]);
+    const [agentName, setAgentName] = useState("yopilot");
 
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
@@ -31,7 +32,6 @@ const ChatApp = () => {
 
     useEffect(() => {
         // get the agent name from the URL
-        const agentName = window.location.pathname.split("/").pop();
         const client = new W3CWebSocket(`ws://localhost:8000/ws/${agentName}`);
 
         client.onopen = () => {
@@ -196,6 +196,19 @@ const ChatApp = () => {
                 {/* {Object.keys(conversationTree.conversations).map(conversationId => 
                     <button onClick={() => pusToPath(conversationId)}>{conversationId}</button>
                 )} */}
+                {/* on the right of the header, show a dropdown for the different agentNames */}
+                <select value={agentName} onChange={e => setAgentName(e.target.value)} style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "10px",
+                    backgroundColor: "black",
+                    color: "white",
+                    padding: "5px",
+                }}>
+                    <option value="yopilot">yopilot</option>
+                    <option value="webgpt">webgpt</option>
+                </select>
+
             </div>
             <div style={{ height: "50px" }}></div>
 

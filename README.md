@@ -70,7 +70,7 @@ pytest test
 ## UI dev setup
 The UI requires the backend to run:
 ```
-python api.py
+python -m minichain.api
 ```
 Then, install and start the frontend:
 ```

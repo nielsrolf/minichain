@@ -36,3 +36,6 @@ RUN apt-get install -y tree ffmpeg
 RUN pip install --upgrade pip
 RUN pip install numpy pandas matplotlib seaborn plotly scikit-learn requests beautifulsoup4
 RUN pip install librosa pydub yt-dlp soundfile
+
+# install screen
+RUN apt-get install -y screen
