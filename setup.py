@@ -20,6 +20,7 @@ setup(
     extras_require={
         "test": [
             "pytest",
+            "pytest-asyncio",
             "pylint!=2.5.0",
             "black",
             "mypy",
