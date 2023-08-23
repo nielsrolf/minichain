@@ -157,7 +157,7 @@ async def edit(
     end: int = Field(..., description="The end line."),
     code: str = Field(..., description="The code to replace the lines with."),
 ):
-    """Edit a section of a file, specified by line range."""
+    """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!"""
     code = remove_line_numbers(code)
     with open(path, "r") as f:
         lines = f.read().split("\n")

@@ -41,13 +41,19 @@ async def run_in_container(
             ports={"80/tcp": None, "443/tcp": None},
             cap_add=["NET_RAW", "NET_ADMIN"],
         )
+        if os.path.exists("requirements.txt"):
+            print(container.exec_run('pip install -r requirements.txt').output.decode())
+        if os.path.exists("setup.py"):
+            print(container.exec_run('pip install -e .').output.decode())
+        if os.path.exists("package.json"):
+            print(container.exec_run('npm install').output.decode())
         container.exec_run('screen -dmS default_session')
 
     # Run the commands
     for command in commands:
         temp_file = f"/tmp/output_{os.urandom(8).hex()}.txt"
         
-        command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1 && echo {SPECIAL_END_TOKEN} >>{temp_file}\n"'
+        command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1 && echo {SPECIAL_END_TOKEN} >>{temp_file} || echo {SPECIAL_END_TOKEN} >>{temp_file}\n"'
         yield f"\n> {command}\n"
         container.exec_run(command_to_run)
 
