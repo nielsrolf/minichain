@@ -16,7 +16,7 @@ const DisplayJson = ({ data }) => {
     code.split('\n').map(line => line.replace(/^\d+:\s*/, '')).join('\n');
 
   const renderData = (data, parentKey = '') => {
-    if (data === null) {
+    if (data === null || data === undefined) {
       return '';
     }
 
@@ -67,7 +67,10 @@ const DisplayJson = ({ data }) => {
         </div>
       );
     }
-
+    console.log({ data, parentKey });
+    if (data === null || data === undefined) {
+      return '';
+    }
     return Object.entries(data).map(([key, value]) => {
       const newKey = `${parentKey}.${key}`;
       if (key === 'code') {

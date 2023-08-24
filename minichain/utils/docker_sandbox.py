@@ -120,16 +120,18 @@ async def test_run_in_container():
 
 async def test_bash():
     commands = [
-        "mkdir test12",
-        "cd test12",
-        "pwd",
-        "cd ..",
-        "rm -rf test12",
-        "sleep 1 && echo hello world && sleep 1 && echo hello world",
-        "echo next",
-        "sleep 1",
-        "echo hello world",
-        "pip install --upgrade pip",
+        "pip install -e .",
+        "python -m minichain.api"
+        # "mkdir test12",
+        # "cd test12",
+        # "pwd",
+        # "cd ..",
+        # "rm -rf test12",
+        # "sleep 1 && echo hello world && sleep 1 && echo hello world",
+        # "echo next",
+        # "sleep 1",
+        # "echo hello world",
+        # "pip install --upgrade pip",
     ]
     outputs = await bash(commands, stream=lambda i: print(i, end=""))
     print("outputs:", outputs)

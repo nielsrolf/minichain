@@ -396,7 +396,7 @@ def tool(name=None, description=None, **kwargs):
     def wrapper(f):
         # Get the function's arguments
         argspec = inspect.getfullargspec(f)
-
+        
         def f_with_args(**inner_kwargs):
             # merge the arguments from the decorator with the arguments from the function
             merged = {**kwargs, **inner_kwargs}
@@ -405,7 +405,7 @@ def tool(name=None, description=None, **kwargs):
         # Create a Pydantic model from the function's arguments
         fields = {
             arg: (argspec.annotations[arg], Field(..., description=field.description))
-            for arg, field in zip(argspec.args, argspec.defaults)
+            for arg, field in zip(argspec.args, argspec.defaults) if not arg in kwargs.keys()
         }
 
         pydantic_model = create_model(f.__name__, **fields)

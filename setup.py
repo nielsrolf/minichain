@@ -28,6 +28,8 @@ setup(
         "requests",
         "pydantic",
         "docker",
+        "html2text",
+        "uvicorn",
     ],
     entry_points={
         "console_scripts": [],

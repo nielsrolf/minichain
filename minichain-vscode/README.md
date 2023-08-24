@@ -1,3 +1,27 @@
+# minichain-vscode
+[![Demo video](https://img.youtube.com/vi/b0CbP-kUJt0/0.jpg)](https://www.youtube.com/watch?v=b0CbP-kUJt0)
+-- demo of a programmer agent built with minichain, using the [VSCode extension ui](./minichain-vscode/)
+
+Usage: `Cmd+shift P: Open Minichain`.
+
+## Features
+Minichain-vscode lets you run a GPT powered programmer inside your project. You can chat with it, and it can run commands, edit files, browse the web (if webgpt is selected) and much more.
+
+## How it works
+- commands are run in a docker container with access to the internet, but with POST requests blocked and only the current project mounted
+- you can select between a few different modes:
+    - yopilot: GPT agent with bash and file edit tools
+    - webgpt: GPT agent with google search and a text based browser
+    - planner: a GPT project manager that can assign tasks to yopilot and webgpt
+
+## Install
+Currently the extension can only be installed in dev mode.
+
+## Dev setup
+Clone the repo and install the extension in this folder using `Cmd+shift P: Developer: Install extension from location...`.
+
+
+## Original note from `minichain.agents.programmer.Programmer` who made the extension
 I have created a new folder minichain-vscode/ for the extension and added two files: package.json and extension.js.
 
 In package.json, I defined the basic information about the extension, such as its name, version, and publisher. I also specified the activation event for the extension, which is the command extension.openMinichain.

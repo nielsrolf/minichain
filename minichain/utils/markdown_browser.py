@@ -2,11 +2,6 @@ import warnings
 
 import click
 import html2text
-from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from playwright.sync_api import sync_playwright
 from playwright.async_api import async_playwright
 import asyncio
 

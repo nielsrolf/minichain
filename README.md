@@ -3,6 +3,9 @@
 
 `{mini: ⛓}` is a minimal langchain alternative for agents with structured data, and many tools for them. You only need one class: `Agent` - for chat, chat with tool usage, or acting as a function.
 
+[![Demo video](https://img.youtube.com/vi/b0CbP-kUJt0/0.jpg)](https://www.youtube.com/watch?v=b0CbP-kUJt0)
+-- demo of a programmer agent built with minichain, using the [VSCode extension ui](./minichain-vscode/)
+
 **Why?**
 - structured output should be the default. Always converting to text is often a bottleneck
 - langchain has too many classes and is generally too big.

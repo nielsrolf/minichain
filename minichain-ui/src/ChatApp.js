@@ -133,7 +133,7 @@ const ChatApp = () => {
         return () => {
             client.close();
         };
-    }, []);
+    }, [agentName]);
 
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
@@ -207,6 +207,7 @@ const ChatApp = () => {
                 }}>
                     <option value="yopilot">yopilot</option>
                     <option value="webgpt">webgpt</option>
+                    <option value="planner">planner</option>
                 </select>
 
             </div>
