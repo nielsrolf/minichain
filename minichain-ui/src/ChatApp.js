@@ -206,8 +206,9 @@ const ChatApp = () => {
                     padding: "5px",
                 }}>
                     <option value="yopilot">yopilot</option>
-                    <option value="webgpt">webgpt</option>
                     <option value="planner">planner</option>
+                    <option value="webgpt">webgpt</option>
+                    <option value="chatgpt">chatgpt</option>
                 </select>
 
             </div>

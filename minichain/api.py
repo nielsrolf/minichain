@@ -4,21 +4,63 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 from typing import Any, Dict
+from minichain.agent import SystemMessage, UserMessage, FunctionMessage, AssistantMessage
 from minichain.agents.webgpt import WebGPT, SmartWebGPT
 from minichain.agents.programmer import Programmer
+from minichain.agents.planner import Planner
+from minichain.agents.chatgpt import ChatGPT
 from fastapi import WebSocket
 from collections import defaultdict
 from typing import Optional
 import traceback
+import os
 import uuid
 
 
 class MessageDB:
-    def __init__(self):
+    def __init__(self, path=".minichain"):
         self.messages = []
+        self.logs = []
+        self.path = path
+        os.makedirs(path, exist_ok=True)
+        self.load()
+    
+    def load(self):
+        path = self.path
+        classes = {
+            "user": UserMessage,
+            "assistant": AssistantMessage,
+            "system": SystemMessage,
+            "function": FunctionMessage,
+        }
+        try:
+            with open(os.path.join(path, "messages.json"), "r") as f:
+                messages = json.load(f)
+                self.messages = [classes[i['role']](**i) for i in messages]
+            with open(os.path.join(path, "logs.json"), "r") as f:
+                self.logs = json.load(f)
+        except FileNotFoundError:
+            print("No messages found")
+        except Exception as e:
+            print("Error loading messages", e)
+    
+    def save(self):
+        path = self.path
+        with open(os.path.join(path, "messages.json"), "w") as f:
+            json.dump([i.dict() for i in self.messages], f)
+        with open(os.path.join(path, "logs.json"), "w") as f:
+            json.dump(self.logs, f)
+    
+    # save on exit
+    def __del__(self):
+        self.save()
 
     def add_message(self, message):
+        self.logs.append(message)
         if not isinstance(message, dict):
+            # The message can either be a dict with control messages ({'type': 'start', 'conversation_id': '10055'})
+            # or a pydantic model (UserMessage, SystemMessage, ...).
+            # We only want to store the messages here.
             self.messages.append(message)
     
     def get_history(self, conversation_id):
@@ -36,6 +78,8 @@ class MessageDB:
             if message.conversation_id == conversation_id:
                 conversation.append(message)
         return conversation
+    
+
     
 app = FastAPI()
 app.add_middleware(
@@ -56,7 +100,9 @@ class Payload(BaseModel):
 agents = {
     "webgpt": WebGPT,
     "smartgpt": SmartWebGPT,
-    "yopilot": Programmer
+    "yopilot": Programmer,
+    "planner": Planner,
+    "chatgpt": ChatGPT,
 }
 
 
@@ -88,6 +134,12 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
     {type: end, conversation_id: 123}
     """
     await websocket.accept()
+
+    # replay logs
+    for message in message_db.logs:
+        if not isinstance(message, dict):
+            message = message.dict()
+        await websocket.send_json(message)
 
     async def add_message_to_db_and_send(message: dict):
         print("add_message_to_db_and_send", message)

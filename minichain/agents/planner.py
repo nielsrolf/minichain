@@ -17,8 +17,13 @@ class Task(BaseModel):
     priority: int = Field(..., description="The priority of the task.")
     status: str = Field("TODO", description="The status of the task.", enum=["TODO", "IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"])
 
+    comments: List[str] = []
+
     def __str__(self):
-        return f"#{self.id} {self.title} ({self.status})\n{self.description}"
+        result = f"#{self.id} {self.title} ({self.status})\n{self.description}"
+        if self.comments:
+            result += "\nComments:\n" + "\n".join(self.comments)
+        return result
 
 
 class TaskBoard:
@@ -48,25 +53,33 @@ async def get_board(board: TaskBoard=None):
     )
 
 
-async def update_task(
+async def update_status(
     board: TaskBoard = None,
-    task: Task = Field(..., description="The task to update."),
+    task_id: int = Field(..., description="The task to update."),
+    status: str = Field(..., description="The new status of the task.", enum=["TODO", "IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"])
 ):
     """Update a task on the task board."""
-    if isinstance(task, dict):
-        task = Task(**task)
-    for i, t in enumerate(board.tasks):
-        if t.id == task.id:
-            board.tasks[i] = task
-            return
-    raise await get_board(board)
+    task = [i for i in board.tasks if i.id == task_id][0]
+    task.status = status
+    return await get_board(board)
 
+
+async def comment_on_issue(
+    board: TaskBoard = None,
+    task_id: int = Field(..., description="The task to comment on."),
+    comment: str = Field(..., description="The comment to add to the task.")
+):
+    """Update a task on the task board."""
+    task = [i for i in board.tasks if i.id == task_id][0]
+    task.comments.append(comment)
+    return str(task)
 
 def tools(board: TaskBoard):
     return [
         tool(board=board)(add_task),
         tool(board=board)(get_board),
-        tool(board=board)(update_task)
+        tool(board=board)(update_status),
+        tool(board=board)(comment_on_issue),
     ]
 
 
@@ -93,9 +106,7 @@ class Planner(Agent):
         ):
             """Assign a task to a programmer or webgpt. The assignee will immediately start working on the task."""
             task = [i for i in self.board.tasks if i.id == task_id][0]
-            task.status = "IN_PROGRESS"
-            await update_task(self.board, task)
-            board_before = await get_board(self.board)
+            board_before = await update_status(self.board, task_id, "IN_PROGRESS")
             if assignee == "programmer":
                 response = await self.programmer.run(
                     query=f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.",
@@ -105,15 +116,13 @@ class Planner(Agent):
                     query=f"Please research on the following ticket: {task.title}.\n{task.description}\n{additional_info}",
                 )
             else:
-                raise ValueError(f"Unknown assignee: {assignee}")
+                return f"Error: Unknown assignee: {assignee}"
             board_after = await get_board(self.board)
             
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
-            breakpoint()
             return response
         
-
         board_tools = tools(self.board)
         self.programmer.functions += board_tools
         init_history = kwargs.pop(
