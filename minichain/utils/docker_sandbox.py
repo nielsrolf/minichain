@@ -3,6 +3,7 @@ import os
 import threading
 from time import sleep
 from typing import List
+import json
 
 import docker
 import asyncio
@@ -53,7 +54,14 @@ async def run_in_container(
     for command in commands:
         temp_file = f"/tmp/output_{os.urandom(8).hex()}.txt"
         
-        command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1 && echo {SPECIAL_END_TOKEN} >>{temp_file} || echo {SPECIAL_END_TOKEN} >>{temp_file}\n"'
+        # command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1; echo {SPECIAL_END_TOKEN} >>{temp_file};"'
+        # command_with_stdbuf = f'stdbuf -oL -eL {command}'
+        # we use json.dumps for the opening " and to escape the command
+        # command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1; echo {SPECIAL_END_TOKEN} >>{temp_file};\n"'
+        command_to_run = f'screen -S default_session -X stuff {json.dumps(command)[:-1]} >{temp_file} 2>&1; echo {SPECIAL_END_TOKEN} >>{temp_file};\n"'
+        # command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1 ; echo {SPECIAL_END_TOKEN} >>{temp_file} \n"'
+        print("command_to_run:", command_to_run)
+
         yield f"\n> {command}\n"
         container.exec_run(command_to_run)
 
@@ -61,6 +69,9 @@ async def run_in_container(
         elapsed_time = 0
         streamed = ""
         while elapsed_time < timeout:
+            await asyncio.sleep(1)
+            elapsed_time += 1
+
             result = container.exec_run(f'cat {temp_file}')
             output = result.output.decode()
             new_streamed = output.replace(streamed, "")
@@ -70,8 +81,6 @@ async def run_in_container(
             if SPECIAL_END_TOKEN in output:
                 break
 
-            await asyncio.sleep(1)
-            elapsed_time += 1
         else:
             yield "TIMEOUT - execution did not finish but is continuing in the background\n"
 
@@ -79,21 +88,24 @@ async def run_in_container(
         container.exec_run(f'rm {temp_file}')
 
 
-async def bash(commands, session=None, stream=lambda i: i):
+async def bash(commands, session='default', stream=None):
     """Callback wrapper for run_in_container.
 
     Args:
         commands (List[str]): A list of bash commands.
         session (str, optional): A session name. Defaults to None.
-        on_newline (Callable[[str], str], optional): A callback function that
+        on_newline (async Callable[[str], str], optional): A callback function that
             takes a string and returns a string. Defaults to lambda i: i.
 
     Returns:
         List[str]: The output of the bash commands.
     """
+    if stream is None:
+        async def stream(i):
+            return
     outputs = []
     async for token in run_in_container(commands, session):
-        stream(token)
+        await stream(token)
         outputs += [token]
     return outputs
 

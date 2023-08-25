@@ -18,8 +18,12 @@ class ProgrammerResponse(BaseModel):
     final_response: str = Field(..., description="The final response to the user.")
 
 
+async def async_print(i):
+    print(i)
+
+
 class Programmer(Agent):
-    def __init__(self, silent=False, on_stream_message=lambda i: print(i), **kwargs):
+    def __init__(self, silent=False, on_stream_message=async_print, **kwargs):
         interpreter = CodeInterpreter(stream=on_stream_message)
         print("Init history for programmer:", kwargs.get("init_history", []))
         init_history = kwargs.pop(

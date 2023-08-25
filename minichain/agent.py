@@ -128,9 +128,6 @@ class Agent:
         response_openapi=None,
         init_history=None,
         on_message_send=None,
-        on_stream_starts=None,
-        on_stream_ends=None,
-        on_stream_message=None,
         keep_first_messages=1,
         keep_last_messages=20,
         silent=False,
@@ -158,9 +155,6 @@ class Agent:
 
         default_message_action = self.print_message if not silent else do_nothing
         self.on_message_send = on_message_send or default_message_action
-        self.on_stream_starts = on_stream_starts or do_nothing
-        self.on_stream_ends = on_stream_ends or do_nothing
-        self.on_stream_message = on_stream_message or do_nothing
 
         self.functions_openai = [i.openapi_json for i in self.functions]
         self.conversation_id = str(uuid.uuid4().hex[:5])
@@ -198,8 +192,22 @@ class Agent:
             streaming_message.function_call = message.get('function_call', None)
             await self.on_message_send(streaming_message)
         return on_stream_message
+    
+    def stream_function_result(self, function_name):
+        streaming_message = FunctionMessage(
+            "",
+            conversation_id=self.conversation_id,
+            name=function_name
+        )
+        self.history.append(streaming_message)
+        async def on_newline(newline):
+            print("stream", self.__class__.__name__, newline)
+            streaming_message.content += newline
+            await self.on_message_send(streaming_message)
+        on_newline.__name__ = f"stream_{function_name}_to_{self.conversation_id}"
+        return on_newline
             
-    async def run(self, keep_session=False, **arguments):
+    async def run(self, keep_session=False, history=[], **arguments):
         """arguments: dict with values mentioned in the prompt template"""
         agent_session = Agent(
             self.functions,
@@ -208,21 +216,20 @@ class Agent:
             self.response_openapi,
             self.init_history,
             self.on_message_send,
-            self.on_stream_starts,
-            self.on_stream_ends,
-            self.on_stream_message,
             keep_first_messages=self.keep_first_messages,
             keep_last_messages=self.keep_last_messages,
             silent=self.silent,
             keep_session=keep_session,
         )
         await agent_session.send_initial_messages()
+        for i in history:
+            await agent_session.history_append(i)
         await agent_session.task_to_history(arguments)
         response = await agent_session.run_until_done()
         return response
     
     async def send_initial_messages(self):
-        await self.on_message_send({"type": "start", "conversation_id": self.conversation_id})
+        await self.on_message_send({"type": "start", "conversation_id": self.conversation_id, "agent": self.__class__.__name__})
         self.system_message.conversation_id = self.conversation_id
         await self.on_message_send(self.system_message)
         for i in self.init_history or []:
@@ -282,7 +289,10 @@ class Agent:
             msg.pop("conversation_id", None)
             msg.pop("id", None)
             history.append(msg)
+        print("YOOOOOOO")
         response = await get_openai_response_stream(history, self.functions_openai, stream=self.stream_to_history())
+        print("YOYOYO")
+        print(response)
         function_call = response.get("function_call", None)
         if function_call is not None:
             function_call = FunctionCall(**function_call)
@@ -303,14 +313,16 @@ class Agent:
                             arguments = {"code": function_call.arguments}
                     else:
                         arguments = json.loads(function_call.arguments)
+                    function._register_stream(self.stream_function_result(function.name))
                     function_output = await function(**arguments)
-                    function_output_str = function_output
-                    if not isinstance(function_output, str):
-                        function_output_str = json.dumps(function_output)
-                    function_message = FunctionMessage(
-                        function_output_str, function.name
-                    )
-                    await self.history_append(function_message)
+                    if not function.has_stream:
+                        function_output_str = function_output
+                        if not isinstance(function_output, str):
+                            function_output_str = json.dumps(function_output)
+                        function_message = FunctionMessage(
+                            function_output_str, function.name
+                        )
+                        await self.history_append(function_message)
                     return function_output
             await self.history_append(
                 FunctionMessage(
@@ -376,14 +388,19 @@ class Function:
         self.name = name
         self.function = function
         self.description = description
+        self.has_stream = False
 
     async def __call__(self, **arguments):
+        """Call the function with the given arguments.
+        _stream: a function that is expected to be called with new parts of the output of the function string
+                (e.g. new lines of a bash command)
+        """
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments).dict()
         response = await self.function(**arguments)
         print("response", response)
         return response
-
+    
     def _register_stream(self, stream):
         self.stream = stream
 

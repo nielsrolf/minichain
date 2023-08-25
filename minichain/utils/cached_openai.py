@@ -43,6 +43,12 @@ async def get_openai_response_stream(
         for i in messages:
             if i.get("function_call") is None:
                 i.pop("function_call", None)
+        
+        with open("last_openai_request.json", "w") as f:
+            json.dump({
+                "messages": messages,
+                "functions": functions,
+            }, f)
 
         # print(messages[-2])
         # print("=====================================")

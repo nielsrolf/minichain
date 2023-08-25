@@ -92,10 +92,10 @@ class Planner(Agent):
     2. While there are tickets:
         2.1. Execute the ticket with highest priority
     """
-    def __init__(self, silent=False, on_stream_message=lambda i: print(i), **kwargs):
+    def __init__(self, **kwargs):
         self.board = TaskBoard()
-        self.programmer = Programmer(silent=silent, on_stream_message=on_stream_message, **kwargs)
-        self.webgpt = WebGPT(silent=silent, on_stream_message=on_stream_message, **kwargs)
+        self.programmer = Programmer(**kwargs)
+        self.webgpt = WebGPT(**kwargs)
 
 
         @tool()
@@ -141,7 +141,6 @@ class Planner(Agent):
                 "You manage a team of programmers and webgpts. When the user asks you to do something, you first create jira issues for the individual tasks. Then you assign the first task that should be done to a programmer or webgpt by calling the respective functions. When the task is done, you update the task board and assign the next task."
             ),
             prompt_template="{query}".format,
-            silent=silent,
             response_openapi=ProgrammerResponse,
             init_history=init_history,
             **kwargs,

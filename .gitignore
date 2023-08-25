@@ -188,3 +188,5 @@ example.md
 example/
 
 .minichain
+
+last_openai_request.json

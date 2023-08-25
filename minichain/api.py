@@ -107,18 +107,13 @@ class Payload(BaseModel):
     response_to: Optional[str] = None
 
 
-agents = {
-    "webgpt": WebGPT,
-    "smartgpt": SmartWebGPT,
-    "yopilot": Programmer,
-    "planner": Planner,
-    "chatgpt": ChatGPT,
-}
+
 
 
 message_db = MessageDB()
 
 
+agents = {}
 
 
 @app.websocket("/ws/{agent_name}")
@@ -144,6 +139,7 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
     {type: end, conversation_id: 123}
     """
     await websocket.accept()
+    print("websocket accepted")
 
     # replay logs
     # for message in message_db.logs:
@@ -157,15 +153,6 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
         if not isinstance(message, dict):
             message = message.dict()
         await websocket.send_json(message)
-
-    async def on_stream_starts(message: dict):
-        await websocket.send_json({"type": "start", "id": message["id"], "parent": message["parent"]})
-
-    async def on_stream_ends(message: dict):
-        await websocket.send_json(message)
-
-    async def on_stream_message(char):
-        await websocket.send_text(char)
 
 
     try:
@@ -190,20 +177,18 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 message_db.add_message(init_message)
                 await websocket.send_json(init_message)
 
-            # try:
-            agent = agents[agent_name](
-                init_history=init_history,
-                on_message_send=add_message_to_db_and_send, 
-                on_stream_starts=on_stream_starts,
-                on_stream_ends=on_stream_ends,
-                on_stream_message=on_stream_message,
-            )
+            agent = agents[agent_name]
+            agent.on_message_send = add_message_to_db_and_send
+            agent.init_history = init_history
+
             response = await agent.run(query=payload.query)
             final_message = {"role": "assistant", "conversation_id": rootId, "id": uuid.uuid4().hex[:5], "content": response}
             # db
             message_db.add_message(final_message)
             await websocket.send_json(final_message)
-            await websocket.send_json({"type": "end", "conversation_id": rootId})
+            conversation_end = {"type": "end", "conversation_id": rootId}
+            message_db.add_message(conversation_end)
+            await websocket.send_json(conversation_end)
 
     except Exception as e:
         traceback.print_exc()
@@ -219,9 +204,25 @@ async def root():
     return {"message": "Hello World"}
 
 
-def start():
+
+
+
+@app.on_event("startup")
+async def preload_agents():
+    """This function should run after the async event loop has started."""
+    agents.update({
+        "webgpt": WebGPT(),
+        "smartgpt": SmartWebGPT(),
+        "yopilot": Programmer(),
+        "planner": Planner(),
+        "chatgpt": ChatGPT(),
+    })
+
+
+def start(port=8000):
     import uvicorn
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="localhost", port=port)
+
 
 # We want to run this via python -m minichain.api
 if __name__ == "__main__":
