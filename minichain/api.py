@@ -146,10 +146,10 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
     await websocket.accept()
 
     # replay logs
-    for message in message_db.logs:
-        if not isinstance(message, dict):
-            message = message.dict()
-        await websocket.send_json(message)
+    # for message in message_db.logs:
+    #     if not isinstance(message, dict):
+    #         message = message.dict()
+    #     await websocket.send_json(message)
 
     async def add_message_to_db_and_send(message: dict):
         print("add_message_to_db_and_send", message)

@@ -79,6 +79,7 @@ class AsyncDiskCache(DiskCache):
                     result = await func(*args, **kwargs, stream=stream)
                 else:
                     result = await func(*args, **kwargs)
+                await stream(result)
                 self.save_to_cache(key, args, kwargs, result)
                 return result
 

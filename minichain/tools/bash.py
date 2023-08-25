@@ -64,7 +64,7 @@ class CodeInterpreter(Function):
         self.bash = BashSession(stream=stream)
 
     async def __call__(self, code: str) -> str:
-        last_line = 'print({k: v for k, v in locals().items() if not k.startswith("_")})'
+        last_line = 'import types; print(", ".join([f"{k}: {v}" for k, v in locals().items() if not k.startswith("_") and not isinstance(v, type) and not isinstance(v, types.ModuleType) and not isinstance(v, types.FunctionType) ]))'
         code = code + "\n" + last_line
         filename = uuid.uuid4().hex
         with open(f"{filename}.py", "w") as f:
