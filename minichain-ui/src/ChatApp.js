@@ -57,6 +57,11 @@ const ChatApp = () => {
                 case "start":
                     console.log("Starting new conversation: " + data.conversation_id);
                     if (data.conversation_id) {
+                        // if we already have this conversation, stop
+                        if (conversationTree.conversations[data.conversation_id]) {
+                            console.log("Conversation already exists: " + data.conversation_id);
+                            break;
+                        }
                         console.log("Starting new conversation: " + data.conversation_id);
                         setConversationTree(prevConversationTree => {
                             const { conversations, subConversations, lastMessageId, parents } = prevConversationTree;
@@ -117,8 +122,9 @@ const ChatApp = () => {
                     setConversationTree(prevConversationTree => {
                         const { conversations, subConversations, parents } = prevConversationTree;
                         const newConversation = conversations[data.conversation_id] || [];
+                        const updatedConversation = [...newConversation.filter(i => i.id !== id), data];
                         return {
-                            conversations: { ...conversations, [data.conversation_id]: [...newConversation, data] },
+                            conversations: { ...conversations, [data.conversation_id]: updatedConversation},
                             subConversations: subConversations,
                             parents: parents,
                             lastMessageId: id

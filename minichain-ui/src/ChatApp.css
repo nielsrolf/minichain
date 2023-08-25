@@ -3,9 +3,10 @@
 .main {
   margin: auto;
   max-width: 1000px;
-  background-color: rgba(50, 50, 70, 0.2);
-  color: white;
+  background-color: #1F1F1F;
+  color: #CCCCCC;
   height: 100vh;
+  font-size: 12px;
 }
 
 .user-input {
@@ -13,8 +14,10 @@
   height: auto;
   min-height: 10em;
   position: relative;
-  background-color: rgba(68, 68, 108, 1);
-  color: white;
+  background-color: #181818;
+  color: #CCCCCC;
+  border: 0px;
+  border-radius: 10px;
 }
 
 .send-button {
@@ -36,7 +39,8 @@
   border: 1px solid black;
   padding: 10px;
   margin-bottom: 10px;
-    border-radius: 5px;
+  border-radius: 10px;
+  border: 0px;
 }
 
 .message-system {
@@ -72,11 +76,12 @@
     padding: 10px;
     position: fixed;
     top: 0;
-    background-color: rgba(50, 50, 70, 1);
+    background-color: #1F1F1F;
+    
     max-width: 1000px;
     /* if possible, grow to 1000px width */
     width: 100%;
-    border-bottom: 1px solid black;
+    /* border-bottom: 1px solid black; */
 }
 
 .disconnected {

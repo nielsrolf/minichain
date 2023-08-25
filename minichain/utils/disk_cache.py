@@ -67,13 +67,18 @@ disk_cache = DiskCache()
 class AsyncDiskCache(DiskCache):
     def cache(self, func):
         async def wrapper(*args, **kwargs):
+            # special case to support streaming openai completions
+            stream = kwargs.pop("stream", None)
             key = str(repr({"args": args, "kwargs": kwargs, "f": func.__name__}))
             cached_value = self.load_from_cache(key)
             if cached_value is not None:
                 return cached_value
             else:
                 print(f"Cache miss")
-                result = await func(*args, **kwargs)
+                if stream:
+                    result = await func(*args, **kwargs, stream=stream)
+                else:
+                    result = await func(*args, **kwargs)
                 self.save_to_cache(key, args, kwargs, result)
                 return result
 

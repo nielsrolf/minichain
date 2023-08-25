@@ -16,69 +16,79 @@ import traceback
 import os
 import uuid
 
-
 class MessageDB:
-    def __init__(self, path=".minichain"):
-        self.messages = []
-        self.logs = []
+    def __init__(self, path=".minichain/"):
         self.path = path
-        os.makedirs(path, exist_ok=True)
+        os.makedirs(f"{path}/messages", exist_ok=True)
+        os.makedirs(f"{path}/logs", exist_ok=True)
         self.load()
     
     def load(self):
         path = self.path
+        self.messages = self.load_dir_as_list(f"{path}/messages")
+        self.logs = self.load_dir_as_list(f"{path}/logs")
+    
+    def load_dir_as_list(self, path):
+        messages = []
+        for filename in os.listdir(path):
+            try:
+                with open(os.path.join(path, filename), "r") as f:
+                    message = json.load(f)
+                    # message = classes[message.get('role', None)](**message)
+                    messages.append(message)
+            except Exception as e:
+                print(f"Error loading message from {filename}", e)
+        return messages
+    
+    def dicts_to_classes(self, dicts):
         classes = {
-            "user": UserMessage,
-            "assistant": AssistantMessage,
-            "system": SystemMessage,
-            "function": FunctionMessage,
+            'user': UserMessage,
+            'system': SystemMessage,
+            'function': FunctionMessage,
+            'assistant': AssistantMessage,
+            None: dict,
         }
-        try:
-            with open(os.path.join(path, "messages.json"), "r") as f:
-                messages = json.load(f)
-                self.messages = [classes[i['role']](**i) for i in messages]
-            with open(os.path.join(path, "logs.json"), "r") as f:
-                self.logs = json.load(f)
-        except FileNotFoundError:
-            print("No messages found")
-        except Exception as e:
-            print("Error loading messages", e)
-    
-    def save(self):
-        path = self.path
-        with open(os.path.join(path, "messages.json"), "w") as f:
-            json.dump([i.dict() for i in self.messages], f)
-        with open(os.path.join(path, "logs.json"), "w") as f:
-            json.dump(self.logs, f)
-    
-    # save on exit
-    def __del__(self):
-        self.save()
+        messages = []
+        for message in dicts:
+            message = classes[message.get('role', None)](**message)
+            messages.append(message)
+        return messages
 
-    def add_message(self, message):
-        self.logs.append(message)
-        if not isinstance(message, dict):
-            # The message can either be a dict with control messages ({'type': 'start', 'conversation_id': '10055'})
-            # or a pydantic model (UserMessage, SystemMessage, ...).
-            # We only want to store the messages here.
-            self.messages.append(message)
+    def save_msg(self, message, dirname):
+        dir_items = self.__dict__[dirname]
+        try:
+            pos = [i['id'] for i in self.messages].index(message.get("id", None))
+            dir_items[pos] = message
+        except ValueError:
+            pos = len(self.messages)
+            dir_items.append(message)
+        path = f"{self.path}/{dirname}"
+        filename = f"{pos}.json"
+        with open(os.path.join(path, filename), "w") as f:
+            json.dump(message, f)
     
+    def add_message(self, message):
+        if not isinstance(message, dict):
+            message = message.dict()
+        self.save_msg(message, "logs")
+        if "role" in message: 
+            self.save_msg(message, "messages")
+
     def get_history(self, conversation_id):
-        return self.get_conversation(conversation_id)
+        return self.dicts_to_classes(self.get_conversation(conversation_id))
 
     def get_message(self, message_id):
         for message in self.messages:
-            if message.id == message_id:
+            if message['id'] == message_id:
                 return message
-        raise Exception(f"Message {message_id} not found")
+        return None
     
     def get_conversation(self, conversation_id):
         conversation = []
         for message in self.messages:
-            if message.conversation_id == conversation_id:
+            if message['conversation_id'] == conversation_id:
                 conversation.append(message)
         return conversation
-    
 
     
 app = FastAPI()

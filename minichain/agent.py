@@ -8,7 +8,7 @@ import uuid
 
 from pydantic import BaseModel, Field, create_model
 
-from minichain.utils.cached_openai import get_openai_response
+from minichain.utils.cached_openai import get_openai_response_stream
 from minichain.utils.debug import debug
 
 
@@ -186,7 +186,19 @@ class Agent:
         message.conversation_id = self.conversation_id
         await self.on_message_send(message)
         self.history.append(message)
-
+    
+    def stream_to_history(self):
+        streaming_message = AssistantMessage(
+            "",
+            conversation_id=self.conversation_id,
+        )
+        self.history.append(streaming_message)
+        async def on_stream_message(message):
+            streaming_message.content = message['content']
+            streaming_message.function_call = message.get('function_call', None)
+            await self.on_message_send(streaming_message)
+        return on_stream_message
+            
     async def run(self, keep_session=False, **arguments):
         """arguments: dict with values mentioned in the prompt template"""
         agent_session = Agent(
@@ -219,8 +231,8 @@ class Agent:
 
     async def run_until_done(self):
         while True:
-            assistant_message = self.get_next_action()
-            await self.history_append(assistant_message)
+            assistant_message = await self.get_next_action()
+            # await self.history_append(assistant_message)
             # Check if we are done and should return content
             if (
                 not self.has_structured_response
@@ -255,7 +267,7 @@ class Agent:
     async def task_to_history(self, arguments):
         await self.history_append(UserMessage(self.prompt_template(**arguments)))
 
-    def get_next_action(self):
+    async def get_next_action(self):
         # do the openai call
         indizes = list(range(len(self.history)))
         keep = (
@@ -270,7 +282,7 @@ class Agent:
             msg.pop("conversation_id", None)
             msg.pop("id", None)
             history.append(msg)
-        response = get_openai_response(history, self.functions_openai)
+        response = await get_openai_response_stream(history, self.functions_openai, stream=self.stream_to_history())
         function_call = response.get("function_call", None)
         if function_call is not None:
             function_call = FunctionCall(**function_call)
