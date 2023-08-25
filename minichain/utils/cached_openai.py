@@ -78,21 +78,21 @@ async def get_openai_response_stream(
                     function_call[key] = function_call.get(key, "") + value
             if "content" in chunk:
                 content += chunk['content'] or ''
-            await stream({"role": "assistant", "content": content, "function_call": function_call})
+            response = {
+                "role": "assistant",
+                "content": content,
+            }
+            if function_call != {}:
+                response["function_call"] = function_call
+            await stream(response)
 
-        if 'arguments' in function_call:
-            try:
-                function_call['arguments'] = json.loads(function_call['arguments'])
-            except:
-                print("Error parsing arguments", function_call['arguments'])
+        # if 'arguments' in function_call:
+        #     try:
+        #         function_call['arguments'] = json.loads(function_call['arguments'])
+        #     except:
+        #         print("Error parsing arguments", function_call['arguments'])
         
-        response = {
-            "role": "assistant",
-            "content": content,
-        }
-
-        if function_call != {}:
-            response["function_call"] = function_call
+        
 
         return response
     except Exception as e:

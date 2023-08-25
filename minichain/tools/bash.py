@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from minichain.agent import Function
 from minichain.utils.docker_sandbox import bash, run_in_container
+import asyncio
 
 
 class BashQuery(BaseModel):
@@ -25,6 +26,11 @@ class BashSession(Function):
         self.image_name = image_name
         self.stream = stream
         self.cwd = os.getcwd()
+        # start a hello world echo command because this will trigger the preinstalling of the packages
+        # if we do asyncio.run, we get: RuntimeError: asyncio.run() cannot be called from a running event loop
+        # so we just create a background task
+        asyncio.create_task(self.__call__(commands=["echo hello world"]))
+
 
     async def __call__(self, commands: List[str]) -> str:
         outputs = await bash([f"cd {self.cwd}"] + commands + ["pwd"], session=self.session, stream=self.stream)
@@ -58,6 +64,8 @@ class CodeInterpreter(Function):
         self.bash = BashSession(stream=stream)
 
     async def __call__(self, code: str) -> str:
+        last_line = 'print({k: v for k, v in locals().items() if not k.startswith("_")})'
+        code = code + "\n" + last_line
         filename = uuid.uuid4().hex
         with open(f"{filename}.py", "w") as f:
             f.write(code)
