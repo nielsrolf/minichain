@@ -235,7 +235,7 @@ const ChatApp = () => {
                 {path[path.length - 1] === "root" && (
                     // get the first messages of all sub conversations of root
                     Object.keys(conversationTree.parents).map(subConversationId => {
-                        const parent = conversationTree.parents[subConversationId];
+                        const parent = conversationTree.parents[subConversationId] || "root";
                         const message = conversationTree.conversations[subConversationId]?.find(i => i.role==="user");
                         if (parent !== "root") {
                             console.log("not root", subConversationId, parent, message);

@@ -82,6 +82,7 @@
     /* if possible, grow to 1000px width */
     width: 100%;
     /* border-bottom: 1px solid black; */
+    z-index: 100;
 }
 
 .disconnected {

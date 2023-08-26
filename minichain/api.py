@@ -58,11 +58,15 @@ class MessageDB:
 
     def save_msg(self, message, dirname):
         dir_items = self.__dict__[dirname]
+        def get_id(d):
+            if "id" in d:
+                return d["id"]
+            return f"{d['type']}-{d['conversation_id']}"
         try:
-            pos = [i["id"] for i in self.messages].index(message.get("id", None))
+            pos = [get_id(i) for i in dir_items].index(get_id(message))
             dir_items[pos] = message
         except ValueError:
-            pos = len(self.messages)
+            pos = len(dir_items)
             dir_items.append(message)
         path = f"{self.path}/{dirname}"
         filename = f"{pos}.json"
@@ -123,17 +127,6 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
     {...message, id: 2},
     {...message, id: 3}
     {type: start, conversation_id: 456}
-    {type: "start", id: 4}
-    h
-    e
-    r
-    e
-
-    c
-    o
-    ...
-    {...message, id: 4} # message finished
-    {type: end, conversation_id: 456}
     {...message, id: 5}
     {type: end, conversation_id: 123}
     """
@@ -141,10 +134,12 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
     print("websocket accepted")
 
     # replay logs
-    # for message in message_db.logs:
-    #     if not isinstance(message, dict):
-    #         message = message.dict()
-    #     await websocket.send_json(message)
+    print("replay logs", message_db.logs)
+    print("start/end conversation", [i for i in message_db.logs if i.get("type", None) in ["start", "end"]])
+    for message in message_db.logs:
+        if not isinstance(message, dict):
+            message = message.dict()
+        await websocket.send_json(message)
 
     async def add_message_to_db_and_send(message: dict):
         print("add_message_to_db_and_send", message)
@@ -172,15 +167,15 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
             )  # TODO get the conv id of the response_to message
             if payload.response_to is None:
                 rootId = uuid.uuid4().hex[:5]
-                await websocket.send_json({"type": "start", "conversation_id": rootId})
+                start_message = {"type": "start", "conversation_id": rootId}
+                await add_message_to_db_and_send(start_message)
                 init_message = {
                     "role": "user",
                     "content": payload.query,
                     "conversation_id": rootId,
                     "id": uuid.uuid4().hex[:5],
                 }
-                message_db.add_message(init_message)
-                await websocket.send_json(init_message)
+                await add_message_to_db_and_send(init_message)
 
             agent = agents[agent_name]
             agent.on_message_send = add_message_to_db_and_send
@@ -194,11 +189,9 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 "content": response,
             }
             # db
-            message_db.add_message(final_message)
-            await websocket.send_json(final_message)
+            await add_message_to_db_and_send(final_message)
             conversation_end = {"type": "end", "conversation_id": rootId}
-            message_db.add_message(conversation_end)
-            await websocket.send_json(conversation_end)
+            await add_message_to_db_and_send(conversation_end)
 
     except Exception as e:
         traceback.print_exc()
@@ -230,7 +223,6 @@ async def preload_agents():
 
 def start(port=8000):
     import uvicorn
-
     uvicorn.run(app, host="localhost", port=port)
 
 
