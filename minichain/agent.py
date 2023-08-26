@@ -220,7 +220,7 @@ class Agent:
         history: list of Message objects that are already part of the conversation, for follow up conversations
         """
         is_followup = len(history) > 0
-        print("is_followup", is_followup, self.conversation_id)
+        print("is_followup", is_followup, conversation_id, history)
         agent_session = Agent(
             self.functions,
             self.system_message,
@@ -255,7 +255,9 @@ class Agent:
             }
         )
         self.system_message.conversation_id = self.conversation_id
-        await self.on_message_send(self.system_message)
+        system_msg_dict = self.system_message.dict()
+        system_msg_dict['is_init'] = True
+        await self.on_message_send(system_msg_dict)
         for i in self.init_history or []:
             i.conversation_id = self.conversation_id
             i = i.dict()
