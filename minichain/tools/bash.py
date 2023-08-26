@@ -50,12 +50,11 @@ class BashSession(Function):
     async def __call__(self, commands: List[str]) -> str:
         print("Using stream:", self.stream.__name__)
         outputs = await bash(
-            [f"cd {self.cwd}"] + commands + ["pwd"],
+            commands,
             session=self.session,
             stream=self.stream,
         )
-        self.cwd = outputs[-1].strip()
-        response = "".join(outputs[2:-2])
+        response = "".join(outputs)
         print("done:", commands, response)
         await self.stream(response, final=True)
         return response
@@ -72,7 +71,7 @@ class BashSession(Function):
 
 
 class CodeInterpreterQuery(BaseModel):
-    code: str = Field(..., description="Python code to run.")
+    code: str = Field(..., description="Python code to run. Code can also be passed directly as a string without the surrounding 'code' field.")
 
 
 class CodeInterpreter(Function):
@@ -96,11 +95,11 @@ def print(*args, **kwargs):
         last_line = 'import types; print(", ".join([f"{k}: {v}" for k, v in locals().items() if not k.startswith("_") and not isinstance(v, type) and not isinstance(v, types.ModuleType) and not isinstance(v, types.FunctionType) ]))'
         code = first_lines + code + "\n" + last_line
         filename = uuid.uuid4().hex[:5]
-        with open(f"{filename}.py", "w") as f:
+        filepath = f"{self.bash.cwd}/.minichain/{filename}.py"
+        with open(filepath, "w") as f:
             f.write(code)
         self.bash._register_stream(self.stream)
-        output = await self.bash(commands=[f"python {filename}.py"])
-        os.remove(f"{filename}.py")
+        output = await self.bash(commands=[f"python {filepath}"])
         return output
 
 

@@ -34,11 +34,8 @@ class Programmer(Agent):
             )
         super().__init__(
             functions=[
-                # WebGPT(silent=silent).as_function("webgpt", "Research the web in order to answer a question.", Query),
                 interpreter.bash,
                 interpreter,
-                # web_search,
-                # tool(**kwargs)(scan_website),
                 codebase.get_file_summary,
                 codebase.view,
                 codebase.edit,

@@ -7,6 +7,20 @@ import CodeBlock from './CodeBlock';
 
 const DisplayJson = ({ data }) => {
   const [isFolded, setIsFolded] = useState({});
+  if (data.name === 'python') {
+    try {
+      const parsed = JSON.parse(data.arguments);
+      if (parsed.code) {
+        return <CodeBlock code={parsed.code} />;
+      }
+    } catch (e) {
+      // code was not wrapped in {code: ...}
+    }
+    return <CodeBlock code={data.arguments} />;
+  }
+  if (data.name === 'return' && JSON.parse(data.arguments).final_response) {
+    return;
+  }
 
   const toggleFold = key => {
     setIsFolded({ ...isFolded, [key]: !isFolded[key] });

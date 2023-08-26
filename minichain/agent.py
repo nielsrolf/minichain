@@ -423,6 +423,10 @@ class Function:
         self.function = function
         self.description = description
         self.has_stream = False
+    
+    # def parse(self, response):
+    #     """This method is for child classes that want to add extra parsing logic to the response, e.g. python"""
+    #     return response
 
     async def __call__(self, **arguments):
         """Call the function with the given arguments.
@@ -434,6 +438,7 @@ class Function:
         response = await self.function(**arguments)
         print("response", response)
         return response
+        # return self.parse(response)
 
     def _register_stream(self, stream):
         self.stream = stream
