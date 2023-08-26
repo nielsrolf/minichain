@@ -174,17 +174,17 @@ async def websocket_endpoint(websocket: WebSocket):
                 payload.response_to
             )  # TODO get the conv id of the response_to message
             is_followup = payload.response_to is not None
-            if not is_followup:
-                rootId = uuid.uuid4().hex[:5]
-                start_message = {"type": "start", "conversation_id": rootId, "agent": agent_name}
-                await add_message_to_db_and_send(start_message)
-                init_message = {
-                    "role": "user",
-                    "content": payload.query,
-                    "conversation_id": rootId,
-                    "id": uuid.uuid4().hex[:5],
-                }
-                await add_message_to_db_and_send(init_message)
+            # if not is_followup:
+            #     rootId = uuid.uuid4().hex[:5]
+            #     start_message = {"type": "start", "conversation_id": rootId, "agent": agent_name}
+            #     await add_message_to_db_and_send(start_message)
+            #     init_message = {
+            #         "role": "user",
+            #         "content": payload.query,
+            #         "conversation_id": rootId,
+            #         "id": uuid.uuid4().hex[:5],
+            #     }
+            #     await add_message_to_db_and_send(init_message)
             
             print("agent_name", agent_name )
             agent = agents[agent_name]
@@ -192,17 +192,17 @@ async def websocket_endpoint(websocket: WebSocket):
             agent.on_message_send = add_message_to_db_and_send
 
             response = await agent.run(query=payload.query, history=history, conversation_id=payload.response_to)
-            if not is_followup:
-                final_message = {
-                    "role": "assistant",
-                    "conversation_id": rootId,
-                    "id": uuid.uuid4().hex[:5],
-                    "content": response,
-                }
-                # db
-                await add_message_to_db_and_send(final_message)
-                conversation_end = {"type": "end", "conversation_id": rootId}
-                await add_message_to_db_and_send(conversation_end)
+            # if not is_followup:
+            #     final_message = {
+            #         "role": "assistant",
+            #         "conversation_id": rootId,
+            #         "id": uuid.uuid4().hex[:5],
+            #         "content": response,
+            #     }
+            #     # db
+            #     await add_message_to_db_and_send(final_message)
+            #     conversation_end = {"type": "end", "conversation_id": rootId}
+            #     await add_message_to_db_and_send(conversation_end)
 
     except Exception as e:
         traceback.print_exc()
