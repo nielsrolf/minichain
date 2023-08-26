@@ -202,24 +202,28 @@ const pusToPath = (id) => {
         <div className="main">
             {connectionStatus !== "CONNECTED" && <div className="disconnected">Connection: {connectionStatus}</div>}
             <div className="header">
-<button onClick={() => pusToPath("root")}>Main</button>
-<button onClick={() => {
-    if (path.length > 1) {
-        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
-    }
-}}>Back </button>
-<button onClick={() => {
-    // parent
-    const currentConversationId = path[path.length - 1];
-    if (currentConversationId !== "root") {
-        pusToPath(conversationTree.parents[currentConversationId]);
-    }
-}}>Parent</button>
-<button onClick={() => {
-    // Scroll to the last message using scrollIntoView
-    const lastMessage = document.querySelector('.chat').lastChild;
-    lastMessage?.scrollIntoView({ behavior: "smooth" });
-}}>Scroll to Last Message</button>
+        <button onClick={() => pusToPath("root")}>Main</button>
+        <button onClick={() => {
+            if (path.length > 1) {
+                setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
+            }
+        }}>Back </button>
+        <button onClick={() => {
+            // parent
+            const currentConversationId = path[path.length - 1];
+            if (currentConversationId !== "root") {
+                pusToPath(conversationTree.parents[currentConversationId]);
+            }
+        }}>Parent</button>
+        <button onClick={() => {
+            // Scroll to the last message using scrollIntoView
+            const lastMessage = document.querySelector('.chat').lastChild;
+            lastMessage?.scrollIntoView({ behavior: "smooth" });
+        }}>Scroll to Last Message</button>
+        <button onClick={() => {
+            // Send a cancel message to the websocket
+            client.send('cancel');
+        }}>Interrupt</button>
 
                 {/* {Object.keys(conversationTree.conversations).map(conversationId => 
                     <button onClick={() => pusToPath(conversationId)}>{conversationId}</button>

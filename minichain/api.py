@@ -4,6 +4,7 @@ import traceback
 import uuid
 from collections import defaultdict
 from typing import Any, Dict, Optional
+import asyncio
 
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -127,6 +128,9 @@ message_db = MessageDB()
 
 agents = {}
 
+class Cancelled(Exception):
+    pass
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -155,8 +159,23 @@ async def websocket_endpoint(websocket: WebSocket):
         message_db.add_message(message)
         if not isinstance(message, dict):
             message = message.dict()
-        await websocket.send_json(message)
+        # check the websocket: has a cancel message been sent? if no message has been sent, avoid blocking by using asyncio.wait
+        try:
+            data = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
+            if data == "cancel":
+                raise Cancelled("cancel")
+        except asyncio.TimeoutError:
+            pass
+        except Cancelled as e:
+            raise e
+        except RuntimeError as e:
+            print(".. hopefully just websocket closed, running in background", e, type(e))
+            return
 
+        try:
+            await websocket.send_json(message)
+        except Exception as e:
+            print("websocket closed, running in background")
     try:
         while True:
             data = await websocket.receive_text()
@@ -172,21 +191,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
 
             history = message_db.get_history(payload.response_to, no_init=True)
-            rootId = (
-                payload.response_to
-            )  # TODO get the conv id of the response_to message
-            is_followup = payload.response_to is not None
-            # if not is_followup:
-            #     rootId = uuid.uuid4().hex[:5]
-            #     start_message = {"type": "start", "conversation_id": rootId, "agent": agent_name}
-            #     await add_message_to_db_and_send(start_message)
-            #     init_message = {
-            #         "role": "user",
-            #         "content": payload.query,
-            #         "conversation_id": rootId,
-            #         "id": uuid.uuid4().hex[:5],
-            #     }
-            #     await add_message_to_db_and_send(init_message)
             
             print("agent_name", agent_name )
             agent = agents[agent_name]
@@ -195,18 +199,7 @@ async def websocket_endpoint(websocket: WebSocket):
             conversation_id = payload.response_to or f"root.{uuid.uuid4().hex[:5]}"
             print("CALLING:", payload.dict(), conversation_id)
             response = await agent.run(query=payload.query, history=history, conversation_id=conversation_id)
-            # if not is_followup:
-            #     final_message = {
-            #         "role": "assistant",
-            #         "conversation_id": rootId,
-            #         "id": uuid.uuid4().hex[:5],
-            #         "content": response,
-            #     }
-            #     # db
-            #     await add_message_to_db_and_send(final_message)
-            #     conversation_end = {"type": "end", "conversation_id": rootId}
-            #     await add_message_to_db_and_send(conversation_end)
-
+            
     except Exception as e:
         traceback.print_exc()
 
