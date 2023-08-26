@@ -14,7 +14,7 @@ class BashQuery(BaseModel):
     commands: List[str] = Field(..., description="A list of bash commands.")
 
 
-async def async_print(i):
+async def async_print(i, final=False):
     print(i)
 
 
@@ -35,7 +35,10 @@ class BashSession(Function):
         # if we do asyncio.run, we get: RuntimeError: asyncio.run() cannot be called from a running event loop
         # so we just create a background task
         print("Starting bash session:", self.session)
-        asyncio.create_task(self.__call__(commands=["echo hello world"]))
+        try:
+            asyncio.create_task(self.__call__(commands=["echo hello world"]))
+        except Exception as e:
+            print(e)
         self.has_stream = True
 
 
@@ -45,6 +48,7 @@ class BashSession(Function):
         self.cwd = outputs[-1].strip()
         response = "".join(outputs[2:-2])
         print("done:", commands, response)
+        await self.stream(response, final=True)
         return response
 
     # when the session is destroyed, stop the container

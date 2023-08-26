@@ -18,7 +18,7 @@ class ProgrammerResponse(BaseModel):
     final_response: str = Field(..., description="The final response to the user.")
 
 
-async def async_print(i):
+async def async_print(i, final=False):
     print(i)
 
 

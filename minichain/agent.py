@@ -200,9 +200,12 @@ class Agent:
             name=function_name
         )
         self.history.append(streaming_message)
-        async def on_newline(newline):
+        async def on_newline(newline, final=False):
             print("stream", self.__class__.__name__, newline)
-            streaming_message.content += newline
+            if not final:
+                streaming_message.content += newline
+            else:
+                streaming_message.content = newline
             await self.on_message_send(streaming_message)
         on_newline.__name__ = f"stream_{function_name}_to_{self.conversation_id}"
         return on_newline
