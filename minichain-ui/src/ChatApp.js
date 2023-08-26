@@ -22,17 +22,19 @@ const ChatApp = () => {
     const [inputValue, setInputValue] = useState("");
     const [path, setPath] = useState(["root"]);
     const [agentName, setAgentName] = useState("yopilot");
+    const [defaultAgentName, setDefaultAgentName] = useState("yopilot");
 
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
         subConversations: {},
         parents: {},
         lastMessageId: null,
+        agents: {}
     });
 
     useEffect(() => {
         // get the agent name from the URL
-        const client = new W3CWebSocket(`ws://localhost:8000/ws/${agentName}`);
+        const client = new W3CWebSocket(`ws://localhost:8000/ws`);
 
         client.onopen = () => {
             console.log('WebSocket Client Connected');
@@ -64,7 +66,7 @@ const ChatApp = () => {
                         }
                         console.log("Starting new conversation: " + data.conversation_id);
                         setConversationTree(prevConversationTree => {
-                            const { conversations, subConversations, lastMessageId, parents } = prevConversationTree;
+                            const { conversations, subConversations, lastMessageId, parents, agents } = prevConversationTree;
                             let activeConversationId = "root";
                             if (lastMessageId) {
                                 // get the conversation if of the last message
@@ -76,7 +78,8 @@ const ChatApp = () => {
                                 conversations: { ...conversations, [data.conversation_id]: [] },
                                 subConversations: { ...subConversations, [lastMessageId]: [...siblings, data.conversation_id] },
                                 parents: { ...parents, [data.conversation_id]: activeConversationId },
-                                lastMessageId: lastMessageId
+                                lastMessageId: lastMessageId,
+                                agents: { ...agents, [data.conversation_id]: data.agent }
                             };
                         });
                     } else {
@@ -96,7 +99,7 @@ const ChatApp = () => {
                             return newPath;
                         });
                         setConversationTree(prevConversationTree => {
-                            const { conversations, subConversations, parents } = prevConversationTree;
+                            const { conversations, subConversations, parents, agents } = prevConversationTree;
                             let lastParentMessageId = null;
                             try {
                                 lastParentMessageId = conversations[parents[data.conversation_id]].slice(-1)[0].id;
@@ -104,10 +107,11 @@ const ChatApp = () => {
                                 // we are at the root, we leave it as null
                             }
                             return {
-                                conversations: conversations,
-                                subConversations: subConversations,
-                                parents: parents,
-                                lastMessageId: lastParentMessageId
+                                conversations,
+                                subConversations,
+                                parents,
+                                lastMessageId: lastParentMessageId,
+                                agents
                             };
                         });
                     } else {
@@ -120,14 +124,15 @@ const ChatApp = () => {
                     console.log("Adding to conv tree: " + message.data);
                     const { id } = data;
                     setConversationTree(prevConversationTree => {
-                        const { conversations, subConversations, parents } = prevConversationTree;
+                        const { conversations, subConversations, parents, agents } = prevConversationTree;
                         const newConversation = conversations[data.conversation_id] || [];
                         const updatedConversation = [...newConversation.filter(i => i.id !== id), data];
                         return {
                             conversations: { ...conversations, [data.conversation_id]: updatedConversation},
-                            subConversations: subConversations,
-                            parents: parents,
-                            lastMessageId: id
+                            subConversations,
+                            parents,
+                            lastMessageId: id,
+                            agents
                         };
                     });
                     pusToPath(data.conversation_id);
@@ -139,7 +144,7 @@ const ChatApp = () => {
         return () => {
             client.close();
         };
-    }, [agentName]);
+    }, []);
 
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
@@ -160,7 +165,7 @@ const ChatApp = () => {
             response_to = currentConversationId;
         }
 
-        const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to });
+        const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to, agent: agentName });
         client.send(messagePayload);
         setInputValue("");
     };
@@ -176,9 +181,16 @@ const ChatApp = () => {
         });
         // setpath[path.length - 1](id);
         console.log("Setting display conversation id to " + id);
+        // set the agent name to the agent of the conversation
+        setAgentName(conversationTree.agents[id] || defaultAgentName);
     };
 
     console.log({ conversationTree });
+
+    const selectAgent = (agentName) => {
+        setAgentName(agentName);
+        setDefaultAgentName(agentName);
+    }
 
 
     return (
@@ -202,20 +214,38 @@ const ChatApp = () => {
                 {/* {Object.keys(conversationTree.conversations).map(conversationId => 
                     <button onClick={() => pusToPath(conversationId)}>{conversationId}</button>
                 )} */}
-                {/* on the right of the header, show a dropdown for the different agentNames */}
-                <select value={agentName} onChange={e => setAgentName(e.target.value)} style={{
-                    position: "absolute",
-                    right: "10px",
-                    top: "10px",
-                    backgroundColor: "black",
-                    color: "white",
-                    padding: "5px",
-                }}>
-                    <option value="yopilot">yopilot</option>
-                    <option value="planner">planner</option>
-                    <option value="webgpt">webgpt</option>
-                    <option value="chatgpt">chatgpt</option>
-                </select>
+                {/* on the right of the header, show the selected agent
+                if we are on root, show the agent selection
+                */}
+                {path[path.length - 1]}
+                {path[path.length - 1] === "root" && (
+                    <select value={agentName} onChange={e => selectAgent(e.target.value)} style={{
+                        position: "absolute",
+                        right: "10px",
+                        top: "10px",
+                        backgroundColor: "black",
+                        color: "white",
+                        padding: "5px",
+                    }}>
+                        <option value="yopilot">yopilot</option>
+                        <option value="planner">planner</option>
+                        <option value="webgpt">webgpt</option>
+                        <option value="chatgpt">chatgpt</option>
+                    </select>
+                )}
+                {/* otherwise show the current agent */}
+                {path[path.length - 1] !== "root" && (
+                    <div style={{
+                        position: "absolute",
+                        right: "10px",
+                        top: "10px",
+                        backgroundColor: "black",
+                        color: "white",
+                        padding: "5px",
+                    }}>
+                        {agentName}
+                    </div>
+                )}
 
             </div>
             <div style={{ height: "50px" }}></div>

@@ -32,7 +32,7 @@ class MessageDB:
 
     def load_dir_as_list(self, path):
         messages = []
-        for filename in os.listdir(path):
+        for filename in sorted(os.listdir(path)):
             try:
                 with open(os.path.join(path, filename), "r") as f:
                     message = json.load(f)
@@ -80,8 +80,14 @@ class MessageDB:
         if "role" in message:
             self.save_msg(message, "messages")
 
-    def get_history(self, conversation_id):
-        return self.dicts_to_classes(self.get_conversation(conversation_id))
+    def get_history(self, conversation_id, no_init=False):
+        dicts = self.get_conversation(conversation_id)
+        if no_init:
+            dicts = [i for i in dicts if i.get("is_init", False) == False]
+        else:
+            for i in dicts:
+                i.pop("is_init", None)
+        return self.dicts_to_classes(dicts)
 
     def get_message(self, message_id):
         for message in self.messages:
@@ -111,6 +117,7 @@ app.add_middleware(
 class Payload(BaseModel):
     query: str
     response_to: Optional[str] = None
+    agent: str
 
 
 message_db = MessageDB()
@@ -119,8 +126,8 @@ message_db = MessageDB()
 agents = {}
 
 
-@app.websocket("/ws/{agent_name}")
-async def websocket_endpoint(websocket: WebSocket, agent_name: str):
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
     """Create a websocket that sends:
     {type: start, conversation_id: 123}
     {...message, id: 1},
@@ -157,17 +164,19 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
             except ValidationError as e:
                 # probably a heart beat
                 continue
+            agent_name = payload.agent
             if agent_name not in agents:
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
 
-            init_history = message_db.get_history(payload.response_to)
+            history = message_db.get_history(payload.response_to, no_init=True)
             rootId = (
                 payload.response_to
             )  # TODO get the conv id of the response_to message
-            if payload.response_to is None:
+            is_followup = payload.response_to is not None
+            if not is_followup:
                 rootId = uuid.uuid4().hex[:5]
-                start_message = {"type": "start", "conversation_id": rootId}
+                start_message = {"type": "start", "conversation_id": rootId, "agent": agent_name}
                 await add_message_to_db_and_send(start_message)
                 init_message = {
                     "role": "user",
@@ -176,22 +185,24 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                     "id": uuid.uuid4().hex[:5],
                 }
                 await add_message_to_db_and_send(init_message)
-
+            
+            print("agent_name", agent_name )
             agent = agents[agent_name]
+            print("agent", agent)
             agent.on_message_send = add_message_to_db_and_send
-            agent.init_history = init_history
 
-            response = await agent.run(query=payload.query)
-            final_message = {
-                "role": "assistant",
-                "conversation_id": rootId,
-                "id": uuid.uuid4().hex[:5],
-                "content": response,
-            }
-            # db
-            await add_message_to_db_and_send(final_message)
-            conversation_end = {"type": "end", "conversation_id": rootId}
-            await add_message_to_db_and_send(conversation_end)
+            response = await agent.run(query=payload.query, history=history, conversation_id=payload.response_to)
+            if not is_followup:
+                final_message = {
+                    "role": "assistant",
+                    "conversation_id": rootId,
+                    "id": uuid.uuid4().hex[:5],
+                    "content": response,
+                }
+                # db
+                await add_message_to_db_and_send(final_message)
+                conversation_end = {"type": "end", "conversation_id": rootId}
+                await add_message_to_db_and_send(conversation_end)
 
     except Exception as e:
         traceback.print_exc()
@@ -219,6 +230,8 @@ async def preload_agents():
             "chatgpt": ChatGPT(),
         }
     )
+    for agent in list(agents.values()):
+        agents[agent.name] = agent
 
 
 def start(port=8000):

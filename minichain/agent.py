@@ -132,6 +132,8 @@ class Agent:
         keep_last_messages=20,
         silent=False,
         keep_session=False,
+        name=None,
+        conversation_id=None,
     ):
         functions = functions.copy()
         self.response_openapi = response_openapi
@@ -149,6 +151,7 @@ class Agent:
         self.keep_last_messages = keep_last_messages
         self.silent = silent
         self.keep_session = keep_session
+        self.name = name or self.__class__.__name__
 
         async def do_nothing(*args, **kwargs):
             pass
@@ -157,7 +160,7 @@ class Agent:
         self.on_message_send = on_message_send or default_message_action
 
         self.functions_openai = [i.openapi_json for i in self.functions]
-        self.conversation_id = str(uuid.uuid4().hex[:5])
+        self.conversation_id = conversation_id or str(uuid.uuid4().hex[:5])
 
     async def print_message(self, message):
         print("-" * 120)
@@ -212,8 +215,12 @@ class Agent:
         on_newline.__name__ = f"stream_{function_name}_to_{self.conversation_id}"
         return on_newline
 
-    async def run(self, keep_session=False, history=[], **arguments):
-        """arguments: dict with values mentioned in the prompt template"""
+    async def run(self, keep_session=False, history=[], conversation_id=None, **arguments):
+        """arguments: dict with values mentioned in the prompt template
+        history: list of Message objects that are already part of the conversation, for follow up conversations
+        """
+        is_followup = len(history) > 0
+        print("is_followup", is_followup, self.conversation_id)
         agent_session = Agent(
             self.functions,
             self.system_message,
@@ -225,26 +232,34 @@ class Agent:
             keep_last_messages=self.keep_last_messages,
             silent=self.silent,
             keep_session=keep_session,
+            name=self.name,
+            conversation_id=conversation_id if is_followup else None,
         )
-        await agent_session.send_initial_messages()
-        for i in history:
-            await agent_session.history_append(i)
+        if not is_followup:
+            await agent_session.send_initial_messages()
+        else:
+            # The history messages already have a message id and don't need to be sent again
+            agent_session.history += history
         await agent_session.task_to_history(arguments)
         response = await agent_session.run_until_done()
         return response
 
     async def send_initial_messages(self):
+        # Get the class name of the agent, but the child class name if this is a child class
+        class_name = self.name or self.__class__.__name__
         await self.on_message_send(
             {
                 "type": "start",
                 "conversation_id": self.conversation_id,
-                "agent": self.__class__.__name__,
+                "agent": class_name
             }
         )
         self.system_message.conversation_id = self.conversation_id
         await self.on_message_send(self.system_message)
         for i in self.init_history or []:
             i.conversation_id = self.conversation_id
+            i = i.dict()
+            i['is_init'] = True
             await self.on_message_send(i)
 
     async def run_until_done(self):
@@ -304,11 +319,9 @@ class Agent:
             msg.pop("conversation_id", None)
             msg.pop("id", None)
             history.append(msg)
-        print("YOOOOOOO")
         response = await get_openai_response_stream(
             history, self.functions_openai, stream=self.stream_to_history()
         )
-        print("YOYOYO")
         print(response)
         function_call = response.get("function_call", None)
         if function_call is not None:
