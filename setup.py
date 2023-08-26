@@ -1,14 +1,13 @@
 from setuptools import find_packages, setup
 
-`setup(
+setup(
     name="minichain",
-    long_description = open('README.md', 'r').read(),
-    description=long_description,
+    version=0.1,
+    description="utils for agi",
     license="Apache 2.0",
     packages=find_packages(),
     package_data={},
     scripts=[],
-)`
     install_requires=[
         "click",
         "python-dotenv",
