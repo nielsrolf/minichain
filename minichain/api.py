@@ -178,7 +178,12 @@ async def websocket_endpoint(websocket: WebSocket):
             print("websocket closed, running in background")
     try:
         while True:
-            data = await websocket.receive_text()
+            try:
+                data = await websocket.receive_text()
+            except Exception:
+                # sleep for a bit and try again
+                await asyncio.sleep(1)
+                continue
             print("received data", data)
             try:
                 payload = Payload(**json.loads(data))

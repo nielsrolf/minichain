@@ -18,8 +18,12 @@ const DisplayJson = ({ data }) => {
     }
     return <CodeBlock code={data.arguments} />;
   }
-  if (data.name === 'return' && JSON.parse(data.arguments).final_response) {
-    return;
+  try {
+    if (data.name === 'return' && JSON.parse(data.arguments).final_response) {
+      return;
+    }
+  } catch (e) {
+    // arguments was not a json
   }
 
   const toggleFold = key => {

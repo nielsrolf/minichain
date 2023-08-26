@@ -2,6 +2,7 @@ import asyncio
 import os
 import uuid
 from typing import Callable, List, Optional, Union
+import json
 
 import docker
 from pydantic import BaseModel, Field
@@ -71,8 +72,18 @@ class BashSession(Function):
 
 
 class CodeInterpreterQuery(BaseModel):
-    code: str = Field(..., description="Python code to run. Code can also be passed directly as a string without the surrounding 'code' field.")
+    code: str = Field(..., description="Python code to run. Code can also be passed directly as a string without the surrounding 'code' field. ")
 
+
+first_lines = """import sys
+import builtins
+def print(*args, **kwargs):
+    builtins.print(*args, **kwargs)
+    sys.stdout.flush()
+"""
+
+last_lines = """import types
+print(", ".join([f"{k}: {v}" for k, v in locals().items() if k in <lastLine> ]))"""
 
 class CodeInterpreter(Function):
     def __init__(self, stream=async_print, **kwargs):
@@ -80,20 +91,14 @@ class CodeInterpreter(Function):
             name="python",
             openapi=CodeInterpreterQuery,
             function=self,
-            description="Create and run a temporary python file (non-interactively).",
+            description="Create and run a temporary python file (non-interactively; jupyter-style !bash commands are not supported).",
         )
         self.bash = BashSession(stream=stream)
         self.has_stream = True
 
     async def __call__(self, code: str) -> str:
-        first_lines = """import sys
-import builtins
-def print(*args, **kwargs):
-    builtins.print(*args, **kwargs)
-    sys.stdout.flush()
-"""
-        last_line = 'import types; print(", ".join([f"{k}: {v}" for k, v in locals().items() if not k.startswith("_") and not isinstance(v, type) and not isinstance(v, types.ModuleType) and not isinstance(v, types.FunctionType) ]))'
-        code = first_lines + code + "\n" + last_line
+        last_line = json.dumps(code.strip().split("\n")[-1])
+        code = first_lines + code + "\n" + last_lines.replace("<lastLine>", last_line)
         filename = uuid.uuid4().hex[:5]
         filepath = f"{self.bash.cwd}/.minichain/{filename}.py"
         with open(filepath, "w") as f:
