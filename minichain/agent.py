@@ -119,6 +119,49 @@ def make_return_function(openapi_json: BaseModel):
     return function_obj
 
 
+def parse_function_call(function_call: Optional[Dict[str, Any]]):
+    if function_call is None:
+        return None
+    try:
+        arguments = json.loads(function_call["arguments"])
+        return FunctionCall(**function_call)
+    except:
+        pass
+    if '"code": ```' in function_call["arguments"]:
+        # replace first occurrence of ``` with " and last
+        try:
+            before, after = function_call["arguments"].split('"code": ```', 1)
+            try:
+                code, after = after.rsplit("```,", 1)[0]
+            except:
+                code, after = after.rsplit("```", 1)[0]
+            arguments_no_code = json.loads(before + after)
+            arguments = {"code": code, **arguments_no_code}
+            function_call["arguments"] = json.dumps(arguments)
+            return FunctionCall(**function_call)
+        except Exception as e:
+            print(e)
+            breakpoint()
+    
+    if '"code": `' in function_call["arguments"]:
+        try:
+            # replace first occurrence of ``` with " and last
+            before, after = function_call["arguments"].split('"code": `', 1)
+            try:
+                code, after = after.rsplit("`,", 1)[0]
+            except:
+                code, after = after.rsplit("`", 1)[0]
+            arguments_no_code = json.loads(before + after)
+            arguments = {"code": code, **arguments_no_code}
+            function_call["arguments"] = json.dumps(arguments)
+            return FunctionCall(**function_call)
+        except Exception as e:
+            print(e)
+            breakpoint()
+    return FunctionCall(**function_call)
+
+
+
 class Agent:
     def __init__(
         self,
@@ -192,8 +235,10 @@ class Agent:
         self.history.append(streaming_message)
 
         async def on_stream_message(message):
-            streaming_message.content = message["content"]
-            streaming_message.function_call = message.get("function_call", None)
+            streaming_message.content = message.get("content", "")
+            streaming_message.function_call = parse_function_call(message.get("function_call", None))
+            # TODO parse here: e.g. `fake JSON` -> JSON
+
             await self.on_message_send(streaming_message)
 
         return on_stream_message
@@ -324,13 +369,14 @@ class Agent:
         response = await get_openai_response_stream(
             history, self.functions_openai, stream=self.stream_to_history()
         )
-        print(response)
-        function_call = response.get("function_call", None)
-        if function_call is not None:
-            function_call = FunctionCall(**function_call)
-        return AssistantMessage(
-            response.get("content", None), function_call=function_call
-        )
+        return self.history[-1]
+        # print(response)
+        # function_call = response.get("function_call", None)
+        # if function_call is not None:
+        #     function_call = FunctionCall(**function_call)
+        # return AssistantMessage(
+        #     response.get("content", None), function_call=function_call
+        # )
 
     # @debug
     async def execute_action(self, function_call):

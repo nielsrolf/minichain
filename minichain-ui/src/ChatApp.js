@@ -187,7 +187,7 @@ const pusToPath = (id) => {
     setAgentName(conversationTree.agents[id] || defaultAgentName);
     // Scroll to the last message
     const lastMessage = document.querySelector('.chat').lastChild;
-    lastMessage?.scrollIntoView({ behavior: "smooth" });
+    lastMessage?.scrollIntoView();
 };
 
     console.log({ conversationTree });
@@ -218,7 +218,7 @@ const pusToPath = (id) => {
         <button onClick={() => {
             // Scroll to the last message using scrollIntoView
             const lastMessage = document.querySelector('.chat').lastChild;
-            lastMessage?.scrollIntoView({ behavior: "smooth" });
+            lastMessage?.scrollIntoView();
         }}>Scroll to Last Message</button>
         <button onClick={() => {
             // Send a cancel message to the websocket

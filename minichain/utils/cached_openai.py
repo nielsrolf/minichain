@@ -102,11 +102,17 @@ async def get_openai_response_stream(
         #         function_call['arguments'] = json.loads(function_call['arguments'])
         #     except:
         #         print("Error parsing arguments", function_call['arguments'])
+        with open(f"last_openai_response_{len(messages)}.json", "w") as f:
+            json.dump(
+                {
+                    "response": response,
+                },
+                f,
+            )
 
         return response
     except Exception as e:
         print(e)
-        breakpoint()
         print(chat_history)
 
 

@@ -153,7 +153,7 @@ async def edit(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
     end: int = Field(..., description="The end line."),
-    code: str = Field(..., description="The code to replace the lines with."),
+    code: str = Field(..., description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON."),
 ):
     """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!"""
     code = remove_line_numbers(code)
@@ -196,7 +196,7 @@ async def replace_symbol(
         ...,
         description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only.",
     ),
-    code: str = Field(..., description="The new code to replace the symbol with."),
+    code: str = Field(..., description="The new code to replace the symbol with. Can be escaped with `ticks` to avoid formatting code as JSON."),
     is_new: bool = Field(False, description="Whether a new symbol should be created."),
 ):
     """Replace a symbol (function/class/method) in a file."""
