@@ -203,10 +203,23 @@ const ChatApp = () => {
         setDefaultAgentName(agentName);
     }
 
+    if (connectionStatus !== "CONNECTED") {
+        return (
+            <div className="main">
+                <div className="header">
+                    minichain is {connectionStatus} :(
+                </div>
+                <div style={{ height: "100px" }}></div>
+                <div className="chat">
+                    You need to manually start the backend via `python -m minichain.api` and have Docker running. Then refresh the page.
+                </div> 
+            </div>
+        );
+    }
+
 
     return (
         <div className="main">
-            {connectionStatus !== "CONNECTED" && <div className="disconnected">Connection: {connectionStatus}</div>}
             <div className="header">
         <button onClick={() => pushToPath("root")}>Main</button>
         <button onClick={() => {
