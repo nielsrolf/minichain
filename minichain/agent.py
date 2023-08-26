@@ -233,7 +233,7 @@ class Agent:
             silent=self.silent,
             keep_session=keep_session,
             name=self.name,
-            conversation_id=conversation_id if is_followup else None,
+            conversation_id=conversation_id,
         )
         if not is_followup:
             await agent_session.send_initial_messages()

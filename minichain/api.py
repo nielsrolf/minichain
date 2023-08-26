@@ -32,7 +32,9 @@ class MessageDB:
 
     def load_dir_as_list(self, path):
         messages = []
-        for filename in sorted(os.listdir(path)):
+        paths = os.listdir(path)
+        paths_sorted = sorted(paths, key=lambda x: int(x.split(".")[0]))
+        for filename in paths_sorted:
             try:
                 with open(os.path.join(path, filename), "r") as f:
                     message = json.load(f)
@@ -190,8 +192,9 @@ async def websocket_endpoint(websocket: WebSocket):
             agent = agents[agent_name]
             print("agent", agent)
             agent.on_message_send = add_message_to_db_and_send
-
-            response = await agent.run(query=payload.query, history=history, conversation_id=payload.response_to)
+            conversation_id = payload.response_to or f"root.{uuid.uuid4().hex[:5]}"
+            print("CALLING:", payload.dict(), conversation_id)
+            response = await agent.run(query=payload.query, history=history, conversation_id=conversation_id)
             # if not is_followup:
             #     final_message = {
             #         "role": "assistant",

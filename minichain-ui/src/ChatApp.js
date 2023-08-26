@@ -67,8 +67,10 @@ const ChatApp = () => {
                         console.log("Starting new conversation: " + data.conversation_id);
                         setConversationTree(prevConversationTree => {
                             const { conversations, subConversations, lastMessageId, parents, agents } = prevConversationTree;
-                            let activeConversationId = "root";
-                            if (lastMessageId) {
+                            // lets prepare to use "root.parent.child" as conversation ids
+                            let activeConversationId = data.conversation_id.split(".")[0]
+                            // but since it's not implemented everywhere, we also use the last message id
+                            if (lastMessageId && !data.conversation_id.includes(".")) {
                                 // get the conversation if of the last message
                                 activeConversationId = Object.keys(conversations).find(conversationId => conversations[conversationId].map(message => message.id).includes(lastMessageId));
                             }
@@ -170,20 +172,23 @@ const ChatApp = () => {
         setInputValue("");
     };
 
-    const pusToPath = (id) => {
-        setPath(prevPath => {
-            // if we are already on that path, do nothing
-            if (prevPath[prevPath.length - 1] === id) {
-                return prevPath;
-            }
-            // otherwise push the path to the stack
-            return [...prevPath, id]
-        });
-        // setpath[path.length - 1](id);
-        console.log("Setting display conversation id to " + id);
-        // set the agent name to the agent of the conversation
-        setAgentName(conversationTree.agents[id] || defaultAgentName);
-    };
+const pusToPath = (id) => {
+    setPath(prevPath => {
+        // if we are already on that path, do nothing
+        if (prevPath[prevPath.length - 1] === id) {
+            return prevPath;
+        }
+        // otherwise push the path to the stack
+        return [...prevPath, id]
+    });
+    // setpath[path.length - 1](id);
+    console.log("Setting display conversation id to " + id);
+    // set the agent name to the agent of the conversation
+    setAgentName(conversationTree.agents[id] || defaultAgentName);
+    // Scroll to the last message
+    const lastMessage = document.querySelector('.chat').lastChild;
+    lastMessage?.scrollIntoView({ behavior: "smooth" });
+};
 
     console.log({ conversationTree });
 
@@ -197,19 +202,24 @@ const ChatApp = () => {
         <div className="main">
             {connectionStatus !== "CONNECTED" && <div className="disconnected">Connection: {connectionStatus}</div>}
             <div className="header">
-                <button onClick={() => pusToPath("root")}>Main</button>
-                <button onClick={() => {
-                    if (path.length > 1) {
-                        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
-                    }
-                }}>Back </button>
-                <button onClick={() => {
-                    // parent
-                    const currentConversationId = path[path.length - 1];
-                    if (currentConversationId !== "root") {
-                        pusToPath(conversationTree.parents[currentConversationId]);
-                    }
-                }}>Parent</button>
+<button onClick={() => pusToPath("root")}>Main</button>
+<button onClick={() => {
+    if (path.length > 1) {
+        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
+    }
+}}>Back </button>
+<button onClick={() => {
+    // parent
+    const currentConversationId = path[path.length - 1];
+    if (currentConversationId !== "root") {
+        pusToPath(conversationTree.parents[currentConversationId]);
+    }
+}}>Parent</button>
+<button onClick={() => {
+    // Scroll to the last message using scrollIntoView
+    const lastMessage = document.querySelector('.chat').lastChild;
+    lastMessage?.scrollIntoView({ behavior: "smooth" });
+}}>Scroll to Last Message</button>
 
                 {/* {Object.keys(conversationTree.conversations).map(conversationId => 
                     <button onClick={() => pusToPath(conversationId)}>{conversationId}</button>
@@ -219,7 +229,7 @@ const ChatApp = () => {
                 */}
                 {path[path.length - 1]}
                 {path[path.length - 1] === "root" && (
-                    <select value={agentName} onChange={e => selectAgent(e.target.value)} style={{
+                    <select value={defaultAgentName} onChange={e => selectAgent(e.target.value)} style={{
                         position: "absolute",
                         right: "10px",
                         top: "10px",
@@ -227,10 +237,10 @@ const ChatApp = () => {
                         color: "white",
                         padding: "5px",
                     }}>
+                        <option value="chatgpt">chatgpt</option>
                         <option value="yopilot">yopilot</option>
                         <option value="planner">planner</option>
                         <option value="webgpt">webgpt</option>
-                        <option value="chatgpt">chatgpt</option>
                     </select>
                 )}
                 {/* otherwise show the current agent */}
@@ -250,7 +260,7 @@ const ChatApp = () => {
             </div>
             <div style={{ height: "50px" }}></div>
 
-            <div>
+            <div className="chat">
                 {conversationTree.conversations[path[path.length - 1]] && conversationTree.conversations[path[path.length - 1]].map((message, index) =>
                     <div className={`message-${message.role}`} key={index}>
                         {message.function_call && <DisplayJson data={message.function_call} />}
@@ -266,7 +276,7 @@ const ChatApp = () => {
                     // get the first messages of all sub conversations of root
                     Object.keys(conversationTree.parents).map(subConversationId => {
                         const parent = conversationTree.parents[subConversationId] || "root";
-                        const message = conversationTree.conversations[subConversationId]?.find(i => i.role==="user");
+                        const message = conversationTree.conversations[subConversationId]?.find(i => i.is_init !== true);
                         if (parent !== "root") {
                             console.log("not root", subConversationId, parent, message);
                             return null;
