@@ -16,7 +16,11 @@ The two core concepts are agents and functions that the agent can use. In order 
 Chat models are agents without structured output and end their turn by responding without a message that is not a function call. They return a string.
 
 # Getting started
-
+To install the python library, run:
+```
+pip install git+git://github.com/nielsrolf/minichain
+docker pull docker push nielsrolf/minichain:latest
+```
 
 ## Defining a tool
 

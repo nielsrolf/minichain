@@ -235,6 +235,8 @@ class Agent:
         self.history.append(streaming_message)
 
         async def on_stream_message(message):
+            if message is None:
+                return
             streaming_message.content = message.get("content", "")
             streaming_message.function_call = parse_function_call(message.get("function_call", None))
             # TODO parse here: e.g. `fake JSON` -> JSON
