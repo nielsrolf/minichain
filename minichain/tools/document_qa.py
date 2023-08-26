@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
 
 
-
 class Citation(BaseModel):
     id: int = Field(
         ...,

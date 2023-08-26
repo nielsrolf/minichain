@@ -1,20 +1,22 @@
 import json
+import os
+import traceback
+import uuid
+from collections import defaultdict
+from typing import Any, Dict, Optional
+
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
-from typing import Any, Dict
-from minichain.agent import SystemMessage, UserMessage, FunctionMessage, AssistantMessage
-from minichain.agents.webgpt import WebGPT, SmartWebGPT
-from minichain.agents.programmer import Programmer
-from minichain.agents.planner import Planner
+
+from minichain.agent import (AssistantMessage, FunctionMessage, SystemMessage,
+                             UserMessage)
 from minichain.agents.chatgpt import ChatGPT
-from fastapi import WebSocket
-from collections import defaultdict
-from typing import Optional
-import traceback
-import os
-import uuid
+from minichain.agents.planner import Planner
+from minichain.agents.programmer import Programmer
+from minichain.agents.webgpt import SmartWebGPT, WebGPT
+
 
 class MessageDB:
     def __init__(self, path=".minichain/"):
@@ -22,12 +24,12 @@ class MessageDB:
         os.makedirs(f"{path}/messages", exist_ok=True)
         os.makedirs(f"{path}/logs", exist_ok=True)
         self.load()
-    
+
     def load(self):
         path = self.path
         self.messages = self.load_dir_as_list(f"{path}/messages")
         self.logs = self.load_dir_as_list(f"{path}/logs")
-    
+
     def load_dir_as_list(self, path):
         messages = []
         for filename in os.listdir(path):
@@ -39,25 +41,25 @@ class MessageDB:
             except Exception as e:
                 print(f"Error loading message from {filename}", e)
         return messages
-    
+
     def dicts_to_classes(self, dicts):
         classes = {
-            'user': UserMessage,
-            'system': SystemMessage,
-            'function': FunctionMessage,
-            'assistant': AssistantMessage,
+            "user": UserMessage,
+            "system": SystemMessage,
+            "function": FunctionMessage,
+            "assistant": AssistantMessage,
             None: dict,
         }
         messages = []
         for message in dicts:
-            message = classes[message.get('role', None)](**message)
+            message = classes[message.get("role", None)](**message)
             messages.append(message)
         return messages
 
     def save_msg(self, message, dirname):
         dir_items = self.__dict__[dirname]
         try:
-            pos = [i['id'] for i in self.messages].index(message.get("id", None))
+            pos = [i["id"] for i in self.messages].index(message.get("id", None))
             dir_items[pos] = message
         except ValueError:
             pos = len(self.messages)
@@ -66,12 +68,12 @@ class MessageDB:
         filename = f"{pos}.json"
         with open(os.path.join(path, filename), "w") as f:
             json.dump(message, f)
-    
+
     def add_message(self, message):
         if not isinstance(message, dict):
             message = message.dict()
         self.save_msg(message, "logs")
-        if "role" in message: 
+        if "role" in message:
             self.save_msg(message, "messages")
 
     def get_history(self, conversation_id):
@@ -79,35 +81,32 @@ class MessageDB:
 
     def get_message(self, message_id):
         for message in self.messages:
-            if message['id'] == message_id:
+            if message["id"] == message_id:
                 return message
         return None
-    
+
     def get_conversation(self, conversation_id):
         conversation = []
         for message in self.messages:
-            if message['conversation_id'] == conversation_id:
+            if message["conversation_id"] == conversation_id:
                 conversation.append(message)
         return conversation
 
-    
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
-    expose_headers=['*'],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
 class Payload(BaseModel):
     query: str
     response_to: Optional[str] = None
-
-
-
 
 
 message_db = MessageDB()
@@ -154,7 +153,6 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
             message = message.dict()
         await websocket.send_json(message)
 
-
     try:
         while True:
             data = await websocket.receive_text()
@@ -163,17 +161,24 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
                 payload = Payload(**json.loads(data))
             except ValidationError as e:
                 # probably a heart beat
-                continue        
+                continue
             if agent_name not in agents:
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
-            
+
             init_history = message_db.get_history(payload.response_to)
-            rootId = payload.response_to # TODO get the conv id of the response_to message
+            rootId = (
+                payload.response_to
+            )  # TODO get the conv id of the response_to message
             if payload.response_to is None:
                 rootId = uuid.uuid4().hex[:5]
                 await websocket.send_json({"type": "start", "conversation_id": rootId})
-                init_message = {"role": "user", "content": payload.query, "conversation_id": rootId, "id": uuid.uuid4().hex[:5]}
+                init_message = {
+                    "role": "user",
+                    "content": payload.query,
+                    "conversation_id": rootId,
+                    "id": uuid.uuid4().hex[:5],
+                }
                 message_db.add_message(init_message)
                 await websocket.send_json(init_message)
 
@@ -182,7 +187,12 @@ async def websocket_endpoint(websocket: WebSocket, agent_name: str):
             agent.init_history = init_history
 
             response = await agent.run(query=payload.query)
-            final_message = {"role": "assistant", "conversation_id": rootId, "id": uuid.uuid4().hex[:5], "content": response}
+            final_message = {
+                "role": "assistant",
+                "conversation_id": rootId,
+                "id": uuid.uuid4().hex[:5],
+                "content": response,
+            }
             # db
             message_db.add_message(final_message)
             await websocket.send_json(final_message)
@@ -204,23 +214,23 @@ async def root():
     return {"message": "Hello World"}
 
 
-
-
-
 @app.on_event("startup")
 async def preload_agents():
     """This function should run after the async event loop has started."""
-    agents.update({
-        "webgpt": WebGPT(),
-        "smartgpt": SmartWebGPT(),
-        "yopilot": Programmer(),
-        "planner": Planner(),
-        "chatgpt": ChatGPT(),
-    })
+    agents.update(
+        {
+            "webgpt": WebGPT(),
+            "smartgpt": SmartWebGPT(),
+            "yopilot": Programmer(),
+            "planner": Planner(),
+            "chatgpt": ChatGPT(),
+        }
+    )
 
 
 def start(port=8000):
     import uvicorn
+
     uvicorn.run(app, host="localhost", port=port)
 
 

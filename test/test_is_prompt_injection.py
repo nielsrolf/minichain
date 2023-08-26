@@ -1,4 +1,5 @@
 import pytest
+
 from minichain.tools.is_prompt_injection import is_prompt_injection
 
 

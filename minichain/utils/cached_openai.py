@@ -5,7 +5,7 @@ import openai
 from retry import retry
 
 from minichain.utils.debug import debug
-from minichain.utils.disk_cache import disk_cache, async_disk_cache
+from minichain.utils.disk_cache import async_disk_cache, disk_cache
 
 
 def validate_message(message):
@@ -34,7 +34,9 @@ async def get_openai_response_stream(
                 message.pop("parent", None)
                 message.pop("id", None)
                 # delete all fields that are None
-                message = {k: v for k, v in message.items() if v is not None or k == "content"}
+                message = {
+                    k: v for k, v in message.items() if v is not None or k == "content"
+                }
                 messages.append(message)
         else:
             messages = chat_history
@@ -43,12 +45,15 @@ async def get_openai_response_stream(
         for i in messages:
             if i.get("function_call") is None:
                 i.pop("function_call", None)
-        
+
         with open("last_openai_request.json", "w") as f:
-            json.dump({
-                "messages": messages,
-                "functions": functions,
-            }, f)
+            json.dump(
+                {
+                    "messages": messages,
+                    "functions": functions,
+                },
+                f,
+            )
 
         # print(messages[-2])
         # print("=====================================")
@@ -67,23 +72,23 @@ async def get_openai_response_stream(
                 temperature=0.1,
                 stream=True,
             )
-    
+
         # create variables to collect the stream of chunks
         collected_chunks = []
         collected_messages = []
         # iterate through the stream of events
         function_call = {}
-        content = ''
+        content = ""
         for chunk in response:
             collected_chunks.append(chunk)  # save the event response
-            chunk = chunk['choices'][0]['delta']  # extract the message
+            chunk = chunk["choices"][0]["delta"]  # extract the message
             collected_messages.append(chunk)  # save the message
             if "function_call" in chunk:
-                delta = chunk['function_call']
+                delta = chunk["function_call"]
                 for key, value in delta.items():
                     function_call[key] = function_call.get(key, "") + value
             if "content" in chunk:
-                content += chunk['content'] or ''
+                content += chunk["content"] or ""
             response = {
                 "role": "assistant",
                 "content": content,
@@ -97,8 +102,6 @@ async def get_openai_response_stream(
         #         function_call['arguments'] = json.loads(function_call['arguments'])
         #     except:
         #         print("Error parsing arguments", function_call['arguments'])
-        
-        
 
         return response
     except Exception as e:

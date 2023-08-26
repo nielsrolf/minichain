@@ -9,4 +9,3 @@ async def web_search(query: str = Field(..., description="The query to search fo
     """Use google to search the web for a query."""
     results = google_search(query)
     return results
-

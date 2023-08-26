@@ -3,15 +3,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import (
-    Agent,
-    AssistantMessage,
-    Function,
-    FunctionCall,
-    FunctionMessage,
-    SystemMessage,
-    UserMessage,
-)
+from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
+                             FunctionMessage, SystemMessage, UserMessage)
 
 
 class IsSafeCall(BaseModel):

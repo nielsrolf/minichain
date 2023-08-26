@@ -1,10 +1,10 @@
 import inspect
 import json
 import traceback
+import uuid
 from dataclasses import asdict, dataclass
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Union
-import uuid
 
 from pydantic import BaseModel, Field, create_model
 
@@ -180,26 +180,27 @@ class Agent:
         message.conversation_id = self.conversation_id
         await self.on_message_send(message)
         self.history.append(message)
-    
+
     def stream_to_history(self):
         streaming_message = AssistantMessage(
             "",
             conversation_id=self.conversation_id,
         )
         self.history.append(streaming_message)
+
         async def on_stream_message(message):
-            streaming_message.content = message['content']
-            streaming_message.function_call = message.get('function_call', None)
+            streaming_message.content = message["content"]
+            streaming_message.function_call = message.get("function_call", None)
             await self.on_message_send(streaming_message)
+
         return on_stream_message
-    
+
     def stream_function_result(self, function_name):
         streaming_message = FunctionMessage(
-            "",
-            conversation_id=self.conversation_id,
-            name=function_name
+            "", conversation_id=self.conversation_id, name=function_name
         )
         self.history.append(streaming_message)
+
         async def on_newline(newline, final=False):
             print("stream", self.__class__.__name__, newline)
             if not final:
@@ -207,9 +208,10 @@ class Agent:
             else:
                 streaming_message.content = newline
             await self.on_message_send(streaming_message)
+
         on_newline.__name__ = f"stream_{function_name}_to_{self.conversation_id}"
         return on_newline
-            
+
     async def run(self, keep_session=False, history=[], **arguments):
         """arguments: dict with values mentioned in the prompt template"""
         agent_session = Agent(
@@ -230,9 +232,15 @@ class Agent:
         await agent_session.task_to_history(arguments)
         response = await agent_session.run_until_done()
         return response
-    
+
     async def send_initial_messages(self):
-        await self.on_message_send({"type": "start", "conversation_id": self.conversation_id, "agent": self.__class__.__name__})
+        await self.on_message_send(
+            {
+                "type": "start",
+                "conversation_id": self.conversation_id,
+                "agent": self.__class__.__name__,
+            }
+        )
         self.system_message.conversation_id = self.conversation_id
         await self.on_message_send(self.system_message)
         for i in self.init_history or []:
@@ -248,7 +256,9 @@ class Agent:
                 not self.has_structured_response
                 and assistant_message.content is not None
             ):
-                await self.on_message_send({"type": "end", "conversation_id": self.conversation_id})
+                await self.on_message_send(
+                    {"type": "end", "conversation_id": self.conversation_id}
+                )
                 if not self.keep_session:
                     return assistant_message.content
                 else:
@@ -271,7 +281,9 @@ class Agent:
                     if self.keep_session:
                         output["session"] = self
                         self.init_history = self.history
-                    await self.on_message_send({"type": "end", "conversation_id": self.conversation_id})
+                    await self.on_message_send(
+                        {"type": "end", "conversation_id": self.conversation_id}
+                    )
                     return output
 
     async def task_to_history(self, arguments):
@@ -293,7 +305,9 @@ class Agent:
             msg.pop("id", None)
             history.append(msg)
         print("YOOOOOOO")
-        response = await get_openai_response_stream(history, self.functions_openai, stream=self.stream_to_history())
+        response = await get_openai_response_stream(
+            history, self.functions_openai, stream=self.stream_to_history()
+        )
         print("YOYOYO")
         print(response)
         function_call = response.get("function_call", None)
@@ -316,7 +330,9 @@ class Agent:
                             arguments = {"code": function_call.arguments}
                     else:
                         arguments = json.loads(function_call.arguments)
-                    function._register_stream(self.stream_function_result(function.name))
+                    function._register_stream(
+                        self.stream_function_result(function.name)
+                    )
                     function_output = await function(**arguments)
                     if not function.has_stream:
                         function_output_str = function_output
@@ -403,7 +419,7 @@ class Function:
         response = await self.function(**arguments)
         print("response", response)
         return response
-    
+
     def _register_stream(self, stream):
         self.stream = stream
 
@@ -428,7 +444,7 @@ def tool(name=None, description=None, **kwargs):
     def wrapper(f):
         # Get the function's arguments
         argspec = inspect.getfullargspec(f)
-        
+
         def f_with_args(**inner_kwargs):
             # merge the arguments from the decorator with the arguments from the function
             merged = {**kwargs, **inner_kwargs}
@@ -437,13 +453,14 @@ def tool(name=None, description=None, **kwargs):
         # Create a Pydantic model from the function's arguments
         fields = {
             arg: (argspec.annotations[arg], Field(..., description=field.description))
-            for arg, field in zip(argspec.args, argspec.defaults) if not arg in kwargs.keys()
+            for arg, field in zip(argspec.args, argspec.defaults)
+            if not arg in kwargs.keys()
         }
 
         pydantic_model = create_model(f.__name__, **fields)
         function = Function(
             name=name or f.__name__,
-            description= description or f.__doc__,
+            description=description or f.__doc__,
             openapi=pydantic_model,
             function=f_with_args,
         )

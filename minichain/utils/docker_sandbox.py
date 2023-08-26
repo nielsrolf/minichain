@@ -1,23 +1,20 @@
 import asyncio
+import json
 import os
 import threading
 from time import sleep
 from typing import List
-import json
 
 import docker
-import asyncio
-
-
-
 
 SPECIAL_END_TOKEN = "END_OF_COMMAND_293842"  # Rare special token
+
 
 async def run_in_container(
     commands: List[str],
     container_name: str = None,
     image_name="nielsrolf/minichain:latest",
-    timeout=60  # in seconds
+    timeout=60,  # in seconds
 ):
     client = docker.from_env()
 
@@ -43,17 +40,17 @@ async def run_in_container(
             cap_add=["NET_RAW", "NET_ADMIN"],
         )
         if os.path.exists("requirements.txt"):
-            print(container.exec_run('pip install -r requirements.txt').output.decode())
+            print(container.exec_run("pip install -r requirements.txt").output.decode())
         if os.path.exists("setup.py"):
-            print(container.exec_run('pip install -e .').output.decode())
+            print(container.exec_run("pip install -e .").output.decode())
         if os.path.exists("package.json"):
-            print(container.exec_run('npm install').output.decode())
-        container.exec_run('screen -dmS default_session')
+            print(container.exec_run("npm install").output.decode())
+        container.exec_run("screen -dmS default_session")
 
     # Run the commands
     for command in commands:
         temp_file = f"/tmp/output_{os.urandom(8).hex()}.txt"
-        
+
         # command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1; echo {SPECIAL_END_TOKEN} >>{temp_file};"'
         # command_with_stdbuf = f'stdbuf -oL -eL {command}'
         # we use json.dumps for the opening " and to escape the command
@@ -72,7 +69,7 @@ async def run_in_container(
             await asyncio.sleep(1)
             elapsed_time += 1
 
-            result = container.exec_run(f'cat {temp_file}')
+            result = container.exec_run(f"cat {temp_file}")
             output = result.output.decode()
             new_streamed = output.replace(streamed, "")
             yield new_streamed.replace(SPECIAL_END_TOKEN, "")
@@ -85,10 +82,10 @@ async def run_in_container(
             yield "TIMEOUT - execution did not finish but is continuing in the background\n"
 
         # Clean up the temporary file
-        container.exec_run(f'rm {temp_file}')
+        container.exec_run(f"rm {temp_file}")
 
 
-async def bash(commands, session='default', stream=None):
+async def bash(commands, session="default", stream=None):
     """Callback wrapper for run_in_container.
 
     Args:
@@ -101,8 +98,10 @@ async def bash(commands, session='default', stream=None):
         List[str]: The output of the bash commands.
     """
     if stream is None:
+
         async def stream(i):
             return
+
     outputs = []
     async for token in run_in_container(commands, session):
         await stream(token)

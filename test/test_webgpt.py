@@ -1,4 +1,5 @@
 import pytest
+
 from minichain.agents.webgpt import WebGPT
 
 

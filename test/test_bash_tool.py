@@ -1,5 +1,6 @@
-import pytest
 import asyncio
+
+import pytest
 
 from minichain.tools.bash import BashSession
 

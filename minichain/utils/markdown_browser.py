@@ -1,14 +1,12 @@
+import asyncio
 import warnings
 
 import click
 import html2text
 from playwright.async_api import async_playwright
-import asyncio
-
 
 warnings.filterwarnings("ignore")
 from minichain.utils.disk_cache import async_disk_cache
-
 
 # @disk_cache
 # def markdown_browser(url):
@@ -44,14 +42,16 @@ async def markdown_browser(url):
         # Wait for user input in terminal
         browser.close()
         return markdown
-    
+
 
 @click.command()
 @click.argument("url")
 def main(url):
     print(url)
+
     async def run_and_print():
         print(await markdown_browser(url))
+
     asyncio.run(run_and_print())
 
 

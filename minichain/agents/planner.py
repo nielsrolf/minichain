@@ -1,21 +1,30 @@
-from pydantic import BaseModel, Field
 import asyncio
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 from minichain.agent import Agent, SystemMessage, UserMessage, tool
-
-from minichain.tools import codebase
-from minichain.agents.webgpt import Query, WebGPT, scan_website
 from minichain.agents.programmer import Programmer, ProgrammerResponse
+from minichain.agents.webgpt import Query, WebGPT, scan_website
 from minichain.memory import SemanticParagraphMemory
-from typing import Optional, List
+from minichain.tools import codebase
 
 
 class Task(BaseModel):
-    id: Optional[int] = Field(None, description="The id of the task - only specify when updating a task.")
+    id: Optional[int] = Field(
+        None, description="The id of the task - only specify when updating a task."
+    )
     title: str = Field(..., description="The title of the task.")
-    description: str = Field(..., description="The description of the task - be verbose and make sure to mention every piece of information that might be relevant to the assignee.")
+    description: str = Field(
+        ...,
+        description="The description of the task - be verbose and make sure to mention every piece of information that might be relevant to the assignee.",
+    )
     priority: int = Field(..., description="The priority of the task.")
-    status: str = Field("TODO", description="The status of the task.", enum=["TODO", "IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"])
+    status: str = Field(
+        "TODO",
+        description="The status of the task.",
+        enum=["TODO", "IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"],
+    )
 
     comments: List[str] = []
 
@@ -30,11 +39,10 @@ class TaskBoard:
     def __init__(self):
         self.tasks = []
         self.issue_counter = 1
-    
+
 
 async def add_task(
-    board: TaskBoard = None,
-    task: Task = Field(..., description="The task to update.")
+    board: TaskBoard = None, task: Task = Field(..., description="The task to update.")
 ):
     """Add a task to the task board."""
     if isinstance(task, dict):
@@ -45,18 +53,20 @@ async def add_task(
     return await get_board(board)
 
 
-async def get_board(board: TaskBoard=None):
+async def get_board(board: TaskBoard = None):
     """Get the task board."""
     tasks_sorted = sorted(board.tasks, key=lambda t: -t.priority)
-    return "# Tasks\n" + "\n".join(
-        [str(t) for t in tasks_sorted]
-    )
+    return "# Tasks\n" + "\n".join([str(t) for t in tasks_sorted])
 
 
 async def update_status(
     board: TaskBoard = None,
     task_id: int = Field(..., description="The task to update."),
-    status: str = Field(..., description="The new status of the task.", enum=["TODO", "IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"])
+    status: str = Field(
+        ...,
+        description="The new status of the task.",
+        enum=["TODO", "IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"],
+    ),
 ):
     """Update a task on the task board."""
     task = [i for i in board.tasks if i.id == task_id][0]
@@ -67,12 +77,13 @@ async def update_status(
 async def comment_on_issue(
     board: TaskBoard = None,
     task_id: int = Field(..., description="The task to comment on."),
-    comment: str = Field(..., description="The comment to add to the task.")
+    comment: str = Field(..., description="The comment to add to the task."),
 ):
     """Update a task on the task board."""
     task = [i for i in board.tasks if i.id == task_id][0]
     task.comments.append(comment)
     return str(task)
+
 
 def tools(board: TaskBoard):
     return [
@@ -83,7 +94,6 @@ def tools(board: TaskBoard):
     ]
 
 
-
 class Planner(Agent):
     """
     Planner gets a task, then breaks it down into jira issues and assigns them to programmers and webgpts.
@@ -92,17 +102,23 @@ class Planner(Agent):
     2. While there are tickets:
         2.1. Execute the ticket with highest priority
     """
+
     def __init__(self, **kwargs):
         self.board = TaskBoard()
         self.programmer = Programmer(**kwargs)
         self.webgpt = WebGPT(**kwargs)
 
-
         @tool()
         async def assign(
             task_id: int = Field(..., description="The id of the task to assign."),
-            assignee: str = Field("programmer", description="The name of the assignee.", enum=["programmer", "webgpt"]),
-            additional_info: str = Field("", description="Additional message to the programmer.")
+            assignee: str = Field(
+                "programmer",
+                description="The name of the assignee.",
+                enum=["programmer", "webgpt"],
+            ),
+            additional_info: str = Field(
+                "", description="Additional message to the programmer."
+            ),
         ):
             """Assign a task to a programmer or webgpt. The assignee will immediately start working on the task."""
             task = [i for i in self.board.tasks if i.id == task_id][0]
@@ -118,25 +134,25 @@ class Planner(Agent):
             else:
                 return f"Error: Unknown assignee: {assignee}"
             board_after = await get_board(self.board)
-            
+
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
             return response
-        
+
         board_tools = tools(self.board)
         self.programmer.functions += board_tools
-        init_history = kwargs.pop(
-            "init_history",
-            []
-        )
+        init_history = kwargs.pop("init_history", [])
         if init_history == []:
-            init_history.append(UserMessage(
-                f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
-            ))
+            init_history.append(
+                UserMessage(
+                    f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
+                )
+            )
         super().__init__(
             functions=[
                 assign,
-            ] + board_tools,
+            ]
+            + board_tools,
             system_message=SystemMessage(
                 "You manage a team of programmers and webgpts. When the user asks you to do something, you first create jira issues for the individual tasks. Then you assign the first task that should be done to a programmer or webgpt by calling the respective functions. When the task is done, you update the task board and assign the next task."
             ),
@@ -154,11 +170,10 @@ async def cli():
         response, model = await model.run(query=query, keep_session=True)
         breakpoint()
         print("# Assistant:\n", response["final_response"])
-        # I want to implement a fastapi backend that acts as an interface to an agent, for example webgpt. The API should have endpoints to send a json object that is passed to agent.run(**payload), and stream back results using the streaming callbacks 
+        # I want to implement a fastapi backend that acts as an interface to an agent, for example webgpt. The API should have endpoints to send a json object that is passed to agent.run(**payload), and stream back results using the streaming callbacks
 
         breakpoint()
 
 
 if __name__ == "__main__":
     asyncio.run(cli())
-    

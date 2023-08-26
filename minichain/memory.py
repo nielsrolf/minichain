@@ -9,17 +9,11 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 from pydantic import BaseModel, Field
 
-from minichain.agent import (
-    Agent,
-    AssistantMessage,
-    Function,
-    FunctionCall,
-    FunctionMessage,
-    SystemMessage,
-    UserMessage,
-)
+from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
+                             FunctionMessage, SystemMessage, UserMessage)
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
-from minichain.tools.text_to_memory import Memory, MemoryWithMeta, text_to_memory
+from minichain.tools.text_to_memory import (Memory, MemoryWithMeta,
+                                            text_to_memory)
 from minichain.utils.cached_openai import get_embedding
 from minichain.utils.markdown_browser import markdown_browser
 
@@ -221,7 +215,9 @@ class SemanticParagraphMemory:
         if self.use_vector_search:
             results += await self.search_by_vector(question, num_results_per_search)
         if self.use_content_scan_search:
-            results += await self.search_by_content_scan(question, num_results_per_search)
+            results += await self.search_by_content_scan(
+                question, num_results_per_search
+            )
         # filter duplicates by id
         results = [
             i
@@ -320,7 +316,9 @@ class SemanticParagraphMemory:
             summary += f"{item.url}: {question_list}  \n"
         return summary
 
-    async def search_by_content_scan(self, question, num_results) -> List[MemoryWithMeta]:
+    async def search_by_content_scan(
+        self, question, num_results
+    ) -> List[MemoryWithMeta]:
         content_summary = self.get_content_summary()
         # Use long document qa to generate a list of titles to search for
         titles = await text_scan(

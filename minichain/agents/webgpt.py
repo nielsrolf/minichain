@@ -32,7 +32,6 @@ class Query(BaseModel):
     query: str = Field(..., description="The query to search for.")
 
 
-
 async def scan_website(
     url: str = Field(
         ...,
@@ -78,7 +77,6 @@ async def scan_website(
         "relevant_sections": sections,
         "read_next": clicks,
     }
-
 
 
 class WebGPT(Agent):

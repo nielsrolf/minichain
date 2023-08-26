@@ -4,7 +4,8 @@ import guidance
 guidance.llm = guidance.llms.OpenAI("gpt-3.5-turbo-0613", caching=False)
 
 # define a guidance program that uses tools
-program = guidance("""
+program = guidance(
+    """
 {{~#system~}}
 {{system}}
 {{>tool_def functions=functions}}
@@ -24,11 +25,9 @@ Get the current weather in New York City.
     {{~#function name=answer.__name__~}}
     {{answer()}}
     {{~/function~}}
-{{~/each~}}""")
-                   
+{{~/each~}}"""
+)
 
-def get_openai_response(
-    chat_history, functions, model="gpt-4-0613"
-):
+
+def get_openai_response(chat_history, functions, model="gpt-4-0613"):
     pass
-    

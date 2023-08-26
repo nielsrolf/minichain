@@ -70,7 +70,9 @@ async def recursive_summarizer(text, question=None, max_words=500, instructions=
     )
 
 
-async def text_scan(text, response_openapi, system_message, on_add_output=None, **kwargs):
+async def text_scan(
+    text, response_openapi, system_message, on_add_output=None, **kwargs
+):
     """
     Splits the text into paragraphs and asks the document_to_json agent for outouts."""
     outputs = []

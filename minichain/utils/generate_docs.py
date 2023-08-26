@@ -111,7 +111,7 @@ def get_symbols(file):
                     break
             i = end_line
             # parse the methods from the code
-            
+
             # get the indention of the first line
             indention_str = ""
             for char in code.split("\n")[0]:

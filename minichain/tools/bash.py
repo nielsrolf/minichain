@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 from typing import Callable, List, Optional, Union
@@ -7,7 +8,6 @@ from pydantic import BaseModel, Field
 
 from minichain.agent import Function
 from minichain.utils.docker_sandbox import bash, run_in_container
-import asyncio
 
 
 class BashQuery(BaseModel):
@@ -30,7 +30,13 @@ class BashSession(Function):
         self.image_name = image_name
         self.stream = stream
         self.cwd = os.getcwd()
-        self.session = self.cwd.replace("/", "").replace(".", "").replace("-", "").replace("_", "").replace(" ", "")
+        self.session = (
+            self.cwd.replace("/", "")
+            .replace(".", "")
+            .replace("-", "")
+            .replace("_", "")
+            .replace(" ", "")
+        )
         # start a hello world echo command because this will trigger the preinstalling of the packages
         # if we do asyncio.run, we get: RuntimeError: asyncio.run() cannot be called from a running event loop
         # so we just create a background task
@@ -41,10 +47,13 @@ class BashSession(Function):
             print(e)
         self.has_stream = True
 
-
     async def __call__(self, commands: List[str]) -> str:
         print("Using stream:", self.stream.__name__)
-        outputs = await bash([f"cd {self.cwd}"] + commands + ["pwd"], session=self.session, stream=self.stream)
+        outputs = await bash(
+            [f"cd {self.cwd}"] + commands + ["pwd"],
+            session=self.session,
+            stream=self.stream,
+        )
         self.cwd = outputs[-1].strip()
         response = "".join(outputs[2:-2])
         print("done:", commands, response)
@@ -98,7 +107,9 @@ def print(*args, **kwargs):
 async def test_bash_session():
     bash = BashSession(stream=async_print)
     # response = bash(commands=["echo hello world", "pip install librosa"])
-    response = await bash(commands=["mkdir bla123", "cd bla123", "touch testfile", "echo hello world"])
+    response = await bash(
+        commands=["mkdir bla123", "cd bla123", "touch testfile", "echo hello world"]
+    )
     response = await bash(commands=["ls"])
     assert "testfile" in response.split("\n")
     response = await bash(commands=["pwd"])
@@ -108,4 +119,5 @@ async def test_bash_session():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(test_bash_session())

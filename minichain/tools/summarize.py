@@ -1,8 +1,9 @@
 from typing import List, Optional, Union
+
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Function, FunctionMessage, SystemMessage, tool
-
+from minichain.agent import (Agent, Function, FunctionMessage, SystemMessage,
+                             tool)
 
 
 async def summarize(text, instructions=[]):
@@ -22,4 +23,3 @@ async def summarize(text, instructions=[]):
     if summary.lower() == "skip":
         summary = ""
     return summary
-

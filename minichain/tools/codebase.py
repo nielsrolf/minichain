@@ -47,7 +47,7 @@ def get_initial_summary(
         summary = ""
     summary += "Files:\n" + "\n".join(available_files)
     return summary
-    
+
 
 async def get_long_summary(
     root_dir=".",
@@ -92,7 +92,6 @@ async def get_long_summary(
     return summary
 
 
-
 @tool()
 async def get_file_summary(path: str = Field(..., description="The path to the file.")):
     """Summarize a file."""
@@ -109,11 +108,10 @@ async def get_file_summary(path: str = Field(..., description="The path to the f
     return f"# {path}\n{summary}\n\n"
 
 
-
 @tool()
 async def scan_file_for_info(
     path: str = Field(..., description="The path to the file."),
-    question: str = Field(..., description="The question to ask.")
+    question: str = Field(..., description="The question to ask."),
 ):
     """Search a file for specific information"""
     if path.endswith(".py"):
@@ -161,11 +159,14 @@ async def edit(
     code = remove_line_numbers(code)
     with open(path, "r") as f:
         lines = f.read().split("\n")
-        lines[start-1:end] = code.split("\n")
+        lines[start - 1 : end] = code.split("\n")
     with open(path, "w") as f:
         f.write("\n".join(lines))
     updated_in_context = await view(
-        path=path, start=start - 4, end=start + len(code.split("\n")) + 4, with_line_numbers=True
+        path=path,
+        start=start - 4,
+        end=start + len(code.split("\n")) + 4,
+        with_line_numbers=True,
     )
     return truncate_updated(updated_in_context)
 
@@ -263,24 +264,29 @@ async def view_symbol(
             )
 
     for symbol in all_symbols:
-        if symbol['id'] == symbol_id:
+        if symbol["id"] == symbol_id:
             return await view(
-                path=symbol['path'],
-                start=symbol['start'],
-                end=symbol['end'],
+                path=symbol["path"],
+                start=symbol["start"],
+                end=symbol["end"],
                 with_line_numbers=True,
             )
-    return "Symbol not found. Available symbols:\n" + "\n".join([symbol['id'] for symbol in all_symbols])
+    return "Symbol not found. Available symbols:\n" + "\n".join(
+        [symbol["id"] for symbol in all_symbols]
+    )
 
 
 async def test_codebase():
     print(get_initial_summary())
     # out = replace_symbol(path="./minichain/tools/bla.py", symbol="foo", code="test\n", is_new=False)
     print(await view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
-    print(await view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json"))
+    print(
+        await view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json")
+    )
     print(await view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
 
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(test_codebase())    
+
+    asyncio.run(test_codebase())
