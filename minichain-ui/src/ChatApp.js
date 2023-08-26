@@ -23,6 +23,7 @@ const ChatApp = () => {
     const [path, setPath] = useState(["root"]);
     const [agentName, setAgentName] = useState("yopilot");
     const [defaultAgentName, setDefaultAgentName] = useState("yopilot");
+    const [isAttached, setIsAttached] = useState(true);
 
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
@@ -137,7 +138,12 @@ const ChatApp = () => {
                             agents
                         };
                     });
-                    pusToPath(data.conversation_id);
+                    // if(isAttached){
+                    // the above doesn't work because it's not updated yet, so we do it ugly and get the html inner state of the button
+                    const button = document.getElementById("attachDetach");
+                    if (button && button.innerHTML === "Detach") {
+                        pushToPath(data.conversation_id);
+                    }
             }
         };
 
@@ -152,7 +158,7 @@ const ChatApp = () => {
     const handleSubConversationClick = (subConversationId) => {
         console.log("clicked on sub conversation: " + subConversationId)
         if (subConversationId) {
-            pusToPath(subConversationId);
+            pushToPath(subConversationId);
         }
     };
 
@@ -172,23 +178,23 @@ const ChatApp = () => {
         setInputValue("");
     };
 
-const pusToPath = (id) => {
-    setPath(prevPath => {
-        // if we are already on that path, do nothing
-        if (prevPath[prevPath.length - 1] === id) {
-            return prevPath;
-        }
-        // otherwise push the path to the stack
-        return [...prevPath, id]
-    });
-    // setpath[path.length - 1](id);
-    console.log("Setting display conversation id to " + id);
-    // set the agent name to the agent of the conversation
-    setAgentName(conversationTree.agents[id] || defaultAgentName);
-    // Scroll to the last message
-    const lastMessage = document.querySelector('.chat').lastChild;
-    lastMessage?.scrollIntoView();
-};
+    const pushToPath = (id) => {
+        setPath(prevPath => {
+            // if we are already on that path, do nothing
+            if (prevPath[prevPath.length - 1] === id) {
+                return prevPath;
+            }
+            // otherwise push the path to the stack
+            return [...prevPath, id]
+        });
+        // setpath[path.length - 1](id);
+        console.log("Setting display conversation id to " + id);
+        // set the agent name to the agent of the conversation
+        setAgentName(conversationTree.agents[id] || defaultAgentName);
+        // Scroll to the last message
+        const lastMessage = document.querySelector('.chat').lastChild;
+        lastMessage?.scrollIntoView();
+    };
 
     console.log({ conversationTree });
 
@@ -202,7 +208,7 @@ const pusToPath = (id) => {
         <div className="main">
             {connectionStatus !== "CONNECTED" && <div className="disconnected">Connection: {connectionStatus}</div>}
             <div className="header">
-        <button onClick={() => pusToPath("root")}>Main</button>
+        <button onClick={() => pushToPath("root")}>Main</button>
         <button onClick={() => {
             if (path.length > 1) {
                 setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
@@ -212,13 +218,14 @@ const pusToPath = (id) => {
             // parent
             const currentConversationId = path[path.length - 1];
             if (currentConversationId !== "root") {
-                pusToPath(conversationTree.parents[currentConversationId]);
+                pushToPath(conversationTree.parents[currentConversationId]);
             }
         }}>Parent</button>
+        {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => setIsAttached(true)}>Attach</button>}
         <button onClick={() => {
             // Scroll to the last message using scrollIntoView
             const lastMessage = document.querySelector('.chat').lastChild;
-            lastMessage?.scrollIntoView();
+            lastMessage?.scrollIntoView({ behavior: "smooth"});
         }}>Scroll to Last Message</button>
         <button onClick={() => {
             // Send a cancel message to the websocket
@@ -226,7 +233,7 @@ const pusToPath = (id) => {
         }}>Interrupt</button>
 
                 {/* {Object.keys(conversationTree.conversations).map(conversationId => 
-                    <button onClick={() => pusToPath(conversationId)}>{conversationId}</button>
+                    <button onClick={() => pushToPath(conversationId)}>{conversationId}</button>
                 )} */}
                 {/* on the right of the header, show the selected agent
                 if we are on root, show the agent selection
@@ -290,7 +297,7 @@ const pusToPath = (id) => {
                             return null;
                         }
                         return (
-                            <div className={`message-${message.role}`} key={subConversationId} onClick={() => pusToPath(subConversationId)}>
+                            <div className={`message-${message.role}`} key={subConversationId} onClick={() => pushToPath(subConversationId)}>
                                 <DisplayJson data={message.content} />
                             </div>
                         );

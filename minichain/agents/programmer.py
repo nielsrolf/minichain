@@ -24,6 +24,7 @@ async def async_print(i, final=False):
 class Programmer(Agent):
     def __init__(self, silent=False, on_stream_message=async_print, **kwargs):
         interpreter = CodeInterpreter(stream=on_stream_message)
+        self.interpreter = interpreter
         print("Init history for programmer:", kwargs.get("init_history", []))
         init_history = kwargs.pop("init_history", [])
         if init_history == []:
