@@ -121,13 +121,15 @@ class Planner(Agent):
             ),
         ):
             """Assign a task to a programmer or webgpt. The assignee will immediately start working on the task."""
+            self.programmer.on_message_send = self.on_message_send
+            self.webgpt.on_message_send = self.on_message_send
             task = [i for i in self.board.tasks if i.id == task_id][0]
             board_before = await update_status(self.board, task_id, "IN_PROGRESS")
-            if assignee == "programmer":
+            if "programmer" in assignee.lower():
                 response = await self.programmer.run(
                     query=f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.",
                 )
-            elif assignee == "webgpt":
+            elif "webgpt" in assignee.lower():
                 response = await self.webgpt.run(
                     query=f"Please research on the following ticket: {task.title}.\n{task.description}\n{additional_info}",
                 )

@@ -203,8 +203,10 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 await agent.interpreter.bash(commands=[f"cd {agent.interpreter.bash.cwd}"])
             except Exception as e:
-                breakpoint()
-                pass
+                try:
+                    await agent.programmer.interpreter.bash(commands=[f"cd {os.getcwd()}"])
+                except Exception as e:
+                    pass
             print("agent", agent)
             agent.on_message_send = add_message_to_db_and_send
             conversation_id = payload.response_to or f"root.{uuid.uuid4().hex[:5]}"
