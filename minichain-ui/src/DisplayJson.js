@@ -4,6 +4,30 @@ import './DisplayJson.css';
 import CodeBlock from './CodeBlock';
 
 
+const MultiMedia = ({ path }) => {
+  const url = path.startsWith("http") ? path : `http://localhost:8000/static/${path}`;
+  // get the file type
+  const extension = path.split('.').pop();
+  if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
+    return <img src={url} alt="uploaded file" />;
+  }
+  if (['mp4', 'webm'].includes(extension)) {
+    return (
+      <video controls>
+        <source src={url} type={`video/${extension}`} />
+      </video>
+    );
+  }
+  if (['mp3', 'wav'].includes(extension)) {
+    return (
+      <audio controls>
+        <source src={url} type={`audio/${extension}`} />
+      </audio>
+    );
+  }
+  return path;
+};
+
 
 const DisplayJson = ({ data }) => {
   const [isFolded, setIsFolded] = useState({});
@@ -30,30 +54,22 @@ const DisplayJson = ({ data }) => {
     try {
       const parsed = JSON.parse(data.arguments);
       const path = parsed.file;
-      const url = path.startsWith("http") ? path : `http://localhost:8000/static/${path}`;
-      // get the file type
-      const extension = path.split('.').pop();
-      if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
-        return <img src={url} alt="uploaded file" />;
-      }
-      if (['mp4', 'webm'].includes(extension)) {
-        return (
-          <video controls>
-            <source src={url} type={`video/${extension}`} />
-          </video>
-        );
-      }
-      if (['mp3', 'wav'].includes(extension)) {
-        return (
-          <audio controls>
-            <source src={url} type={`audio/${extension}`} />
-          </audio>
-        );
-      }
-      return (
-        "Can't display file with extension " + extension + '. Download it here: ' + url
-      );
+      return <MultiMedia path={path} />;
     } catch (e) {}
+  }
+
+  if (data.generated_files) {
+    // simply display all files
+    return (
+      <div>
+        {data.generated_files.map((file, index) => (
+          <div key={index}>
+            <b>{file}</b>
+            <MultiMedia path={file} />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const toggleFold = key => {
@@ -66,6 +82,11 @@ const DisplayJson = ({ data }) => {
   const renderData = (data, parentKey = '') => {
     if (data === null || data === undefined) {
       return '';
+    }
+
+    // all links should be medias
+    if (typeof data === 'string' && data.startsWith('http')) {
+      return <MultiMedia path={data} />;
     }
 
     if (typeof data === 'string') {

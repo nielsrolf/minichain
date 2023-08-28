@@ -106,6 +106,10 @@ class FunctionMessage:
         return f"{self.name}: {self.content}"
 
 
+class Cancelled(Exception):
+    pass
+
+
 def make_return_function(openapi_json: BaseModel):
     async def return_function(**arguments):
         return arguments
@@ -416,6 +420,8 @@ class Agent:
             )
         except Exception as e:
             # check if it's a pydantic validation error to guide gpt
+            if isinstance(e, Cancelled):
+                raise e
             try:
                 msg = f"{type(e)}: {e} - {e.msg}"
             except AttributeError:

@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 
 from minichain.agent import (AssistantMessage, FunctionMessage, SystemMessage,
-                             UserMessage)
+                             UserMessage, Cancelled)
 from minichain.agents.chatgpt import ChatGPT
 from minichain.agents.planner import Planner
 from minichain.agents.programmer import Programmer
@@ -143,9 +143,6 @@ async def upload_file_to_chat(
     return f"displaying file: {file}"
 
 
-
-class Cancelled(Exception):
-    pass
 
 
 @app.websocket("/ws")
