@@ -202,8 +202,11 @@ class Agent:
         default_message_action = self.print_message if not silent else do_nothing
         self.on_message_send = on_message_send or default_message_action
 
-        self.functions_openai = [i.openapi_json for i in self.functions]
         self.conversation_id = conversation_id or str(uuid.uuid4().hex[:5])
+
+    @property
+    def functions_openai(self):
+        return [i.openapi_json for i in self.functions]
 
     async def print_message(self, message):
         print("-" * 120)
@@ -412,6 +415,7 @@ class Agent:
                 )
             )
         except Exception as e:
+            # check if it's a pydantic validation error to guide gpt
             try:
                 msg = f"{type(e)}: {e} - {e.msg}"
             except AttributeError:
@@ -419,6 +423,7 @@ class Agent:
             if not self.silent:
                 traceback.print_exc()
                 # breakpoint()
+            msg = msg.replace("<class 'pydantic.error_wrappers.ValidationError'>", "Response could not be parsed, did you mean to call return?\nError:")
 
             await self.history_append(FunctionMessage(msg, function.name))
         # self.on_message_send(self.history[-1])

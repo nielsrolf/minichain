@@ -14,7 +14,7 @@ memory = SemanticParagraphMemory()
 
 
 class ProgrammerResponse(BaseModel):
-    final_response: str = Field(..., description="The final response to the user.")
+    content: str = Field(..., description="The final response to the user.")
 
 
 async def async_print(i, final=False):
@@ -82,12 +82,12 @@ I need you to create a react frontend for this, which works in the following way
 - on send, it sends the message to the websocket. from then on, it renders the main history, but also saves the sub-histories (messages between start: 4 and end: 4 belong to conversation 4, which is a sub conversation of message 3, which belongs to the main conversation 123.
 - when a message has a sub conversation, I want the sub conversation to show on the screen"""
     response = await model.run(query=query, keep_session=True)
-    print(response["final_response"])
+    print(response["content"])
 
     while query := input("# User: \n"):
         response, model = await model.run(query=query, keep_session=True)
         breakpoint()
-        print("# Assistant:\n", response["final_response"])
+        print("# Assistant:\n", response["content"])
         # I want to implement a fastapi backend that acts as an interface to an agent, for example webgpt. The API should have endpoints to send a json object that is passed to agent.run(**payload), and stream back results using the streaming callbacks
 
         breakpoint()

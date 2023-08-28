@@ -24,6 +24,7 @@ const ChatApp = () => {
     const [agentName, setAgentName] = useState("yopilot");
     const [defaultAgentName, setDefaultAgentName] = useState("yopilot");
     const [isAttached, setIsAttached] = useState(true);
+    const [minBottomTop, setMinBottomTop] = useState(0);
 
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
@@ -154,6 +155,29 @@ const ChatApp = () => {
         };
     }, []);
 
+    // // when the user scrolls up, detach
+    const detachOnScrollUp = () => {
+        const handleScrollUp = () => {
+            const bottom = document.getElementById("bottom");
+            if (bottom) {
+                const rect = bottom.getBoundingClientRect();
+                console.log("bottom rect", rect, rect.top)
+
+                if (rect.top > minBottomTop) {
+                    setIsAttached(false);
+                } else if(rect.top < minBottomTop) {
+                    setMinBottomTop(rect.top);
+                }
+            }
+        }
+        window.addEventListener("scroll", handleScrollUp);
+        return () => {
+            window.removeEventListener("scroll", handleScrollUp);
+        }
+    };
+    // run this shorty after the component is mounted
+    useEffect(detachOnScrollUp, []);
+
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
         console.log("clicked on sub conversation: " + subConversationId)
@@ -176,6 +200,7 @@ const ChatApp = () => {
         const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to, agent: agentName });
         client.send(messagePayload);
         setInputValue("");
+        setIsAttached(true);
     };
 
     const pushToPath = (id) => {
@@ -191,9 +216,18 @@ const ChatApp = () => {
         console.log("Setting display conversation id to " + id);
         // set the agent name to the agent of the conversation
         setAgentName(conversationTree.agents[id] || defaultAgentName);
-        // Scroll to the last message
-        const lastMessage = document.querySelector('.chat').lastChild;
-        lastMessage?.scrollIntoView();
+        // Scroll to the bottom of the page
+        const bottom = document.getElementById("bottom");
+        // If we open a new conversation the upscroll detection will notice we are higher than the bottom and detach
+        // so we need to set the minBottomTop to a really high value
+        if (bottom) {
+            const rect = bottom.getBoundingClientRect();
+            console.log("bottom rect", rect, rect.top)
+            setMinBottomTop(rect.top + 100000);
+        }
+        bottom?.scrollIntoView({ behavior: "smooth" });
+
+
     };
 
     console.log({ conversationTree });
@@ -234,11 +268,19 @@ const ChatApp = () => {
                 pushToPath(conversationTree.parents[currentConversationId]);
             }
         }}>Parent</button>
-        {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => setIsAttached(true)}>Attach</button>}
+        {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {
+            setIsAttached(true);
+            const bottom = document.getElementById("bottom");
+            if (bottom) {
+                const rect = bottom.getBoundingClientRect();
+                console.log("bottom rect", rect, rect.top)
+                setMinBottomTop(rect.top);
+            }
+        }}>Attach</button>}
         <button onClick={() => {
             // Scroll to the last message using scrollIntoView
-            const lastMessage = document.querySelector('.chat').lastChild;
-            lastMessage?.scrollIntoView({ behavior: "smooth"});
+            const bottom = document.getElementById("bottom");
+            bottom?.scrollIntoView({ behavior: "smooth" });
         }}>Scroll to Last Message</button>
         <button onClick={() => {
             // Send a cancel message to the websocket
@@ -287,8 +329,8 @@ const ChatApp = () => {
             <div className="chat">
                 {conversationTree.conversations[path[path.length - 1]] && conversationTree.conversations[path[path.length - 1]].map((message, index) =>
                     <div className={`message-${message.role}`} key={index}>
-                        {message.function_call && <DisplayJson data={message.function_call} />}
                         {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
+                        {message.function_call && <DisplayJson data={message.function_call} />}
                         {(conversationTree.subConversations[message.id] || []).map(subConversationId => {
                             return (
                                 <div onClick={() => handleSubConversationClick(subConversationId)}>View thread</div>
@@ -316,6 +358,7 @@ const ChatApp = () => {
                         );
                     })
                 )}
+                <div id="bottom"></div> {/* this is used to scroll to the bottom when a new message is added */}
             </div>
             <div className="spacer"></div>
             <div className="input-area">

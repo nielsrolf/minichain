@@ -46,14 +46,14 @@ async def get_openai_response_stream(
             if i.get("function_call") is None:
                 i.pop("function_call", None)
 
-        with open("last_openai_request.json", "w") as f:
-            json.dump(
-                {
-                    "messages": messages,
-                    "functions": functions,
-                },
-                f,
-            )
+        # with open("last_openai_request.json", "w") as f:
+        #     json.dump(
+        #         {
+        #             "messages": messages,
+        #             "functions": functions,
+        #         },
+        #         f,
+        #     )
 
         # print(messages[-2])
         # print("=====================================")
@@ -102,13 +102,13 @@ async def get_openai_response_stream(
         #         function_call['arguments'] = json.loads(function_call['arguments'])
         #     except:
         #         print("Error parsing arguments", function_call['arguments'])
-        with open(f"last_openai_response_{len(messages)}.json", "w") as f:
-            json.dump(
-                {
-                    "response": response,
-                },
-                f,
-            )
+        # with open(f"last_openai_response_{len(messages)}.json", "w") as f:
+        #     json.dump(
+        #         {
+        #             "response": response,
+        #         },
+        #         f,
+        #     )
 
         return response
     except Exception as e:

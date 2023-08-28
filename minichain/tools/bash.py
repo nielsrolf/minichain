@@ -13,6 +13,7 @@ from minichain.utils.docker_sandbox import bash, run_in_container
 
 class BashQuery(BaseModel):
     commands: List[str] = Field(..., description="A list of bash commands.")
+    timeout: Optional[int] = Field(60, description="The timeout in seconds.")
 
 
 async def async_print(i, final=False):
@@ -48,12 +49,13 @@ class BashSession(Function):
             print(e)
         self.has_stream = True
 
-    async def __call__(self, commands: List[str]) -> str:
+    async def __call__(self, commands: List[str], timeout: int = 60) -> str:
         print("Using stream:", self.stream.__name__)
         outputs = await bash(
             commands,
             session=self.session,
             stream=self.stream,
+            timeout=timeout,
         )
         response = "".join(outputs)
         print("done:", commands, response)
@@ -73,6 +75,7 @@ class BashSession(Function):
 
 class CodeInterpreterQuery(BaseModel):
     code: str = Field(..., description="Python code to run. Code can also be passed directly as a string without the surrounding 'code' field. ")
+    timeout: Optional[int] = Field(60, description="The timeout in seconds.")
 
 
 first_lines = """import sys
@@ -96,15 +99,17 @@ class CodeInterpreter(Function):
         self.bash = BashSession(stream=stream)
         self.has_stream = True
 
-    async def __call__(self, code: str) -> str:
+    async def __call__(self, code: str, timeout: int = 60) -> str:
         last_line = json.dumps(code.strip().split("\n")[-1])
-        code = first_lines + code + "\n" + last_lines.replace("<lastLine>", last_line)
+        code = first_lines + code
+        if not "=" in last_line and not "plt" in last_line and not "print" in last_line and not "import" in last_line and not "save" in last_line and not last_line.startswith("#"):
+            code = code + "\n" + last_lines.replace("<lastLine>", last_line)
         filename = uuid.uuid4().hex[:5]
         filepath = f"{self.bash.cwd}/.minichain/{filename}.py"
         with open(filepath, "w") as f:
             f.write(code)
         self.bash._register_stream(self.stream)
-        output = await self.bash(commands=[f"python {filepath}"])
+        output = await self.bash(commands=[f"python {filepath}"], timeout=timeout)
         return output
 
 

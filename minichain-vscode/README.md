@@ -1,6 +1,6 @@
 # minichain-vscode
-[![Demo video](https://img.youtube.com/vi/b0CbP-kUJt0/0.jpg)](https://www.youtube.com/watch?v=b0CbP-kUJt0)
--- demo of a programmer agent built with minichain, using the [VSCode extension ui](./minichain-vscode/)
+[![Demo video](https://img.youtube.com/vi/yZPpOqtzjms/0.jpg)](https://www.youtube.com/watch?v=yZPpOqtzjms)
+
 
 Usage: `Cmd+shift P: Open Minichain`.
 
