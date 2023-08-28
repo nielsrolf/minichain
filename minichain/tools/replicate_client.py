@@ -44,13 +44,13 @@ def replace_files_by_data_recursive(data):
 from urllib.request import urlretrieve
 import uuid
 
-def replace_urls_by_url_and_local_file_recursive(data):
+def replace_urls_by_url_and_local_file_recursive(data, download_dir=".minichain/downloads"):
     if isinstance(data, str) and data.startswith("http"):
         # Download the file and return a dict with url and local file
         extension = data.split(".")[-1]
-        target_dir = ".minichain/downloads"
-        os.makedirs(target_dir, exist_ok=True)
-        local_file = f"{target_dir}/{uuid.uuid4().hex[:4]}.{extension}"
+        os.makedirs(download_dir, exist_ok=True)
+        file_id = str(len(os.listdir(download_dir)) + 1)
+        local_file = f"{download_dir}/{file_id}.{extension}"
         urlretrieve(data, local_file)
         return {
             "url": data,
@@ -68,14 +68,14 @@ def replace_urls_by_url_and_local_file_recursive(data):
 
 
 
-def replicate_model_as_tool(model_id, name=None):
+def replicate_model_as_tool(model_id, name=None, download_dir=".minichain/downloads"):
     openapi = get_model_details(model_id)
     async def replicate_tool(**kwargs):
         """Replicate model"""
         # Upload all files referenced in the input
         kwargs = replace_files_by_data_recursive(kwargs)
         output = use_model(model_id, kwargs)
-        return replace_urls_by_url_and_local_file_recursive(output)
+        return replace_urls_by_url_and_local_file_recursive(output, download_dir=download_dir)
     replicate_tool.__name__ = name or model_id.split(":")[0]
     replicate_tool.__doc__ = "Use the replicate model: " + model_id.split(":")[0]
     replicate_tool = Function(

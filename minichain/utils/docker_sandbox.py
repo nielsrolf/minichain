@@ -38,6 +38,8 @@ async def run_in_container(
             working_dir=os.getcwd(),
             ports={"80/tcp": None, "443/tcp": None},
             cap_add=["NET_RAW", "NET_ADMIN"],
+            # remove the container when it is stopped
+            auto_remove=True,
         )
         if os.path.exists("requirements.txt"):
             print(container.exec_run("pip install -r requirements.txt").output.decode())

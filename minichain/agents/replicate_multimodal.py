@@ -29,19 +29,28 @@ class MultiModalResponse(BaseModel):
 async def async_print(i, final=False):
     print(i)
 
+artist_message = """You are a multimodal artist. You use the functions available to you to interact with media files. You also use the python interpreter and ffmpeg when needed.
 
+Instructions:
+- when you generate images, be very verbose in the prompt and describe the image in detail. Mention styles (e.g. photo-realistic, cartoon, oil painting etc.), colors, shapes, objects, etc. Describe what something looks like, not what is happening. Example of a bad prompt: "John is driving to the kindergarden". Example of a good prompt: "A 40-year old black man wearing a cap is driving in his red VW-passat. Photorealistic, high quality". Reason it's better: the image creator does not know what John looks like, and the first prompt is generally not informative about the image. The second prompt describes the image in enough detail for the image creator to generate exactly what we want.
+- when you are asked to generate a story or a video using multiple images, describe each object and person in detail, and use the same descriptions for the persons in every image. Otherwise, two people will look different in the first and second image, and the story will not make sense.
+- besides ffmpeg, do almost all other programming tasks using the python interpreter. Many libraries are preinstalled, but you can use bash and pip to install new libraries if needed.
+- when you call a function, you call a different AI model. This model knows nothing about the current conversation, so include all relevant info in the prompts
+"""
 class Artist(Agent):
     def __init__(self, silent=False, on_stream_message=async_print, **kwargs):
         interpreter = CodeInterpreter(stream=on_stream_message)
         self.interpreter = interpreter
-        self.replicate_models = [replicate_model_as_tool(i, name=key) for key, i in models.items()]
+        os.makedirs(".minichain/downloads", exist_ok=True)
+        download_dir = f".minichain/downloads/{len(os.listdir('.minichain/downloads'))}"
+        self.replicate_models = [replicate_model_as_tool(i, name=key, download_dir=download_dir) for key, i in models.items()]
         super().__init__(
             functions=self.replicate_models + [
                 interpreter.bash,
                 interpreter,
             ],
             system_message=SystemMessage(
-                "You are a multimodal AI. You use the models available to you to interact with media files. You also use the python interpreter and ffmpeg when needed."
+                artist_message
             ),
             prompt_template="{query}".format,
             silent=silent,

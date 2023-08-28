@@ -310,6 +310,7 @@ const ChatApp = () => {
                         <option value="planner">planner</option>
                         <option value="webgpt">webgpt</option>
                         <option value="artist">artist</option>
+                        <option value="agi">agi</option>
                     </select>
                 )}
                 {/* otherwise show the current agent */}
