@@ -18,6 +18,7 @@ from minichain.agents.chatgpt import ChatGPT
 from minichain.agents.planner import Planner
 from minichain.agents.programmer import Programmer
 from minichain.agents.webgpt import SmartWebGPT, WebGPT
+from minichain.agents.replicate_multimodal import Artist
 
 
 class MessageDB:
@@ -258,6 +259,7 @@ async def preload_agents():
             "yopilot": Programmer(),
             "planner": Planner(),
             "chatgpt": ChatGPT(),
+            "artist": Artist(),
         }
     )
     for agent in list(agents.values()):
