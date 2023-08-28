@@ -156,6 +156,10 @@ async def edit(
     code: str = Field(..., description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON."),
 ):
     """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!"""
+    if not os.path.exists(path):
+        # create the file
+        with open(path, "w") as f:
+            f.write("")
     code = remove_line_numbers(code)
     with open(path, "r") as f:
         lines = f.read().split("\n")

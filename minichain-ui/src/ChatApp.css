@@ -92,3 +92,8 @@
     right: 0;
     z-index: 100;
 }
+
+/* Images in .chat should not be wider than the chat */
+.chat img {
+    max-width: 100%;
+}

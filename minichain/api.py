@@ -7,16 +7,18 @@ from typing import Any, Dict, Optional
 import asyncio
 
 from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 
 from minichain.agent import (AssistantMessage, FunctionMessage, SystemMessage,
-                             UserMessage)
+                             UserMessage, Cancelled)
 from minichain.agents.chatgpt import ChatGPT
 from minichain.agents.planner import Planner
 from minichain.agents.programmer import Programmer
 from minichain.agents.webgpt import SmartWebGPT, WebGPT
+from minichain.agents.replicate_multimodal import Artist
 
 
 class MessageDB:
@@ -128,8 +130,19 @@ message_db = MessageDB()
 
 agents = {}
 
-class Cancelled(Exception):
-    pass
+
+from minichain.agent import tool
+from pydantic import BaseModel, Field
+
+
+@tool()
+async def upload_file_to_chat(
+    file: str = Field(..., description="The path to the file to upload."),
+):
+    """Upload a file to the chat."""
+    return f"displaying file: {file}"
+
+
 
 
 @app.websocket("/ws")
@@ -147,7 +160,6 @@ async def websocket_endpoint(websocket: WebSocket):
     print("websocket accepted")
 
     # replay logs
-    print("replay logs", message_db.logs)
     print("start/end conversation", [i for i in message_db.logs if i.get("type", None) in ["start", "end"]])
     for message in message_db.logs:
         if not isinstance(message, dict):
@@ -227,6 +239,13 @@ async def root():
     return {"message": "Hello World"}
 
 
+@app.get("/static/{path:path}")
+async def static(path):
+    print("static", path)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path)
+
 @app.on_event("startup")
 async def preload_agents():
     """This function should run after the async event loop has started."""
@@ -237,8 +256,11 @@ async def preload_agents():
             "yopilot": Programmer(),
             "planner": Planner(),
             "chatgpt": ChatGPT(),
+            "artist": Artist(),
         }
     )
+    for agent in list(agents.values()):
+        agent.functions.append(upload_file_to_chat)
     for agent in list(agents.values()):
         agents[agent.name] = agent
 
