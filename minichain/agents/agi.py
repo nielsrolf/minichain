@@ -67,6 +67,9 @@ class AGI(Agent):
         board_tools = taskboard.tools(self.board)
         self.programmer.functions += board_tools
         all_tools = self.programmer.functions + self.artist.functions + self.webgpt.functions
+        # deduplicate by name
+        all_tools = list({i.name: i for i in all_tools}.values())
+
         init_history = kwargs.pop("init_history", [])
         if init_history == []:
             init_history.append(

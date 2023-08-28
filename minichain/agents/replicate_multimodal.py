@@ -43,6 +43,7 @@ class Artist(Agent):
         self.interpreter = interpreter
         os.makedirs(".minichain/downloads", exist_ok=True)
         download_dir = f".minichain/downloads/{len(os.listdir('.minichain/downloads'))}"
+        print("Artist", download_dir)
         self.replicate_models = [replicate_model_as_tool(i, name=key, download_dir=download_dir) for key, i in models.items()]
         super().__init__(
             functions=self.replicate_models + [
