@@ -215,7 +215,9 @@ const ChatApp = () => {
         // setpath[path.length - 1](id);
         console.log("Setting display conversation id to " + id);
         // set the agent name to the agent of the conversation
-        setAgentName(conversationTree.agents[id] || defaultAgentName);
+        if(conversationTree.agents[id]){
+            setAgentName(conversationTree.agents[id] || defaultAgentName);
+        }
         // Scroll to the bottom of the page
         const bottom = document.getElementById("bottom");
         // If we open a new conversation the upscroll detection will notice we are higher than the bottom and detach
