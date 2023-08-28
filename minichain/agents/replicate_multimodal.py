@@ -9,19 +9,15 @@ from typing import List, Optional
 
 from minichain.tools.replicate_client import *
 
+
 models = {
     "text_to_image": "stability-ai/sdxl:d830ba5dabf8090ec0db6c10fc862c6eb1c929e1a194a5411852d25fd954ac82",
-    # "text_to_video": "anotherjesse/zeroscope-v2-xl:latest",
-    # "text_to_music": "facebookresearch/musicgen:latest",
-    # "image_to_text": "salesforce/blip:latest",
+    # "text_to_video": "anotherjesse/zeroscope-v2-xl:9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
+    "text_to_music": "facebookresearch/musicgen:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906",
+    "image_to_text": "andreasjansson/blip-2:4b32258c42e9efd4288bb9910bc532a69727f9acd26aa08e175713a0a857a608",
     # text_to_speech: ?
-    # speech_to_text: ?
+    "speech_to_text": "openai/whisper:91ee9c0c3df30478510ff8c8a3a545add1ad0259ad3a9f78fba57fbc05ee64f7"
 }
-
-
-
-
-
 
 
 
@@ -45,7 +41,7 @@ class Artist(Agent):
                 interpreter,
             ],
             system_message=SystemMessage(
-                "You are an expert programmer. You can do a wide range of tasks, such as implementing features, debugging and refactoring code, writing docs, etc. using bash commands. Avoid interactive commands, outputs are only send when a command finished execution. When you implement something, write code, and run tests to make sure it works. If the user asks you to do something (e.g. make a plot, install a package, etc.), do it using the bash and python functions, and explain what you did instead of responding to the user directly. When something doesn't work on the first try, try to find a way to fix it before asking the user for help."
+                "You are a multimodal AI. You use the models available to you to interact with media files. You also use the python interpreter and ffmpeg when needed."
             ),
             prompt_template="{query}".format,
             silent=silent,
