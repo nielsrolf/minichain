@@ -27,7 +27,7 @@ models = {
 
 class MultiModalResponse(BaseModel):
     content: str = Field(..., description="The final response to the user.")
-    generated_files: Optional[List[str]] = Field(..., description="The generated files.")
+    generated_files: List[str] = Field(..., description="Media files that have been generated.")
 
 
 async def async_print(i, final=False):

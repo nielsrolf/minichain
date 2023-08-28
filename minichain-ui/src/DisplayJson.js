@@ -30,7 +30,7 @@ const DisplayJson = ({ data }) => {
     try {
       const parsed = JSON.parse(data.arguments);
       const path = parsed.file;
-      const url = `http://localhost:8000/static/${path}`;
+      const url = path.startsWith("http") ? path : `http://localhost:8000/static/${path}`;
       // get the file type
       const extension = path.split('.').pop();
       if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
