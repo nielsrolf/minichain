@@ -221,7 +221,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception as e:
                     pass
             print("agent", agent)
-            agent.on_message_send = add_message_to_db_and_send
+            # agent.on_message_send = add_message_to_db_and_send
+            agent.register_on_message_send(add_message_to_db_and_send)
             conversation_id = payload.response_to or f"root.{uuid.uuid4().hex[:5]}"
             print("CALLING:", payload.dict(), conversation_id)
             response = await agent.run(query=payload.query, history=history, conversation_id=conversation_id)

@@ -39,3 +39,5 @@ RUN pip install librosa pydub yt-dlp soundfile
 
 # install screen
 RUN apt-get install -y screen
+
+RUN pip install moviepy

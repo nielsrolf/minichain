@@ -20,6 +20,21 @@ async def async_print(i, final=False):
     print(i)
 
 
+def shorten_response(response: str) -> str:
+    # remove character in each line after the first 100 characters, add ... if the line is longer
+    response = "\n".join(
+        [
+            line[:200] + ("..." if len(line) > 200 else "")
+            for line in response.split("\n")
+        ]
+    )
+    # if more than 100 lines, remove all lines except the first 5 and the last 5 and insert ...
+    lines = response.split("\n")
+    if len(lines) > 100:
+        response = "\n".join(lines[:20] + ["..."] + lines[-80:])
+    return response
+
+
 class BashSession(Function):
     def __init__(self, stream=async_print, image_name="nielsrolf/minichain:latest"):
         super().__init__(
@@ -58,6 +73,7 @@ class BashSession(Function):
             timeout=timeout,
         )
         response = "".join(outputs)
+        response = shorten_response(response)
         print("done:", commands, response)
         await self.stream(response, final=True)
         return response

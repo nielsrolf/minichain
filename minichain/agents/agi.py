@@ -1,13 +1,9 @@
-import asyncio
-from typing import List, Optional
-
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from minichain.agent import Agent, SystemMessage, UserMessage, tool
-from minichain.agents.programmer import Programmer, ProgrammerResponse
-from minichain.agents.webgpt import Query, WebGPT, scan_website
-from minichain.agents.replicate_multimodal import Artist
-from minichain.memory import SemanticParagraphMemory
+from minichain.agents.programmer import Programmer
+from minichain.agents.webgpt import WebGPT
+from minichain.agents.replicate_multimodal import Artist, MultiModalResponse
 from minichain.tools import codebase
 from minichain.tools import taskboard
 
@@ -83,7 +79,7 @@ class AGI(Agent):
                 "You are a smart and friendly AGI. You fulfill tasks for the user by using the tools available to you. If a task is complex, you break it down into sub tasks using the issue board and assign them to someone to work on."
             ),
             prompt_template="{query}".format,
-            response_openapi=ProgrammerResponse,
+            response_openapi=MultiModalResponse,
             init_history=init_history,
             **kwargs,
         )

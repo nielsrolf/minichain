@@ -3,12 +3,9 @@ import asyncio
 from pydantic import BaseModel, Field
 
 from minichain.agent import Agent, SystemMessage, UserMessage
-from minichain.agents.webgpt import Query, WebGPT, scan_website
 from minichain.memory import SemanticParagraphMemory
 from minichain.tools import codebase
-# from minichain.tools.code_interpreter import code_interpreter
-from minichain.tools.bash import BashSession, CodeInterpreter
-from minichain.tools.google_search import web_search
+from minichain.tools.bash import CodeInterpreter
 
 memory = SemanticParagraphMemory()
 

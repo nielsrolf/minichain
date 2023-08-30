@@ -1,12 +1,8 @@
-import asyncio
-from typing import List, Optional
-
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from minichain.agent import Agent, SystemMessage, UserMessage, tool
 from minichain.agents.programmer import Programmer, ProgrammerResponse
-from minichain.agents.webgpt import Query, WebGPT, scan_website
-from minichain.memory import SemanticParagraphMemory
+from minichain.agents.webgpt import WebGPT
 from minichain.tools import codebase
 from minichain.tools import taskboard
 

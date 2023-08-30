@@ -97,7 +97,7 @@ const ChatApp = () => {
                         // set active conversation to parent conversation
                         setPath(prevPath => {
                             const newPath = [...prevPath];
-                            if (newPath[newPath.length - 1] === data.conversation_id) {
+                            if (newPath[newPath.length - 1] === data.conversation_id && newPath.length > 2 && newPath[newPath.length - 2] !== "root") {
                                 newPath.pop();
                             }
                             return newPath;

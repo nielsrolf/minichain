@@ -96,4 +96,5 @@
 /* Images in .chat should not be wider than the chat */
 .chat img {
     max-width: 100%;
+    border-radius: 10px;
 }

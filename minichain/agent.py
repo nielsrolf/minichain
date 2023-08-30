@@ -420,6 +420,7 @@ class Agent:
             )
         except Exception as e:
             # check if it's a pydantic validation error to guide gpt
+            traceback.print_exc()
             if isinstance(e, Cancelled):
                 raise e
             try:
@@ -451,7 +452,13 @@ class Agent:
             function,
             description,
         )
+        function_tool.has_stream = True
         return function_tool
+
+    def register_on_message_send(self, on_message_send):
+        self.on_message_send = on_message_send
+        for function in self.functions:
+            function.register_on_message_send(on_message_send)
 
 
 class Function:
@@ -509,6 +516,13 @@ class Function:
             "description": self.description,
             "parameters": self.parameters_openapi,
         }
+    
+    def register_on_message_send(self, on_message_send):
+        """This is only relevant for agents used by the function. Other function result streams are
+        registered just before the function is called."""
+        for maybe_agent in self.__dict__.values():
+            if isinstance(maybe_agent, Agent):
+                maybe_agent.register_on_message_send(on_message_send)
 
 
 def tool(name=None, description=None, **kwargs):
