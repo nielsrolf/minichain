@@ -27,7 +27,8 @@ class MultiModalResponse(BaseModel):
 
 
 async def async_print(i, final=False):
-    print(i)
+    # print(i)
+    pass
 
 artist_message = """You are a multimodal artist. You use the functions available to you to interact with media files. You also use the python interpreter and ffmpeg when needed.
 

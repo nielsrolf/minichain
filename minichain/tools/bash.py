@@ -17,7 +17,8 @@ class BashQuery(BaseModel):
 
 
 async def async_print(i, final=False):
-    print(i)
+    # print(i)
+    pass
 
 
 def shorten_response(response: str) -> str:

@@ -27,7 +27,7 @@ async def get_openai_response_stream(
     # transform objects to dicts
     if not isinstance(chat_history[0], dict):
         for i in chat_history:
-            print(i)
+            # print(i)
             message = i.dict()
             # delete the parent field
             message.pop("parent", None)
@@ -45,14 +45,14 @@ async def get_openai_response_stream(
         if i.get("function_call") is None:
             i.pop("function_call", None)
 
-    # with open(".minichain/last_openai_request.json", "w") as f:
-    #     json.dump(
-    #         {
-    #             "messages": messages,
-    #             "functions": functions,
-    #         },
-    #         f,
-    #     )
+    with open(".minichain/last_openai_request.json", "w") as f:
+        json.dump(
+            {
+                "messages": messages,
+                "functions": functions,
+            },
+            f,
+        )
 
     # print(messages[-2])
     # print("=====================================")
@@ -70,6 +70,14 @@ async def get_openai_response_stream(
             messages=messages,
             temperature=0.1,
             stream=True,
+        )
+    
+    with open(".minichain/last_openai_response.json", "w") as f:
+        json.dump(
+            {
+                "response": openai_response,
+            },
+            f,
         )
 
     # create variables to collect the stream of chunks

@@ -15,7 +15,8 @@ class ProgrammerResponse(BaseModel):
 
 
 async def async_print(i, final=False):
-    print(i)
+    # print(i)
+    pass
 
 
 class Programmer(Agent):
