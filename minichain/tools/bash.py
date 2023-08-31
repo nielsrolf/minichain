@@ -41,7 +41,7 @@ class BashSession(Function):
             name="bash",
             openapi=BashQuery,
             function=self,
-            description="Run bash commands. Each new command is run in the project root directory.",
+            description="Run bash commands. Cwd is reset after each message. Run commands with the -y flag to avoid interactive prompts.",
         )
         # self.session = uuid.uuid4().hex
         self.image_name = image_name
@@ -66,6 +66,7 @@ class BashSession(Function):
 
     async def __call__(self, commands: List[str], timeout: int = 60) -> str:
         print("Using stream:", self.stream.__name__)
+        await bash([f"cd {self.cwd}"], session=self.session)
         outputs = await bash(
             commands,
             session=self.session,

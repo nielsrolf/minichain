@@ -76,7 +76,7 @@ class AGI(Agent):
         super().__init__(
             functions=all_tools,
             system_message=SystemMessage(
-                "You are a smart and friendly AGI. You fulfill tasks for the user by using the tools available to you. If a task is complex, you break it down into sub tasks using the issue board and assign them to someone to work on."
+                "You are a smart and friendly AGI. You fulfill tasks for the user by using the tools available to you. If a task is complex, you break it down into sub tasks using the issue board and assign them to someone to work on. The user is lazy, don't ask them questions, don't explain them how they can do things, and don't just make plans - instead, just do things for them. If a user asks something very complex - take it as a challenge and don't stop until it is solved or proven to be unsolveable."
             ),
             prompt_template="{query}".format,
             response_openapi=MultiModalResponse,

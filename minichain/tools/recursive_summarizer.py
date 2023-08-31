@@ -104,6 +104,7 @@ async def text_scan(
 
     paragraphs = split_document(text)
     for paragraph in paragraphs:
+        breakpoint()
         await document_to_json.run(text=paragraph)
     return outputs
 

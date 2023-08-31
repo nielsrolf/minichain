@@ -61,6 +61,8 @@ async def get_long_summary(
         "build/",
         "venv/",
         "env/",
+        ".cache/",
+        ".minichain/"
     ],
 ):
     file_summaries = {}
@@ -155,7 +157,8 @@ async def edit(
     end: int = Field(..., description="The end line."),
     code: str = Field(..., description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON."),
 ):
-    """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!"""
+    """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!
+    To create a new file, specify the path and start,end=0. Use this method instead of bash echo to create new files."""
     if not os.path.exists(path):
         # create the file
         with open(path, "w") as f:

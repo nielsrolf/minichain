@@ -58,7 +58,11 @@ async def run_in_container(
         # we use json.dumps for the opening " and to escape the command
         # command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1; echo {SPECIAL_END_TOKEN} >>{temp_file};\n"'
         maybe_newline = "\n" if ">" in command else ""
-        command_to_run = f'screen -S default_session -X stuff "timeout {timeout} {json.dumps(command)[1:-1]}{maybe_newline} >{temp_file} 2>&1; echo {SPECIAL_END_TOKEN} >>{temp_file};\n"'
+        if not command.startswith("cd"):
+            maybe_timeout = f"timeout {timeout} "
+        else:
+            maybe_timeout = ""
+        command_to_run = f'screen -S default_session -X stuff "{maybe_timeout}{json.dumps(command)[1:-1]}{maybe_newline} >{temp_file} 2>&1; echo {SPECIAL_END_TOKEN} >>{temp_file};\n"'
         # command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1 ; echo {SPECIAL_END_TOKEN} >>{temp_file} \n"'
         print("command_to_run:", command_to_run)
 
@@ -100,10 +104,10 @@ async def bash(commands, session="default", stream=None, timeout=60):
     Returns:
         List[str]: The output of the bash commands.
     """
-    with open("last_bash_request.json", "w") as f:
-        f.write(json.dumps(commands))
-    with open("last_bash_request.txt", "w") as f:
-        f.write("\n".join(commands))
+    # with open("last_bash_request.json", "w") as f:
+    #     f.write(json.dumps(commands))
+    # with open("last_bash_request.txt", "w") as f:
+    #     f.write("\n".join(commands))
     if stream is None:
 
         async def stream(i):
@@ -138,8 +142,14 @@ async def test_run_in_container():
 
 async def test_bash():
     commands = [
-        "sleep 5 && cd .. && ls",
-        "ls",
+        f"cd {os.getcwd()}",
+        "mkdir bla",
+        "cd bla",
+        "pwd",
+        "cd ..",
+        "rm -rf bla",
+        # "sleep 5 && cd .. && ls",
+        # "ls",
         # "pip install -e .",
         # "ls",
         # "mkdir test12",

@@ -45,19 +45,19 @@ async def get_openai_response_stream(
         if i.get("function_call") is None:
             i.pop("function_call", None)
 
-    with open("last_openai_request.json", "w") as f:
-        json.dump(
-            {
-                "messages": messages,
-                "functions": functions,
-            },
-            f,
-        )
+    # with open(".minichain/last_openai_request.json", "w") as f:
+    #     json.dump(
+    #         {
+    #             "messages": messages,
+    #             "functions": functions,
+    #         },
+    #         f,
+    #     )
 
     # print(messages[-2])
     # print("=====================================")
     if len(functions) > 0:
-        response = openai.ChatCompletion.create(
+        openai_response = openai.ChatCompletion.create(
             model=model,
             messages=messages,
             functions=functions,
@@ -65,7 +65,7 @@ async def get_openai_response_stream(
             stream=True,
         )
     else:
-        response = openai.ChatCompletion.create(
+        openai_response = openai.ChatCompletion.create(
             model=model,
             messages=messages,
             temperature=0.1,
@@ -78,7 +78,7 @@ async def get_openai_response_stream(
     # iterate through the stream of events
     function_call = {}
     content = ""
-    for chunk in response:
+    for chunk in openai_response:
         collected_chunks.append(chunk)  # save the event response
         chunk = chunk["choices"][0]["delta"]  # extract the message
         collected_messages.append(chunk)  # save the message

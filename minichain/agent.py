@@ -164,6 +164,92 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
             breakpoint()
     return FunctionCall(**function_call)
 
+import tiktoken
+
+
+def count_tokens(text):
+    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+    num_tokens = len(encoding.encode(text))
+    return num_tokens
+
+
+async def get_summarized_history(history, functions, max_tokens=6000):
+    try:
+        messages = [i.dict() for i in history]
+        for i in messages:
+            i.pop("id")
+            i.pop("conversation_id")
+    except:
+        breakpoint()
+    tokens = count_tokens(json.dumps(functions))
+    assert tokens < max_tokens, f"Too many tokens in functions: {tokens} > {max_tokens}"
+    # while the total token number is too large, we summarize the first max_token/2 messages and try again
+    while count_tokens(json.dumps(messages)) > max_tokens:
+        # Get as many messages as possible without exceeding the token limit / 2
+        for i in range(1, len(messages)):
+            if count_tokens(json.dumps(messages[:i])) > max_tokens / 2:
+                break
+        summary = await summarize_chunk(messages[:i - 1])
+        messages = summary + messages[i - 1:]
+    return messages
+        
+
+
+class ReferencesToOriginalMessages(BaseModel):
+    original_message_id: Optional[int] = Field(None, description="The id of the original message that you want to keep.")
+    summary: Optional[str] = Field(None, description="A summary of one or more messages that you want to keep instead of the original message.")
+
+
+class ShortenedHistory(BaseModel):
+    messages: List[ReferencesToOriginalMessages] = Field(..., description="The messages you want to keep from the original history. You can either pass message ids - those messages will be kept and not summarized - or no id but a text summary to insert into the history.")
+
+
+async def summarize_chunk(history):
+    system_prompt = (
+        "Summarize the following message history:\n"
+        "- each message is presented in the format: 'Message <id>: <message json>'\n"
+        "- your task is to construct a shorter version of the message history that contains all relevant information that is needed to complete the task\n"
+        "- you must keep every system message (role: system)"
+        "- don't shorten it too much - you will in the next step be asked to continue the task with only the information you are keeping now. Details especially in the code are important. For tasks that are completed, you can remove the messages but add a summary that lists all the file paths you (assistant) worked on. \n"
+        "- keep in particular the last messages that contain relevant details about the next steps. Of the last messages, keeping should be the default unless it is a long message with uninformative output, such as logs from a pip install command or similar messages.\n"
+    )
+
+    prompt = ""
+    for i, message in enumerate(history):
+        prompt += f"Message {i}: {json.dumps(message)}\n"
+    
+    example = FunctionCall(name="return", arguments=json.dumps({"messages": [{"original_message_id": 0}, {"summary": "This is a summary of messages 2-6"}, {"original_message_id": 7}]}))
+
+    prompt += (
+        "\n\nReturn the messages you want to keep with summaries for the less relevant messages by using the return function. Specify the shortened history like in this example:\n" +
+        json.dumps(example.dict(), indent=2)
+    )
+
+    with open(".minichain/last_summarize_prompt", "w") as f:
+        f.write(prompt)
+
+    summarizer = Agent(
+        functions=[],
+        system_message=SystemMessage(system_prompt),
+        prompt_template="{prompt}".format,
+        response_openapi=ShortenedHistory,
+    )
+
+    summary = await summarizer.run(prompt=prompt)
+
+    new_history = []
+    for keep in summary['messages']:
+        if keep['original_message_id'] is not None:
+            new_history.append(history[keep['original_message_id']])
+        else:
+            new_history.append({
+                "role": "assistant",
+                "content": f"(conversation summary):\n{keep['summary']}",
+            })
+    with open(".minichain/last_summary.json", "w") as f:
+        json.dump({"history": history, "summary": summary, "new_histrory": new_history}, f)
+    return new_history
+
 
 
 class Agent:
@@ -363,18 +449,8 @@ class Agent:
     async def get_next_action(self):
         # do the openai call
         indizes = list(range(len(self.history)))
-        keep = (
-            [indizes[0]]
-            + indizes[1 : self.keep_first_messages + 1]
-            + indizes[-self.keep_last_messages :]
-        )
-        keep = sorted(list(set(keep)))
-        history = []
-        for i in keep:
-            msg = self.history[i].dict()
-            msg.pop("conversation_id", None)
-            msg.pop("id", None)
-            history.append(msg)
+        
+        history = await get_summarized_history(self.history, self.functions_openai)
         response = await get_openai_response_stream(
             history, self.functions_openai, stream=self.stream_to_history()
         )

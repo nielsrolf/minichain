@@ -237,6 +237,7 @@ const ChatApp = () => {
     const selectAgent = (agentName) => {
         setAgentName(agentName);
         setDefaultAgentName(agentName);
+        console.log({conversationTree})
     }
 
     if (connectionStatus !== "CONNECTED") {
