@@ -80,6 +80,17 @@ async def run_in_container(
             output = result.output.decode()
             new_streamed = output.replace(streamed, "")
             yield new_streamed.replace(SPECIAL_END_TOKEN, "")
+            # check if a programm is asking for input and send y or yes
+            if "y/n" in new_streamed.lower() or "(y)" in new_streamed.lower():
+                print("sending y")
+                command_to_run = f'screen -S default_session -X stuff "y \n"'
+                container.exec_run(command_to_run)
+                # command_to_run = f'screen -S default_session -X stuff "{command} >{temp_file} 2>&1 ; echo {SPECIAL_END_TOKEN} >>{temp_file} \n"'
+            elif "yes/no" in new_streamed.lower().replace(" ", ""):
+                print("sending yes")
+                command_to_run = f'screen -S default_session -X stuff "yes \n"'
+                container.exec_run(command_to_run)
+
             streamed = output
 
             if SPECIAL_END_TOKEN in output:
@@ -142,12 +153,13 @@ async def test_run_in_container():
 
 async def test_bash():
     commands = [
-        f"cd {os.getcwd()}",
-        "mkdir bla",
-        "cd bla",
-        "pwd",
-        "cd ..",
-        "rm -rf bla",
+        "npx create-react-app yooooapp",
+        # f"cd {os.getcwd()}",
+        # "mkdir bla",
+        # "cd bla",
+        # "pwd",
+        # "cd ..",
+        # "rm -rf bla",
         # "sleep 5 && cd .. && ls",
         # "ls",
         # "pip install -e .",

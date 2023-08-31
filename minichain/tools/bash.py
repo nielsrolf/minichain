@@ -42,7 +42,7 @@ class BashSession(Function):
             name="bash",
             openapi=BashQuery,
             function=self,
-            description="Run bash commands. Cwd is reset after each message. Run commands with the -y flag to avoid interactive prompts.",
+            description="Run bash commands. Cwd is reset after each message. Run commands with the -y flag to avoid interactive prompts (e.g. npx create-app)",
         )
         # self.session = uuid.uuid4().hex
         self.image_name = image_name
@@ -68,6 +68,8 @@ class BashSession(Function):
     async def __call__(self, commands: List[str], timeout: int = 60) -> str:
         print("Using stream:", self.stream.__name__)
         await bash([f"cd {self.cwd}"], session=self.session)
+        if any(["npx" in i for i in commands]):
+            timeout = max(timeout, 180)
         outputs = await bash(
             commands,
             session=self.session,

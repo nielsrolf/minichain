@@ -158,8 +158,11 @@ async def edit(
     code: str = Field(..., description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON."),
 ):
     """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!
-    To create a new file, specify the path and start,end=0. Use this method instead of bash echo to create new files."""
+    To create a new file, specify the path and start,end=0. Use this method instead of bash touch or echo to create new files."""
     if not os.path.exists(path):
+        # check if the dir exists
+        dir_path = os.path.dirname(path)
+        os.makedirs(dir_path, exist_ok=True)
         # create the file
         with open(path, "w") as f:
             f.write("")

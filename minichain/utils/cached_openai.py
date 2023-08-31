@@ -71,14 +71,6 @@ async def get_openai_response_stream(
             temperature=0.1,
             stream=True,
         )
-    
-    with open(".minichain/last_openai_response.json", "w") as f:
-        json.dump(
-            {
-                "response": openai_response,
-            },
-            f,
-        )
 
     # create variables to collect the stream of chunks
     collected_chunks = []
@@ -109,13 +101,13 @@ async def get_openai_response_stream(
     #         function_call['arguments'] = json.loads(function_call['arguments'])
     #     except:
     #         print("Error parsing arguments", function_call['arguments'])
-    # with open(f"last_openai_response_{len(messages)}.json", "w") as f:
-    #     json.dump(
-    #         {
-    #             "response": response,
-    #         },
-    #         f,
-    #     )
+    with open(f".minichain/last_openai_response_{len(messages)}.json", "w") as f:
+        json.dump(
+            {
+                "response": response,
+            },
+            f,
+        )
 
     return response
 

@@ -3,6 +3,10 @@ from pydantic import BaseModel, Field
 from minichain.agent import tool
 
 
+class TasksNotDoneError(Exception):
+    pass
+
+
 class Task(BaseModel):
     id: Optional[int] = Field(
         None, description="The id of the task - only specify when updating a task."

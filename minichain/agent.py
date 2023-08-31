@@ -110,8 +110,10 @@ class Cancelled(Exception):
     pass
 
 
-def make_return_function(openapi_json: BaseModel):
+def make_return_function(openapi_json: BaseModel, check=None):
     async def return_function(**arguments):
+        if check is not None:
+            check(**arguments)
         return arguments
 
     function_obj = Function(
@@ -176,12 +178,14 @@ def count_tokens(text):
 history_summarize_prompt = (
     "Summarize the following message history:\n"
     "- each message is presented in the format: 'Message <id>: <message json>'\n"
+    "- you are the assistant. Formulate the summaries in first person, e.g. 'I did this and that.'\n"
     "- your task is to construct a shorter version of the message history that contains all relevant information that is needed to complete the task\n"
     "- you must keep every system message (role: system)"
     "- summarize steps related to completed tasks, but mention the full paths to all files that were created or modified\n"
     "- don't shorten it too much - you will in the next step be asked to continue the task with only the information you are keeping now. Details especially in the code are important. For tasks that are completed, you can remove the messages but add a summary that lists all the file paths you (assistant) worked on. \n"
     "- keep in particular the last messages that contain relevant details about the next steps.\n"
-    "- you should try to shorten the history by about 50% and reduce the number of messages by at least 1"
+    "- you should try to shorten the history by about 50% and reduce the number of messages by at least 1\n"
+    "- end the history in a way that makes it very clear what should be done next, and make sure all the information needed to complete the task is there\n"
 )
 async def get_summarized_history(history, functions, max_tokens=6000):
     messages = [i.dict() for i in history]
@@ -220,9 +224,13 @@ async def get_summarized_history(history, functions, max_tokens=6000):
             breakpoint()
             continue # with increased step, and therefore larger chunk
         messages = summary + messages[i:]
+    
+    if messages[-1]["content"].startswith("(summarized)"):
+        messages[-1]["content"] += "\n\nOkay let's continue with the task."
 
     with open(".minichain/last_summarized_history_final.json", "w") as f:
         json.dump({"original_history": original_history, "summarized_history": messages, "length_original": count_tokens(json.dumps(original_history)), "length_shortened": count_tokens(json.dumps(messages))}, f)
+    
     return messages
         
 
