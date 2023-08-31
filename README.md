@@ -3,7 +3,7 @@
 
 `{mini: ⛓}` is a minimal langchain alternative for agents with structured data, and many tools for them. You only need one class: `Agent` - for chat, chat with tool usage, or acting as a function.
 
-[![Demo video](https://img.youtube.com/vi/b0CbP-kUJt0/0.jpg)](https://www.youtube.com/watch?v=b0CbP-kUJt0)
+[![Demo video](https://img.youtube.com/vi/wxj7qjC8Xb4/0.jpg)](https://www.youtube.com/watch?v=wxj7qjC8Xb4)
 -- demo of a programmer agent built with minichain, using the [VSCode extension ui](./minichain-vscode/)
 
 **Why?**

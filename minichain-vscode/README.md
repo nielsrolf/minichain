@@ -1,5 +1,5 @@
 # minichain-vscode
-[![Demo video](https://img.youtube.com/vi/yZPpOqtzjms/0.jpg)](https://www.youtube.com/watch?v=yZPpOqtzjms)
+[![Demo video](https://img.youtube.com/vi/wxj7qjC8Xb4/0.jpg)](https://www.youtube.com/watch?v=wxj7qjC8Xb4)
 
 
 Usage: `Cmd+shift P: Open Minichain`.
