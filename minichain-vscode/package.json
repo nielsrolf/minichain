@@ -8,9 +8,7 @@
     "vscode": "^1.50.0"
   },
   "scripts": {
-      "vscode:prepublish": "npm install && npm run compile",
-      "compile": "tsc -p ./",
-      "watch": "tsc -watch -p ./",
+      "vscode:prepublish": "npm install",
       "postinstall": "pip install git+https://github.com/nielsrolf/minichain.git"
     },
   "categories": [
