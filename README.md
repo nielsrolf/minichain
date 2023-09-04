@@ -18,8 +18,7 @@ Chat models are agents without structured output and end their turn by respondin
 # Getting started
 To install the python library, run:
 ```
-pip install git+git://github.com/nielsrolf/minichain
-docker pull docker push nielsrolf/minichain:latest
+pip install git+https://github.com/nielsrolf/minichain
 docker pull nielsrolf/minichain:latest
 ```
 
