@@ -20,6 +20,7 @@ To install the python library, run:
 ```
 pip install git+git://github.com/nielsrolf/minichain
 docker pull docker push nielsrolf/minichain:latest
+docker pull nielsrolf/minichain:latest
 ```
 
 ## Defining a tool
