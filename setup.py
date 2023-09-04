@@ -32,6 +32,7 @@ setup(
         "uvicorn",
         "numpy",
         "tiktoken",
+        "uvicorn[standard]",
     ],
     entry_points={
         "console_scripts": [],
