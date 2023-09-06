@@ -18,8 +18,8 @@ Chat models are agents without structured output and end their turn by respondin
 # Getting started
 To install the python library, run:
 ```
-pip install git+git://github.com/nielsrolf/minichain
-docker pull docker push nielsrolf/minichain:latest
+pip install git+https://github.com/nielsrolf/minichain
+docker pull nielsrolf/minichain:latest
 ```
 
 ## Defining a tool
@@ -75,10 +75,23 @@ pytest test
 ```
 
 ## UI dev setup
-The UI requires the backend to run:
+If don't have [docker](https://docs.docker.com/engine/install/), install it now.
+
+The UI requires the backend to run.  You will need your [OpenAI GPT-4](https://openai.com) and [Replicate](https://replicate.com) keys in your enviroment variables:
 ```
-python -m minichain.api
+OPENAI_API_KEY=key REPLICATE_API_TOKEN=key python -m minichain.api
 ```
+### macOS npm install
+Install [Brew](https://brew.sh/) if you don't have it already:
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+Install npm [Node.js](https://nodejs.org/en/) if you don't have it already:
+```
+brew install npm
+```
+
+### Linux and macOS
 Then, install and start the frontend:
 ```
 cd minichain-ui
@@ -86,5 +99,17 @@ npm install
 npm run start
 ```
 
+## VSCode extension dev setup
 
+Install vsce if you don't have it already:
+```
+cd minichain-vscode
+npm install vsce
+```
 
+Create the VSCode extension .vsix file:
+```
+vsce package
+```
+
+ To start the extension, you can open Visual Studio Code, go to the Extensions view (Ctrl+Shift+X), and click on the ... (More Actions) button at the top of the view and select Install from VSIX.... Navigate to the minichain-vscode/ directory, select the .vsix file, and click Install. After the installation, you should be able to use the "Open Minichain" command.

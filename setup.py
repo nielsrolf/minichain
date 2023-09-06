@@ -30,6 +30,9 @@ setup(
         "docker",
         "html2text",
         "uvicorn",
+        "numpy",
+        "tiktoken",
+        "uvicorn[standard]",
     ],
     entry_points={
         "console_scripts": [],

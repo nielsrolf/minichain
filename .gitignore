@@ -193,3 +193,6 @@ last_openai_request.json
 last*
 
 *.vsix
+
+.idea/
+**/build/
