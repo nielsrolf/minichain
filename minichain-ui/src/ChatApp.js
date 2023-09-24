@@ -36,7 +36,7 @@ const ChatApp = () => {
 
     useEffect(() => {
         // get the agent name from the URL
-        const client = new W3CWebSocket(`ws://localhost:8000/ws`);
+        const client = new W3CWebSocket(`ws://127.0.0.1:8745/ws`);
 
         client.onopen = () => {
             console.log('WebSocket Client Connected');

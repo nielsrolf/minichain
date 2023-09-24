@@ -253,9 +253,9 @@ async def preload_agents():
     """This function should run after the async event loop has started."""
     to_load = {
         "webgpt": WebGPT,
-        # "smartgpt": SmartWebGPT(),
+        # # "smartgpt": SmartWebGPT(),
         "yopilot": Programmer,
-        "planner": Planner,
+        # "planner": Planner,
         "chatgpt": ChatGPT,
         "artist": Artist,
         "agi": AGI,
@@ -264,6 +264,7 @@ async def preload_agents():
     for name, agent in to_load.items():
         try:
             loaded_agents[name] = agent()
+            print("Loaded", name)
         except Exception as e:
             print(f"Error loading agent {name}", e)
     agents.update(
@@ -276,9 +277,9 @@ async def preload_agents():
         agents[agent.name] = agent
 
 
-def start(port=8000):
+def start(port=8745):
     import uvicorn
-    uvicorn.run(app, host="localhost", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 # We want to run this via python -m minichain.api
