@@ -251,17 +251,25 @@ async def static(path):
 @app.on_event("startup")
 async def preload_agents():
     """This function should run after the async event loop has started."""
+    to_load = {
+        "webgpt": WebGPT,
+        # "smartgpt": SmartWebGPT(),
+        "yopilot": Programmer,
+        "planner": Planner,
+        "chatgpt": ChatGPT,
+        "artist": Artist,
+        "agi": AGI,
+    }
+    loaded_agents = {}
+    for name, agent in to_load.items():
+        try:
+            loaded_agents[name] = agent()
+        except Exception as e:
+            print(f"Error loading agent {name}", e)
     agents.update(
-        {
-            "webgpt": WebGPT(),
-            # "smartgpt": SmartWebGPT(),
-            "yopilot": Programmer(),
-            "planner": Planner(),
-            "chatgpt": ChatGPT(),
-            "artist": Artist(),
-            "agi": AGI(),
-        }
+        loaded_agents
     )
+
     for agent in list(agents.values()):
         agent.functions.append(upload_file_to_chat)
     for agent in list(agents.values()):
