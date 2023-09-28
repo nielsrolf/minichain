@@ -11,15 +11,18 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
+import yaml
+
 
 from minichain.agent import (AssistantMessage, FunctionMessage, SystemMessage,
                              UserMessage, Cancelled)
-from minichain.agents.chatgpt import ChatGPT
-from minichain.agents.planner import Planner
-from minichain.agents.programmer import Programmer
-from minichain.agents.webgpt import SmartWebGPT, WebGPT
-from minichain.agents.replicate_multimodal import Artist
-from minichain.agents.agi import AGI
+# from minichain.agents.chatgpt import ChatGPT
+# from minichain.agents.planner import Planner
+# from minichain.agents.programmer import Programmer
+# from minichain.agents.memory_agent import MemoryAgent
+# from minichain.agents.webgpt import SmartWebGPT, WebGPT
+# from minichain.agents.replicate_multimodal import Artist
+# from minichain.agents.agi import AGI
 
 
 class MessageDB:
@@ -241,6 +244,11 @@ async def root():
     return {"message": "Hello World"}
 
 
+@app.get("/agents")
+async def get_agents():
+    return list(agents.keys())
+
+
 @app.get("/static/{path:path}")
 async def static(path):
     print("static", path)
@@ -248,20 +256,50 @@ async def static(path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path)
 
+
 @app.on_event("startup")
 async def preload_agents():
     """This function should run after the async event loop has started."""
-    agents.update(
-        {
-            "webgpt": WebGPT(),
-            # "smartgpt": SmartWebGPT(),
-            "yopilot": Programmer(),
-            "planner": Planner(),
-            "chatgpt": ChatGPT(),
-            "artist": Artist(),
-            "agi": AGI(),
-        }
-    )
+    # load the ./minichain/settings.yml file
+    if not os.path.exists(".minichain/settings.yml"):
+        # copy the default settings file from the modules install dir (minichain/default_settings.yml) to the cwd ./minichain/settings.yml
+        print("Copying default settings file to .minichain/settings.yml")
+        os.makedirs(".minichain", exist_ok=True)
+        import shutil
+        shutil.copyfile(
+            os.path.join(os.path.dirname(__file__), "default_settings.yml"),
+            ".minichain/settings.yml",
+        )
+
+    with open(".minichain/settings.yml", "r") as f:
+        settings = yaml.load(f, Loader=yaml.FullLoader)
+    # load the agents
+    for agent_name, agent_settings in settings.get("agents", {}).items():
+        if not agent_settings.get("display", False):
+            continue
+        print("Loading agent", agent_name)
+        class_name = agent_settings.pop("class")
+        # class name is e.g. minichain.agents.programmer.Programmer
+        # import the agent class
+        module_name, class_name = class_name.rsplit(".", 1)
+        module = __import__(module_name, fromlist=[class_name])
+        agent_class = getattr(module, class_name)
+        # create the agent
+        agent = agent_class(**agent_settings.get('init', {}))
+        # add the agent to the agents dict
+        agents[agent_name] = agent
+
+    # agents.update(
+    #     {
+    #         "webgpt": WebGPT(),
+    #         # "smartgpt": SmartWebGPT(),
+    #         "yopilot": Programmer(),
+    #         "planner": Planner(),
+    #         "chatgpt": ChatGPT(),
+    #         "artist": Artist(),
+    #         "agi": AGI(),
+    #     }
+    # )
     for agent in list(agents.values()):
         agent.functions.append(upload_file_to_chat)
     for agent in list(agents.values()):

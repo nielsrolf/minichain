@@ -25,6 +25,7 @@ const ChatApp = () => {
     const [defaultAgentName, setDefaultAgentName] = useState("yopilot");
     const [isAttached, setIsAttached] = useState(true);
     const [minBottomTop, setMinBottomTop] = useState(0);
+    const [availableAgents, setAvailableAgents] = useState([]);
 
     const [conversationTree, setConversationTree] = useState({
         conversations: { root: [] },
@@ -33,6 +34,15 @@ const ChatApp = () => {
         lastMessageId: null,
         agents: {}
     });
+
+    // fetch the available agents
+    useEffect(() => {
+        fetch("http://localhost:8000/agents")
+            .then(response => response.json())
+            .then(data => {
+                setAvailableAgents(data);
+            });
+    }, []);
 
     useEffect(() => {
         // get the agent name from the URL
@@ -306,12 +316,7 @@ const ChatApp = () => {
                         color: "white",
                         padding: "5px",
                     }}>
-                        <option value="chatgpt">chatgpt</option>
-                        <option value="yopilot">yopilot</option>
-                        <option value="planner">planner</option>
-                        <option value="webgpt">webgpt</option>
-                        <option value="artist">artist</option>
-                        <option value="agi">agi</option>
+                        {availableAgents.map(agentName => <option value={agentName}>{agentName}</option>)}
                     </select>
                 )}
                 {/* otherwise show the current agent */}

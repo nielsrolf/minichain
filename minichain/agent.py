@@ -295,8 +295,6 @@ class Agent:
         response_openapi=None,
         init_history=None,
         on_message_send=None,
-        keep_first_messages=1,
-        keep_last_messages=20,
         silent=False,
         keep_session=False,
         name=None,
@@ -314,8 +312,6 @@ class Agent:
         self.system_message = system_message
         self.history = [system_message] + (init_history or [])
         self.prompt_template = prompt_template
-        self.keep_first_messages = keep_first_messages
-        self.keep_last_messages = keep_last_messages
         self.silent = silent
         self.keep_session = keep_session
         self.name = name or self.__class__.__name__
@@ -402,8 +398,6 @@ class Agent:
             self.response_openapi,
             self.init_history,
             self.on_message_send,
-            keep_first_messages=self.keep_first_messages,
-            keep_last_messages=self.keep_last_messages,
             silent=self.silent,
             keep_session=keep_session,
             name=self.name,
@@ -489,15 +483,7 @@ class Agent:
             history, self.functions_openai, stream=self.stream_to_history()
         )
         return self.history[-1]
-        # print(response)
-        # function_call = response.get("function_call", None)
-        # if function_call is not None:
-        #     function_call = FunctionCall(**function_call)
-        # return AssistantMessage(
-        #     response.get("content", None), function_call=function_call
-        # )
 
-    # @debug
     async def execute_action(self, function_call):
         try:
             for function in self.functions:
@@ -521,7 +507,7 @@ class Agent:
                         function_message = FunctionMessage(
                             function_output_str, function.name
                         )
-                        # await self.history_append(function_message)
+                        await self.history_append(function_message)
                     return function_output
             await self.history_append(
                 FunctionMessage(
@@ -539,17 +525,14 @@ class Agent:
                 msg = f"{type(e)}: {e}"
             if not self.silent:
                 traceback.print_exc()
-                # breakpoint()
             msg = msg.replace("<class 'pydantic.error_wrappers.ValidationError'>", "Response could not be parsed, did you mean to call return?\nError:")
 
             await self.history_append(FunctionMessage(msg, function.name))
-        # self.on_message_send(self.history[-1])
         print(self.history[-1].content)
         return False
 
     async def follow_up(self, user_message):
         await self.history_append(user_message)
-        # self.on_message_send(self.history[-1])
         return await self.run_until_done()
 
     def as_function(self, name, description, prompt_openapi):

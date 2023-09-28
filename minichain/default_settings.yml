@@ -1,0 +1,28 @@
+agents:
+  memory:
+    class: minichain.agents.memory_agent.MemoryAgent
+    init:
+      load_memory_from: .minichain/memory
+    display: true
+  yopilot:
+    class: minichain.agents.programmer.Programmer
+    init:
+      load_memory_from: .minichain/memory
+    display: true
+  chatgpt:
+    class: minichain.agents.chatgpt.ChatGPT
+    display: false
+  artist:
+    class: minichain.agents.replicate_multimodal.Artist
+    display: false
+  webgpt:
+    class: minichain.agents.webgpt.WebGPT
+    display: false
+  agi:
+    class: minichain.agents.agi.AGI
+    display: false
+  custom_agent:
+    class: minichain.agent.Agent
+    display: false
+    init:
+      system_prompt: "answer like a pirate"
