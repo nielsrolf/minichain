@@ -153,10 +153,11 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
         try:
             # replace first occurrence of ``` with " and last
             before, after = function_call["arguments"].split('"code": `', 1)
-            try:
-                code, after = after.rsplit("`,", 1)[0]
-            except:
-                code, after = after.rsplit("`", 1)[0]
+            if "`, " in after:
+                try:
+                    code, after = after.rsplit("`,", 1)[0]
+                except:
+                    code, after = after.rsplit("`", 1)[0]
             arguments_no_code = json.loads(before + after)
             arguments = {"code": code, **arguments_no_code}
             function_call["arguments"] = json.dumps(arguments)
@@ -164,6 +165,7 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
         except Exception as e:
             print(e)
             breakpoint()
+
     return FunctionCall(**function_call)
 
 import tiktoken
@@ -519,7 +521,7 @@ class Agent:
                         function_message = FunctionMessage(
                             function_output_str, function.name
                         )
-                        await self.history_append(function_message)
+                        # await self.history_append(function_message)
                     return function_output
             await self.history_append(
                 FunctionMessage(

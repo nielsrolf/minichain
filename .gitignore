@@ -196,3 +196,14 @@ last*
 
 .idea/
 **/build/
+
+.vscode/
+Untitled.ipynb
+art-portfolio/
+examples/
+llama_prompt_templates/
+music/
+portfolio/
+sine_plot.png
+sine_wave.png
+webdesign/
