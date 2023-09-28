@@ -27,7 +27,7 @@ class MemoryAgent(Agent):
         if init_history == []:
             user_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}."
             if len(self.memory.memories) > 0:
-                user_msg += f"\nHere is a summary of your memory: \n{memory.get_content_summary()}"
+                user_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}"
             else:
                 user_msg += f"\nYou don't have any memories yet."
             init_history.append(

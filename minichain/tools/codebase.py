@@ -56,7 +56,6 @@ def get_visible_files(
     while len(new_files) <= max_lines and depth < 10:  # Limiting depth to avoid infinite loops
         files = new_files
         new_files = list_files(root_dir, depth)
-        breakpoint()
         depth += 1
 
     if files == []:
@@ -87,7 +86,6 @@ def get_initial_summary(
     summary += "Files:\n" + "\n".join(available_files)
     return summary
 
-print(get_initial_summary())
 
 async def get_long_summary(
     root_dir=".",

@@ -285,7 +285,6 @@ class SemanticParagraphMemory:
             summary += f"# Memories from: {source} \n"
             for i in memories:
                 summary += i.memory.title + "\n"
-                summary += f"    {i.memory.tags}\n"
         return summary
 
     def get_queue_summary(self, queue):
@@ -380,7 +379,6 @@ class SemanticParagraphMemory:
                 content = f.read()
             new_memories = await self.ingest(content, path)
             summary = self.get_content_summary(new_memories)
-            breakpoint()
             return f"Ingested {path}. New memories formed:\n{summary} "
         return create_memories_from_file
             
