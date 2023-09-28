@@ -16,30 +16,69 @@ class RelevantSection(BaseModel):
     end: int = Field(..., description="The end line of this section.")
 
 
+def get_visible_files(
+    root_dir,
+    extensions,
+    ignore_files=[],
+    max_lines=100
+):
+    def should_ignore(path):
+        print("ignore? path:", path)
+        for ignore in ignore_files:
+            if ignore in path:
+                return True
+        return False
+
+    def list_files(directory, depth=1):
+        entries = []
+        try:
+            for name in os.listdir(directory):
+                # check if it's a hidden file
+                if name.startswith("."):
+                    continue
+                path = os.path.join(directory, name)
+                rel_path = os.path.relpath(path, root_dir)
+                if should_ignore(rel_path):
+                    continue
+                if os.path.isdir(path) and depth > 0:
+                    entries.extend(list_files(path, depth - 1))
+                elif os.path.isdir(path):
+                    entries.append(rel_path + "/")
+                else:
+                    if any(rel_path.endswith(ext) for ext in extensions):
+                        entries.append(rel_path)
+        except PermissionError:
+            pass
+        return entries
+
+    depth = 0
+    files, new_files = [], []
+    while len(new_files) <= max_lines and depth < 10:  # Limiting depth to avoid infinite loops
+        files = new_files
+        new_files = list_files(root_dir, depth)
+        breakpoint()
+        depth += 1
+
+    if files == []:
+        files = new_files[:max_lines] + ["..."]
+    return files
+
+
 def get_initial_summary(
     root_dir=".",
     extensions=[".py", ".js", ".ts", "README.md"],
     ignore_files=[
-        ".git/",
-        ".vscode/",
-        "__pycache__/",
-        "node_modules/",
-        "dist/",
-        "build/",
-        "venv/",
-        "env/",
+        "__pycache__",
+        "node_modules",
+        "dist",
+        "build",
+        "venv",
+        "env",
+        "examples",
     ],
+    max_lines=25
 ):
-    available_files = []
-    root_dir = root_dir or root_dir
-    for root, dirs, filenames in os.walk(root_dir):
-        for _filename in filenames:
-            filename = os.path.join(root, _filename)
-            for extension in extensions:
-                if not any(
-                    [ignore_file in filename for ignore_file in ignore_files]
-                ) and filename.endswith(extension):
-                    available_files.append(filename)
+    available_files = get_visible_files(root_dir=root_dir, extensions=extensions, ignore_files=ignore_files, max_lines=max_lines)
     try:
         with open("README.md") as f:
             summary = "\n".join(f.readlines()[:5]) + "...\n"
@@ -48,6 +87,7 @@ def get_initial_summary(
     summary += "Files:\n" + "\n".join(available_files)
     return summary
 
+print(get_initial_summary())
 
 async def get_long_summary(
     root_dir=".",
@@ -296,7 +336,7 @@ async def test_codebase():
     print(await view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
 
 
-if __name__ == "__main__":
-    import asyncio
+# if __name__ == "__main__":
+#     import asyncio
 
-    asyncio.run(test_codebase())
+#     asyncio.run(test_codebase())
