@@ -29,10 +29,6 @@ class Memory(BaseModel):
         ...,
         description="Questions that are answered by the content of this memory. You will later be asked to find all memories related to arbitrary questions. Use this field to generate example questions for which you would like this memory to show up. Provide plain, unformatted questions without links.",
     )
-    tags: List[str] = Field(
-        ...,
-        description="Tags that describe the content of this memory. You will later be asked to find all memories related to arbitrary tags. Use this field to generate example tags for which you would like this memory to show up. Don't 'pollute' good tags with uninformative memories, as this will make it harder to retrieve the good memories later.",
-    )
     context: Optional[str] = Field(
         ...,
         description="Additional context for this memory. This should contain information from the previous sections that is needed to correctly understand the content. Provide plain, unformatted text without links.",
@@ -42,9 +38,13 @@ class Memory(BaseModel):
         ...,
         description='The type of this memory. Allowed values are: ["content", "navigation", "further-reading"]. "navigation" and "further-reading" must include outgoing links in the "links" field.',
     )
-    links: List[ReadLater] = Field(
-        ...,
+    links: Optional[List[ReadLater]] = Field(
+        None,
         description="List of links mentioned in this section to websites that you might want to read later.",
+    )
+    symbol_id: Optional[str] = Field(
+        None,
+        description="For source code: the id of the symbol that is described in this memory. Example: 'src/agent.py:Agent.run'",
     )
 
 
@@ -63,7 +63,7 @@ class MemoryWithMeta(BaseModel):
     )
 
 
-async def text_to_memory(text, source=None, max_num_memories=None) -> List[MemoryWithMeta]:
+async def text_to_memory(text, source=None, max_num_memories=None, agent_kwargs={}) -> List[MemoryWithMeta]:
     """
     Turn a text into a list of semantic paragraphs.
     - add line numbers to the text
@@ -79,8 +79,10 @@ async def text_to_memory(text, source=None, max_num_memories=None) -> List[Memor
     current_paragraph_start = 0
     current_paragraph_end = len(paragraphs[0].split("\n")) - 1
 
-    def add_memory(**memory):
+    async def add_memory(**memory):
         memory = Memory(**memory)
+        if memory.links is None:
+            memory.links = []
         progress = max(
             [0] + [i.memory.end_line for i in memories if i.meta.source == source]
         )
@@ -130,9 +132,8 @@ async def text_to_memory(text, source=None, max_num_memories=None) -> List[Memor
             f"Turn a text into a list of {at_most_n }memories. A memory is one piece of information that is self-contained to understand but also atomic. You will use these memories later: you will be able to generate questions or keywords, and find the memories you are creating now. Remember only informative bits of information. The text has line numberes added at the beginning of each line, make sure to reference them when you create a memory.  Make sure to add all memories before you end the conversation by responding with a 'content' instead of a 'function_call'. If you encounter navigation elements or sections with many outgoing links - especially to docs - remember them so you can read the referenced urls later. If you get stuck while creating a memory just move on the a later section of the text. You can only see a section of a larger text at a time, so it can happen the the entirely text is irrelevant / consists out of references etc. In that case, directly end the session so that we can move on to the interesting parts."
         ),
         prompt_template="{text}".format,
-        keep_first_messages=1,
-        keep_last_messages=5,
         response_openapi=Done,
+        **agent_kwargs,
     )
 
     for paragraph in paragraphs:
