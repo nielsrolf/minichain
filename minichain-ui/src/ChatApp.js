@@ -17,13 +17,13 @@ const functionsToRenderAsCode = [
 
 
 function addDiffToMessage(message, diff) {
+    console.log("addDiffToMessage", message, diff);
+    if (!message) {
+        return diff;
+    }
     // if both values are strings, add the diff
     if (typeof message === "string" && typeof diff === "string") {
         return message + diff;
-    }
-    // check if message is null or undefined
-    if (!message) {
-        return diff;
     }
     // add the diff recursively to message
     for (const key in diff) {
@@ -136,9 +136,11 @@ const ChatApp = () => {
                     const existingMessageIndex = newMessages.findIndex(i => i.id === message.id);
                     if (existingMessageIndex !== -1) {
                         // add the diff to the existing message
-                        newMessages[existingMessageIndex] = addDiffToMessage(newMessages[existingMessageIndex], message);
+                        console.log("before add diff", newMessages[existingMessageIndex], message)
+                        newMessages[existingMessageIndex] = addDiffToMessage(newMessages[existingMessageIndex], message.diff);
+                        console.log("after add diff", newMessages[existingMessageIndex])
                     } else {
-                        newMessages[existingMessageIndex] = message.diff;
+                        newMessages.push({"id": message.id, ...message.diff});
                     }
                     return newMessages;
                 });

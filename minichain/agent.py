@@ -135,7 +135,7 @@ class Session():
                         f"Error: this function does not exist", action.name,
                     )
             except Exception as e:
-                await stream.set(self.format_error_message(e))
+                await stream.chunk(self.format_error_message(e))
         return False
     
     def format_error_message(self, e):
@@ -147,6 +147,7 @@ class Session():
         except AttributeError:
             msg = f"{type(e)}: {e}"
         msg = msg.replace("<class 'pydantic.error_wrappers.ValidationError'>", "Response could not be parsed, did you mean to call return?\nError:")
+        msg = '```\n' + msg + '\n```'
         return msg
 
     async def follow_up(self, user_message):

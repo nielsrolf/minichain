@@ -57,9 +57,10 @@ class Stream:
             on_message = do_nothing
         self.on_message = on_message
         self.on_chunk = on_chunk
-        self.conversation_stack = conversation_stack
+        self.conversation_stack = list(conversation_stack)
         self.current_message = current_message or {"id": "hidden", "role": "hidden", "conversation_id": "hidden"}
         self.history = history or []
+        self.originally_streamed = {}
 
         self.logs = []
     
@@ -109,7 +110,11 @@ class Stream:
             conversation_stack=self.conversation_stack,
             current_message=current_message,
             on_chunk=self.on_chunk,
-            history=history)
+            history=history
+        )
+        # set initial msg
+        await message_stream.set(current_message)
+        message_stream.originally_streamed = dict(current_message)
         return message_stream
         
     async def chunk(self, diff):
@@ -119,7 +124,11 @@ class Stream:
         """
         if isinstance(diff, str):
             diff = {"content": diff}
-        diff.pop("role", None)
+        print("not streaming diffs in: ", self.originally_streamed)
+        for initially_streamed, value in self.originally_streamed.items():
+            if value is not None and value != "":
+                diff.pop(initially_streamed, None)
+        print("add", diff, "to", self.current_message)
         nested("add", self.current_message, diff)
         print(self.current_message['role'])
         self.logs.append({"diff": diff, "message": self.current_message})
