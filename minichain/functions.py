@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, create_model
 import inspect
+import json
 
 from minichain.streaming import Stream
 
@@ -47,16 +48,17 @@ class Function:
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments).dict()
         response = await self.function(**arguments)
+        response = json.dumps(response)
         await self.stream.set(response)
         print("response", response)
         return response
         # return self.parse(response)
 
-    def _register_stream(self, stream):
+    def register_stream(self, stream):
         self.stream = stream
         for maybe_agent in self.__dict__.values():
             try:
-                maybe_agent._register_stream(stream)
+                maybe_agent.register_stream(stream)
             except:
                 pass
 

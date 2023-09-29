@@ -67,6 +67,8 @@ class AssistantMessage:
     def __post_init__(self):
         if self.id is None:
             self.id = str(uuid.uuid4().hex[:5])
+        if isinstance(self.function_call, dict):
+            self.function_call = FunctionCall(**self.function_call)
 
     def dict(self):
         json = asdict(self)

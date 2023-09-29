@@ -75,6 +75,9 @@ class Agent:
         agent_session.history.append(UserMessage(self.prompt_template(**arguments)))
         response = await agent_session.run_until_done()
         return response
+    
+    def register_stream(self, stream):
+        self.stream = stream
 
     def as_function(self, name, description, prompt_openapi):
         def function(**arguments):
@@ -85,8 +88,8 @@ class Agent:
             name,
             function,
             description,
+            stream=self.stream,
         )
-        function_tool.has_stream = True
         return function_tool
 
 
@@ -103,12 +106,10 @@ class Session():
         with self.agent.stream.conversation() as stream:
             await self.send_initial_messages(stream)
             while True:
-                assistant_message = await self.get_next_action(stream)
-                # await self.history_append(assistant_message)
-                function_call = assistant_message.function_call
-                if function_call is not None:
-                    output = await self.execute_action(function_call, stream)
-                    if function_call.name == "return" and output is not False:
+                action = await self.get_next_action(stream)
+                if action is not None:
+                    output = await self.execute_action(action, stream)
+                    if action.name == "return" and output is not False:
                         return output
     
     async def get_next_action(self, stream):
@@ -116,29 +117,28 @@ class Session():
         # history = await get_summarized_history(self.history, self.agent.functions_openai)
         history = self.history
         # TODO
-        with stream.to(history, role="assistant") as stream:
+        with await stream.to(history, role="assistant") as stream:
             await get_openai_response_stream(
                 history, self.agent.functions_openai, model=self.agent.llm, stream=stream
             )
-        return history[-1]
+        return history[-1].function_call
 
-    async def execute_action(self, function_call, stream):
-        with stream.to(self.history, role="function") as stream:
+    async def execute_action(self, action, stream):
+        with await stream.to(self.history, role="function", name=action.name) as stream:
             try:
                 for function in self.agent.functions:
-                    if function.name == function_call.name:
-                        arguments = json.loads(function_call.arguments)
-                        function._register_stream(stream)
-                        function_output = await function(**arguments)
+                    if function.name == action.name:
+                        function.register_stream(stream)
+                        function_output = await function(**action.arguments)
                         return function_output
                 await stream.set(
-                        f"Error: this function does not exist", function_call.name
+                        f"Error: this function does not exist", action.name,
                     )
             except Exception as e:
                 await stream.set(self.format_error_message(e))
-            return False
+        return False
     
-    async def format_error_message(self, e):
+    def format_error_message(self, e):
         if isinstance(e, Cancelled):
             raise e
         traceback.print_exc()
@@ -150,12 +150,9 @@ class Session():
         return msg
 
     async def follow_up(self, user_message):
-        with self.agent.stream.to(self.history, role="user") as stream:
+        with await self.agent.stream.to(self.history, role="user") as stream:
             await stream.set(user_message.content)
         return await self.run_until_done()
-    
-    def _register_stream(self, stream):
-        self.stream = stream
     
     async def send_initial_messages(self, stream):
         for message in self.history:

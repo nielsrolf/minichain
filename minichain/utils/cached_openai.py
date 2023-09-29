@@ -13,9 +13,6 @@ from minichain.streaming import Stream
 
 
 def parse_function_call(function_call: Optional[Dict[str, Any]]):
-    """
-    TODO: move this to cached_openai.py
-    """
     if function_call is None:
         return None
     try:
@@ -69,8 +66,13 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
 
 def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
     """Fix common errors in the formatting and turn the dict into a AssistantMessage"""
-    if response.get("function_call"):
-        response["function_call"] = parse_function_call(response["function_call"])
+    if not response.get("function_call"):
+        response["function_call"] = {
+            "name": "return",
+            "arguments": json.dumps({"content": response.pop("content")}),
+        }
+        response["content"] = ""
+    response["function_call"] = parse_function_call(response["function_call"])
     return AssistantMessage(**response)
 
 
@@ -94,6 +96,13 @@ def messages_types_to_history(chat_history: list) -> list:
         for k, v in dict(**message).items():
             if v is None and not k == "content":
                 message.pop(k)
+        if (function_call := message.get("function_call")) is not None:
+            try:
+                if isinstance(function_call['arguments'], dict):
+                    function_call['arguments'] = json.dumps(function_call['arguments'])
+            except Exception as e:
+                print(e)
+                breakpoint()
     return messages
 
 
@@ -139,8 +148,11 @@ async def get_openai_response_stream(
     for chunk in openai_response:
         chunk = chunk["choices"][0]["delta"].to_dict_recursive()
         try:
-            await stream.chunk_dict(chunk)
-        except:
+            await stream.chunk(chunk)
+        except Exception as e:
+            print(e)
+            import traceback
+            traceback.print_exc()
             breakpoint()
     response = {key: value for key, value in stream.current_message.items() if "id" not in key}
     response = fix_common_errors(response)

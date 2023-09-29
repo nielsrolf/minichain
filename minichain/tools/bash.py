@@ -119,7 +119,7 @@ class CodeInterpreter(Function):
         filepath = f"{self.bash.cwd}/.minichain/{filename}.py"
         with open(filepath, "w") as f:
             f.write(code)
-        self.bash._register_stream(self.stream)
+        self.bash.register_stream(self.stream)
         output = await self.bash(commands=[f"python {filepath}"], timeout=timeout)
         return output
 

@@ -16,6 +16,23 @@ const functionsToRenderAsCode = [
 ];
 
 
+function addDiffToMessage(message, diff) {
+    // if both values are strings, add the diff
+    if (typeof message === "string" && typeof diff === "string") {
+        return message + diff;
+    }
+    // check if message is null or undefined
+    if (!message) {
+        return diff;
+    }
+    // add the diff recursively to message
+    for (const key in diff) {
+        message[key] = addDiffToMessage(message[key], diff[key]);
+    }
+    return message
+}
+
+
 const ChatApp = () => {
     const [client, setClient] = useState(null);
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
@@ -26,14 +43,8 @@ const ChatApp = () => {
     const [isAttached, setIsAttached] = useState(true);
     const [minBottomTop, setMinBottomTop] = useState(0);
     const [availableAgents, setAvailableAgents] = useState([]);
-
-    const [conversationTree, setConversationTree] = useState({
-        conversations: { root: [] },
-        subConversations: {},
-        parents: {},
-        lastMessageId: null,
-        agents: {}
-    });
+    const [messages, setMessages] = useState([]);
+    const [childrenOf, setChildrenOf] = useState({}); // childrenOf[conversationId] = [...messageIds]
 
     // fetch the available agents
     useEffect(() => {
@@ -43,6 +54,23 @@ const ChatApp = () => {
                 setAvailableAgents(data);
             });
     }, []);
+
+    // fetch the history
+    useEffect(() => {
+        fetch("http://localhost:8000/history")
+            .then(response => response.json())
+            .then(data => {
+                console.log("history", data);
+                // set the messages
+                console.log("setMessages", setMessages);
+                setMessages(data.messages);
+                // the above gives a 'setMessages is not a function' error
+                // so we use the below instead
+                
+                // set the childrenOf
+                setChildrenOf(data.childrenOf);
+            });
+    }, [setMessages, setChildrenOf]);
 
     useEffect(() => {
         // get the agent name from the URL
@@ -63,98 +91,59 @@ const ChatApp = () => {
             setConnectionStatus("CLOSED");
         };
 
-        client.onmessage = (message) => {
-            console.log("message received", message);
-            const data = JSON.parse(message.data);
-            console.log({ data })
-            switch (data.type) {
-                case "start":
-                    console.log("Starting new conversation: " + data.conversation_id);
-                    if (data.conversation_id) {
-                        // if we already have this conversation, stop
-                        if (conversationTree.conversations[data.conversation_id]) {
-                            console.log("Conversation already exists: " + data.conversation_id);
-                            break;
+        client.onmessage = (messageRaw) => {
+            const message = JSON.parse(messageRaw.data);
+            // check if it's
+            // - a stack message
+            // - message update
+            // - a message chunk
+            if (message.type === "stack") {
+                // each message starts with a stack message that tells us where in the tree the message belongs
+                const { stack } = message;
+                setChildrenOf(prevChildrenOf => {
+                    const newChildrenOf = { ...prevChildrenOf };
+                    // iterate over the stack
+                    let parent = stack[0];
+                    for (let i = 1; i < stack.length; i++) {
+                        const child = stack[i];
+                        if (newChildrenOf[parent]) {
+                            if (!newChildrenOf[parent].includes(child)) {
+                                newChildrenOf[parent].push(child);
+                            }
+                        } else {
+                            newChildrenOf[parent] = [child];
                         }
-                        console.log("Starting new conversation: " + data.conversation_id);
-                        setConversationTree(prevConversationTree => {
-                            const { conversations, subConversations, lastMessageId, parents, agents } = prevConversationTree;
-                            // lets prepare to use "root.parent.child" as conversation ids
-                            let activeConversationId = data.conversation_id.split(".")[0]
-                            // but since it's not implemented everywhere, we also use the last message id
-                            if (lastMessageId && !data.conversation_id.includes(".")) {
-                                // get the conversation if of the last message
-                                activeConversationId = Object.keys(conversations).find(conversationId => conversations[conversationId].map(message => message.id).includes(lastMessageId));
-                            }
-                            const siblings = subConversations[activeConversationId] || [];
-                            console.log(`New conversation ${data.conversation_id} jas parent ${activeConversationId}`);
-                            return {
-                                conversations: { ...conversations, [data.conversation_id]: [] },
-                                subConversations: { ...subConversations, [lastMessageId]: [...siblings, data.conversation_id] },
-                                parents: { ...parents, [data.conversation_id]: activeConversationId },
-                                lastMessageId: lastMessageId,
-                                agents: { ...agents, [data.conversation_id]: data.agent }
-                            };
-                        });
+                        parent = child;
+                    }
+                    return newChildrenOf;
+                });
+            } else if (message.type === "message") {
+                setMessages(prevMessages => {
+                    const newMessages = [...prevMessages];
+                    // if the message already exists, update it
+                    const existingMessageIndex = newMessages.findIndex(i => i.id === message.data.id);
+                    if (existingMessageIndex !== -1) {
+                        newMessages[existingMessageIndex] = message.data;
                     } else {
-                        // we are starting to stream a message. 
-                        // TODO
-                        console.log("Starting to stream a message - not implemented", data);
+                        newMessages.push(message.data);
                     }
-                    break;
-                case "end":
-                    if (data.conversation_id) {
-                        // set active conversation to parent conversation
-                        setPath(prevPath => {
-                            const newPath = [...prevPath];
-                            if (newPath[newPath.length - 1] === data.conversation_id && newPath.length > 2 && newPath[newPath.length - 2] !== "root") {
-                                newPath.pop();
-                            }
-                            return newPath;
-                        });
-                        setConversationTree(prevConversationTree => {
-                            const { conversations, subConversations, parents, agents } = prevConversationTree;
-                            let lastParentMessageId = null;
-                            try {
-                                lastParentMessageId = conversations[parents[data.conversation_id]].slice(-1)[0].id;
-                            } catch (error) {
-                                // we are at the root, we leave it as null
-                            }
-                            return {
-                                conversations,
-                                subConversations,
-                                parents,
-                                lastMessageId: lastParentMessageId,
-                                agents
-                            };
-                        });
+                    return newMessages;
+                });
+            } else if (message.type === "chunk") {
+                // if the message already exists, update it
+                setMessages(prevMessages => {
+                    const newMessages = [...prevMessages];
+                    const existingMessageIndex = newMessages.findIndex(i => i.id === message.id);
+                    if (existingMessageIndex !== -1) {
+                        // add the diff to the existing message
+                        newMessages[existingMessageIndex] = addDiffToMessage(newMessages[existingMessageIndex], message);
                     } else {
-                        // we are ending a stream of messages.
-                        // TODO
-                        console.log("Ending a stream of messages - not implemented", data);
+                        newMessages[existingMessageIndex] = message.diff;
                     }
-                    break;
-                default:
-                    console.log("Adding to conv tree: " + message.data);
-                    const { id } = data;
-                    setConversationTree(prevConversationTree => {
-                        const { conversations, subConversations, parents, agents } = prevConversationTree;
-                        const newConversation = conversations[data.conversation_id] || [];
-                        const updatedConversation = [...newConversation.filter(i => i.id !== id), data];
-                        return {
-                            conversations: { ...conversations, [data.conversation_id]: updatedConversation},
-                            subConversations,
-                            parents,
-                            lastMessageId: id,
-                            agents
-                        };
-                    });
-                    // if(isAttached){
-                    // the above doesn't work because it's not updated yet, so we do it ugly and get the html inner state of the button
-                    const button = document.getElementById("attachDetach");
-                    if (button && button.innerHTML === "Detach") {
-                        pushToPath(data.conversation_id);
-                    }
+                    return newMessages;
+                });
+            } else {
+                console.error("Unknown message type", message);
             }
         };
 
@@ -222,12 +211,6 @@ const ChatApp = () => {
             // otherwise push the path to the stack
             return [...prevPath, id]
         });
-        // setpath[path.length - 1](id);
-        console.log("Setting display conversation id to " + id);
-        // set the agent name to the agent of the conversation
-        if(conversationTree.agents[id]){
-            setAgentName(conversationTree.agents[id] || defaultAgentName);
-        }
         // Scroll to the bottom of the page
         const bottom = document.getElementById("bottom");
         // If we open a new conversation the upscroll detection will notice we are higher than the bottom and detach
@@ -238,16 +221,12 @@ const ChatApp = () => {
             setMinBottomTop(rect.top + 100000);
         }
         bottom?.scrollIntoView({ behavior: "smooth" });
-
-
     };
 
-    console.log({ conversationTree });
 
     const selectAgent = (agentName) => {
         setAgentName(agentName);
         setDefaultAgentName(agentName);
-        console.log({conversationTree})
     }
 
     if (connectionStatus !== "CONNECTED") {
@@ -264,49 +243,52 @@ const ChatApp = () => {
         );
     }
 
+    const getMessages = (conversationId, messages, childrenOf) => {
+        if (!messages) {
+            return [];
+        }
+        console.log("getMessages", conversationId, messages, childrenOf);
+        const messagesForConversation = messages.filter(message => childrenOf[conversationId].includes(message.id));
+        // sort the messages by id
+        console.log("messagesForConversation", messagesForConversation);
+        return messagesForConversation;
+    }
 
     return (
         <div className="main">
             <div className="header">
-        <button onClick={() => pushToPath("root")}>Main</button>
-        <button onClick={() => {
-            if (path.length > 1) {
-                setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
-            }
-        }}>Back </button>
-        <button onClick={() => {
-            // parent
-            const currentConversationId = path[path.length - 1];
-            if (currentConversationId !== "root") {
-                pushToPath(conversationTree.parents[currentConversationId]);
-            }
-        }}>Parent</button>
-        {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {
-            setIsAttached(true);
-            const bottom = document.getElementById("bottom");
-            if (bottom) {
-                const rect = bottom.getBoundingClientRect();
-                console.log("bottom rect", rect, rect.top)
-                setMinBottomTop(rect.top);
-            }
-        }}>Attach</button>}
-        <button onClick={() => {
-            // Scroll to the last message using scrollIntoView
-            const bottom = document.getElementById("bottom");
-            bottom?.scrollIntoView({ behavior: "smooth" });
-        }}>Scroll to Last Message</button>
-        <button onClick={() => {
-            // Send a cancel message to the websocket
-            client.send('cancel');
-        }}>Interrupt</button>
-
-                {/* {Object.keys(conversationTree.conversations).map(conversationId => 
-                    <button onClick={() => pushToPath(conversationId)}>{conversationId}</button>
-                )} */}
-                {/* on the right of the header, show the selected agent
-                if we are on root, show the agent selection
-                */}
-                {path[path.length - 1]}
+                <button onClick={() => pushToPath("root")}>Main</button>
+                <button onClick={() => {
+                    if (path.length > 1) {
+                        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
+                    }
+                }}>Back </button>
+                <button onClick={() => {
+                    // parent
+                    const currentConversationId = path[path.length - 1];
+                    if (currentConversationId !== "root") {
+                        const parent = Object.keys(childrenOf).find(key => childrenOf[key].includes(currentConversationId));
+                        pushToPath(parent);
+                    }
+                }}>Parent</button>
+                {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {
+                    setIsAttached(true);
+                    const bottom = document.getElementById("bottom");
+                    if (bottom) {
+                        const rect = bottom.getBoundingClientRect();
+                        console.log("bottom rect", rect, rect.top)
+                        setMinBottomTop(rect.top);
+                    }
+                }}>Attach</button>}
+                <button onClick={() => {
+                    // Scroll to the last message using scrollIntoView
+                    const bottom = document.getElementById("bottom");
+                    bottom?.scrollIntoView({ behavior: "smooth" });
+                }}>Scroll to Last Message</button>
+                <button onClick={() => {
+                    // Send a cancel message to the websocket
+                    client.send('cancel');
+                }}>Interrupt</button>
                 {path[path.length - 1] === "root" && (
                     <select value={defaultAgentName} onChange={e => selectAgent(e.target.value)} style={{
                         position: "absolute",
@@ -337,37 +319,20 @@ const ChatApp = () => {
             <div style={{ height: "50px" }}></div>
 
             <div className="chat">
-                {conversationTree.conversations[path[path.length - 1]] && conversationTree.conversations[path[path.length - 1]].map((message, index) =>
-                    <div className={`message-${message.role}`} key={index}>
-                        {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
-                        {message.function_call && <DisplayJson data={message.function_call} />}
-                        {(conversationTree.subConversations[message.id] || []).map(subConversationId => {
-                            return (
-                                <div onClick={() => handleSubConversationClick(subConversationId)}>View thread</div>
-                            );
-                        })}
-                    </div>
-                )}
-                {path[path.length - 1] === "root" && (
-                    // get the first messages of all sub conversations of root
-                    Object.keys(conversationTree.parents).map(subConversationId => {
-                        const parent = conversationTree.parents[subConversationId] || "root";
-                        const message = conversationTree.conversations[subConversationId]?.find(i => i.is_init !== true);
-                        if (parent !== "root") {
-                            console.log("not root", subConversationId, parent, message);
-                            return null;
-                        }
-                        console.log({ subConversationId, message });
-                        if (!message) {
-                            return null;
-                        }
-                        return (
-                            <div className={`message-${message.role}`} key={subConversationId} onClick={() => pushToPath(subConversationId)}>
-                                <DisplayJson data={message.content} />
-                            </div>
-                        );
-                    })
-                )}
+                {getMessages(path[path.length - 1], messages, childrenOf).map(message => {
+                    return (
+                        <div className={`message-${message.role}`} key={message.id}>
+                            {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
+                            {message.function_call && <DisplayJson data={message.function_call} />}
+                            {childrenOf[message.id] && childrenOf[message.id].map(subConversationId => {
+                                return (
+                                    <div onClick={() => handleSubConversationClick(subConversationId)}>View thread</div>
+                                );
+                            })}
+                        </div>
+                    );
+                })
+                }
                 <div id="bottom"></div> {/* this is used to scroll to the bottom when a new message is added */}
             </div>
             <div className="spacer"></div>
