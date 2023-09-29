@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Function, FunctionMessage, SystemMessage
+from minichain.agent import Agent
 
 
 class Citation(BaseModel):
@@ -46,7 +46,7 @@ async def qa(text, question, instructions=[]):
         system_message += "\n" + "\n".join(instructions)
     summarizer = Agent(
         functions=[],
-        system_message=SystemMessage(system_message),
+        system_message=system_message,
         prompt_template="{text}".format,
         response_openapi=AnswerWithCitations,
     )

@@ -2,7 +2,6 @@ import json
 import os
 import traceback
 import uuid
-from collections import defaultdict
 from typing import Any, Dict, Optional
 import asyncio
 
@@ -14,15 +13,9 @@ from pydantic.error_wrappers import ValidationError
 import yaml
 
 
-from minichain.agent import (AssistantMessage, FunctionMessage, SystemMessage,
+from minichain.dtypes import (AssistantMessage, FunctionMessage, SystemMessage,
                              UserMessage, Cancelled)
-# from minichain.agents.chatgpt import ChatGPT
-# from minichain.agents.planner import Planner
-# from minichain.agents.programmer import Programmer
-# from minichain.agents.memory_agent import MemoryAgent
-# from minichain.agents.webgpt import SmartWebGPT, WebGPT
-# from minichain.agents.replicate_multimodal import Artist
-# from minichain.agents.agi import AGI
+from minichain.streaming import APIStream
 
 
 class MessageDB:
@@ -68,9 +61,12 @@ class MessageDB:
     def save_msg(self, message, dirname):
         dir_items = self.__dict__[dirname]
         def get_id(d):
-            if "id" in d:
-                return d["id"]
-            return f"{d['type']}-{d['conversation_id']}"
+            try:
+                if "id" in d:
+                    return d["id"]
+                return f"{d['type']}-{d['conversation_id']}"
+            except Exception as e:
+                print("Error getting id", e, d)
         try:
             pos = [get_id(i) for i in dir_items].index(get_id(message))
             dir_items[pos] = message
@@ -152,19 +148,30 @@ async def upload_file_to_chat(
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Create a websocket that sends:
-    {type: start, conversation_id: 123}
-    {...message, id: 1},
-    {...message, id: 2},
-    {...message, id: 3}
-    {type: start, conversation_id: 456}
-    {...message, id: 5}
-    {type: end, conversation_id: 123}
+        {type: stack, stack: [123]}
+        {...message, id: 1, conversation_id: 123},
+        {...message, id: 2, conversation_id: 123},
+        {...message, id: 3, conversation_id: 123}
+        {type: stack, stack: [123, 3, 456]}
+        {type: start, conversation_id: 456, id: 4}
+        {type: chunk, key: content, chunk: "hello", id: 4}
+        {type: chunk, key: content, chunk: "world", id: 4}
+        {...final_message, id: 4, conversation_id: 456}
+        {...message, id: 5, conversation_id: 123}
+
+    Corresponding to the following messages:
+        conv 123
+        - msg 1
+        - msg 2
+        - msg 3
+            - conv 456
+                - msg 4
+        - msg 5
     """
     await websocket.accept()
     print("websocket accepted")
 
     # replay logs
-    print("start/end conversation", [i for i in message_db.logs if i.get("type", None) in ["start", "end"]])
     for message in message_db.logs:
         if not isinstance(message, dict):
             message = message.dict()
@@ -175,7 +182,15 @@ async def websocket_endpoint(websocket: WebSocket):
         message_db.add_message(message)
         if not isinstance(message, dict):
             message = message.dict()
-        # check the websocket: has a cancel message been sent? if no message has been sent, avoid blocking by using asyncio.wait
+        await send_message_raise_cancelled(message)
+    
+    async def add_chunk(chunk, key, message_id):
+        message = {"chunk": chunk, "key": key, "id": message_id}
+        await send_message_raise_cancelled(message)
+    
+    async def send_message_raise_cancelled(message):
+        # check the websocket: has a cancel message been sent? if no message has 
+        # been sent, avoid blocking by using asyncio.wait_for
         try:
             data = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
             if data == "cancel":
@@ -187,11 +202,12 @@ async def websocket_endpoint(websocket: WebSocket):
         except RuntimeError as e:
             print(".. hopefully just websocket closed, running in background", e, type(e))
             return
-
         try:
             await websocket.send_json(message)
         except Exception as e:
             print("websocket closed, running in background")
+
+
     try:
         while True:
             try:
@@ -215,6 +231,7 @@ async def websocket_endpoint(websocket: WebSocket):
             
             print("agent_name", agent_name )
             agent = agents[agent_name]
+            agent.stream = APIStream(on_message=add_message_to_db_and_send)
             # go to cwd if the agent has a bash
             try:
                 await agent.interpreter.bash(commands=[f"cd {agent.interpreter.bash.cwd}"])
@@ -225,10 +242,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     pass
             print("agent", agent)
             # agent.on_message_send = add_message_to_db_and_send
-            agent.register_on_message_send(add_message_to_db_and_send)
             conversation_id = payload.response_to or f"root.{uuid.uuid4().hex[:5]}"
             print("CALLING:", payload.dict(), conversation_id)
-            response = await agent.run(query=payload.query, history=history, conversation_id=conversation_id)
+            response = await agent.run(query=payload.query, history=history)
             
     except Exception as e:
         traceback.print_exc()

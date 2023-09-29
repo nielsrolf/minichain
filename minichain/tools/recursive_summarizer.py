@@ -2,7 +2,10 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Done, Function, SystemMessage
+from minichain.agent import Agent
+from minichain.functions import Function
+from minichain.schemas import Done
+
 from minichain.tools.document_qa import qa
 from minichain.tools.summarize import summarize
 from minichain.utils.document_splitter import split_document
@@ -95,7 +98,7 @@ async def text_scan(
 
     document_to_json = Agent(
         functions=[add_output_function],
-        system_message=SystemMessage(system_message),
+        system_message=system_message,
         prompt_template="{text}".format,
         response_openapi=Done,
         keep_last_messages=20,

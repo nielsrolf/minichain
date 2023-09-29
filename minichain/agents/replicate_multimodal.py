@@ -8,6 +8,7 @@ from minichain.tools.bash import CodeInterpreter
 from typing import List, Optional
 
 from minichain.tools.replicate_client import *
+from minichain.schemas import MultiModalResponse
 
 
 models = {
@@ -20,10 +21,6 @@ models = {
 }
 
 
-
-class MultiModalResponse(BaseModel):
-    content: str = Field(..., description="The final response to the user.")
-    generated_files: List[str] = Field(..., description="Media files that have been generated.")
 
 
 async def async_print(i, final=False):
@@ -39,8 +36,8 @@ Instructions:
 - when you call a function, you call a different AI model. This model knows nothing about the current conversation, so include all relevant info in the prompts
 """
 class Artist(Agent):
-    def __init__(self, silent=False, on_stream_message=async_print, **kwargs):
-        interpreter = CodeInterpreter(stream=on_stream_message)
+    def __init__(self, **kwargs):
+        interpreter = CodeInterpreter()
         self.interpreter = interpreter
         os.makedirs(".minichain/downloads", exist_ok=True)
         download_dir = f".minichain/downloads/{len(os.listdir('.minichain/downloads'))}"
@@ -55,7 +52,6 @@ class Artist(Agent):
                 artist_message
             ),
             prompt_template="{query}".format,
-            silent=silent,
             response_openapi=MultiModalResponse,
             **kwargs,
         )

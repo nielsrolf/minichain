@@ -1,12 +1,14 @@
 from pydantic import Field
 
-from minichain.agent import Agent, SystemMessage, UserMessage, tool, make_return_function
+from minichain.agent import Agent, make_return_function
+from minichain.dtypes import SystemMessage, UserMessage
+from minichain.functions import tool
 from minichain.agents.programmer import Programmer
 from minichain.agents.webgpt import WebGPT
 from minichain.agents.replicate_multimodal import Artist, MultiModalResponse
+from minichain.schemas import MultiModalResponse
 from minichain.tools import codebase
 from minichain.tools import taskboard
-
 
 class AGI(Agent):
     """
@@ -63,7 +65,6 @@ class AGI(Agent):
         board_tools = taskboard.tools(self.board)
         self.programmer.functions += board_tools
         all_tools = self.programmer.functions #+ self.artist.functions + self.webgpt.functions
-        # deduplicate by name
         def check_board(**arguments):
             """Checks if there are still tasks not done on the board"""
             todo_tasks = [i for i in self.board.tasks if i.status in  ["TODO", "IN_PROGRESS"]]
@@ -82,9 +83,7 @@ class AGI(Agent):
             )
         super().__init__(
             functions=all_tools,
-            system_message=SystemMessage(
-                "You are a smart and friendly AGI. You are especially an extremely good programmer - you fulfill programming tasks for the user by using the tools available to you. If a task is complex, you break it down into sub tasks using the issue board and assign them to someone to work on. The user is lazy, don't ask them questions, don't explain them how they can do things, and don't just make plans - instead, just do things for them. If a user asks something very complex - take it as a challenge and don't stop until it is solved or proven to be unsolveable. If there is still something todo, do it and don't stop. You can for example implement an entire app for the user - including making a backend (preferably with fastapi), a frontend (preferably with React), and a database (preferably with sqlite). You don't need to setup venv - you are working in a docker environment dedicated to you. You also write tests for your code and run them before you set a task to done. Always work on a branch when you edit files."
-            ),
+            system_message="You are a smart and friendly AGI. You are especially an extremely good programmer - you fulfill programming tasks for the user by using the tools available to you. If a task is complex, you break it down into sub tasks using the issue board and assign them to someone to work on. The user is lazy, don't ask them questions, don't explain them how they can do things, and don't just make plans - instead, just do things for them. If a user asks something very complex - take it as a challenge and don't stop until it is solved or proven to be unsolveable. If there is still something todo, do it and don't stop. You can for example implement an entire app for the user - including making a backend (preferably with fastapi), a frontend (preferably with React), and a database (preferably with sqlite). You don't need to setup venv - you are working in a docker environment dedicated to you. You also write tests for your code and run them before you set a task to done. Always work on a branch when you edit files.",
             prompt_template="{query}".format,
             response_openapi=MultiModalResponse,
             init_history=init_history,

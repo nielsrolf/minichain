@@ -3,9 +3,10 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Done, Function, SystemMessage
+from minichain.agent import Agent
+from minichain.functions import Function
+from minichain.schemas import Done
 from minichain.utils.document_splitter import split_document
-from minichain.utils.markdown_browser import markdown_browser
 
 
 class ReadLater(BaseModel):
@@ -128,9 +129,7 @@ async def text_to_memory(text, source=None, max_num_memories=None, agent_kwargs=
         functions=[
             add_memory_function,
         ],
-        system_message=SystemMessage(
-            f"Turn a text into a list of {at_most_n }memories. A memory is one piece of information that is self-contained to understand but also atomic. You will use these memories later: you will be able to generate questions or keywords, and find the memories you are creating now. Remember only informative bits of information. The text has line numberes added at the beginning of each line, make sure to reference them when you create a memory.  Make sure to add all memories before you end the conversation by responding with a 'content' instead of a 'function_call'. If you encounter navigation elements or sections with many outgoing links - especially to docs - remember them so you can read the referenced urls later. If you get stuck while creating a memory just move on the a later section of the text. You can only see a section of a larger text at a time, so it can happen the the entirely text is irrelevant / consists out of references etc. In that case, directly end the session so that we can move on to the interesting parts."
-        ),
+        system_message=f"Turn a text into a list of {at_most_n }memories. A memory is one piece of information that is self-contained to understand but also atomic. You will use these memories later: you will be able to generate questions or keywords, and find the memories you are creating now. Remember only informative bits of information. The text has line numberes added at the beginning of each line, make sure to reference them when you create a memory.  Make sure to add all memories before you end the conversation by responding with a 'content' instead of a 'function_call'. If you encounter navigation elements or sections with many outgoing links - especially to docs - remember them so you can read the referenced urls later. If you get stuck while creating a memory just move on the a later section of the text. You can only see a section of a larger text at a time, so it can happen the the entirely text is irrelevant / consists out of references etc. In that case, directly end the session so that we can move on to the interesting parts.",
         prompt_template="{text}".format,
         response_openapi=Done,
         **agent_kwargs,

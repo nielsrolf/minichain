@@ -6,7 +6,7 @@ class ChatGPT(Agent):
         kwargs["functions"] = kwargs.get("functions", [])
         kwargs["system_message"] = kwargs.get(
             "system_message",
-            SystemMessage("You are chatgpt. You are a helpful assistant."),
+           "You are chatgpt. You are a helpful assistant.",
         )
         kwargs["prompt_template"] = "{query}".format
         super().__init__(**kwargs)

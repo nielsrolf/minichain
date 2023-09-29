@@ -1,9 +1,4 @@
-from typing import List, Optional, Union
-
-from pydantic import BaseModel, Field
-
-from minichain.agent import (Agent, Function, FunctionMessage, SystemMessage,
-                             tool)
+from minichain.agent import Agent
 
 
 async def summarize(text, instructions=[]):
@@ -16,7 +11,7 @@ async def summarize(text, instructions=[]):
         system_message += "\n" + "\n".join(instructions)
     summarizer = Agent(
         functions=[],
-        system_message=SystemMessage(system_message),
+        system_message=system_message,
         prompt_template="{text}".format,
     )
     summary = await summarizer.run(text=text)

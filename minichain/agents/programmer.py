@@ -9,9 +9,6 @@ from minichain.tools.bash import CodeInterpreter
 
 
 
-class ProgrammerResponse(BaseModel):
-    content: str = Field(..., description="The final response to the user.")
-
 
 async def async_print(i, final=False):
     # print(i)
@@ -19,13 +16,13 @@ async def async_print(i, final=False):
 
 
 class Programmer(Agent):
-    def __init__(self, silent=False, on_stream_message=async_print, memory=None, load_memory_from=None, **kwargs):
+    def __init__(self, memory=None, load_memory_from=None, **kwargs):
         self.memory = memory
         if load_memory_from:
             if not memory:
                 self.memory =  SemanticParagraphMemory(use_vector_search=True, agents_kwargs=kwargs)
             self.memory.load(load_memory_from)
-        interpreter = CodeInterpreter(stream=on_stream_message)
+        interpreter = CodeInterpreter()
         self.interpreter = interpreter
         print("Init history for programmer:", kwargs.get("init_history", []))
         init_history = kwargs.pop("init_history", [])
@@ -51,12 +48,8 @@ class Programmer(Agent):
             ]
         super().__init__(
             functions=functions,
-            system_message=SystemMessage(
-                "You are an expert programmer. You can do a wide range of tasks, such as implementing features, debugging and refactoring code, writing docs, etc. using bash commands. Avoid interactive commands, outputs are only send when a command finished execution. When you implement something, write code, and run tests to make sure it works. If the user asks you to do something (e.g. make a plot, install a package, etc.), do it using the bash and python functions, and explain what you did instead of responding to the user directly. When something doesn't work on the first try, try to find a way to fix it before asking the user for help."
-            ),
+            system_message= "You are an expert programmer. You can do a wide range of tasks, such as implementing features, debugging and refactoring code, writing docs, etc. using bash commands. Avoid interactive commands, outputs are only send when a command finished execution. When you implement something, write code, and run tests to make sure it works. If the user asks you to do something (e.g. make a plot, install a package, etc.), do it using the bash and python functions, and explain what you did instead of responding to the user directly. When something doesn't work on the first try, try to find a way to fix it before asking the user for help.",
             prompt_template="{query}".format,
-            silent=silent,
-            response_openapi=ProgrammerResponse,
             init_history=init_history,
             **kwargs,
         )

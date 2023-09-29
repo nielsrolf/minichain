@@ -8,17 +8,10 @@ import docker
 from pydantic import BaseModel, Field
 
 from minichain.agent import Function
-from minichain.utils.docker_sandbox import bash, run_in_container
+from minichain.utils.docker_sandbox import bash
+from minichain.streaming import Stream
+from minichain.schemas import BashQuery
 
-
-class BashQuery(BaseModel):
-    commands: List[str] = Field(..., description="A list of bash commands.")
-    timeout: Optional[int] = Field(60, description="The timeout in seconds.")
-
-
-async def async_print(i, final=False):
-    # print(i)
-    pass
 
 
 def shorten_response(response: str) -> str:
@@ -37,16 +30,16 @@ def shorten_response(response: str) -> str:
 
 
 class BashSession(Function):
-    def __init__(self, stream=async_print, image_name="nielsrolf/minichain:latest"):
+    def __init__(self, stream=None, image_name="nielsrolf/minichain:latest"):
         super().__init__(
             name="bash",
             openapi=BashQuery,
             function=self,
             description="Run bash commands. Cwd is reset after each message. Run commands with the -y flag to avoid interactive prompts (e.g. npx create-app)",
+            stream=stream,
         )
         # self.session = uuid.uuid4().hex
         self.image_name = image_name
-        self.stream = stream
         self.cwd = os.getcwd()
         self.session = (
             self.cwd.replace("/", "")
@@ -63,10 +56,8 @@ class BashSession(Function):
             asyncio.create_task(self.__call__(commands=["echo hello world"]))
         except Exception as e:
             print(e)
-        self.has_stream = True
 
     async def __call__(self, commands: List[str], timeout: int = 60) -> str:
-        print("Using stream:", self.stream.__name__)
         await bash([f"cd {self.cwd}"], session=self.session)
         if any(["npx" in i for i in commands]):
             timeout = max(timeout, 180)
@@ -79,7 +70,7 @@ class BashSession(Function):
         response = "".join(outputs)
         response = shorten_response(response)
         print("done:", commands, response)
-        await self.stream(response, final=True)
+        await self.stream.set({"content": response})
         return response
 
     # when the session is destroyed, stop the container
@@ -109,15 +100,15 @@ last_lines = """import types
 print(", ".join([f"{k}: {v}" for k, v in locals().items() if k in <lastLine> ]))"""
 
 class CodeInterpreter(Function):
-    def __init__(self, stream=async_print, **kwargs):
+    def __init__(self, stream=None, **kwargs):
         super().__init__(
             name="python",
             openapi=CodeInterpreterQuery,
             function=self,
             description="Create and run a temporary python file (non-interactively; jupyter-style !bash commands are not supported).",
+            stream=stream,
         )
         self.bash = BashSession(stream=stream)
-        self.has_stream = True
 
     async def __call__(self, code: str, timeout: int = 60) -> str:
         last_line = json.dumps(code.strip().split("\n")[-1])
@@ -134,7 +125,7 @@ class CodeInterpreter(Function):
 
 
 async def test_bash_session():
-    bash = BashSession(stream=async_print)
+    bash = BashSession()
     # response = bash(commands=["echo hello world", "pip install librosa"])
     response = await bash(
         commands=["mkdir bla123", "cd bla123", "touch testfile", "echo hello world"]

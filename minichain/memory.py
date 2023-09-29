@@ -9,14 +9,12 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 from pydantic import BaseModel, Field
 
-from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
-                             FunctionMessage, SystemMessage, UserMessage, tool)
+from minichain.agent import Agent
+from minichain.functions import Function, tool
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
-from minichain.tools.text_to_memory import (Memory, MemoryWithMeta,
-                                            text_to_memory)
+from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory
 from minichain.utils.cached_openai import get_embedding
 from minichain.utils.markdown_browser import markdown_browser
-
 
 
 snippet_template = """## {title}
@@ -171,9 +169,8 @@ class SemanticParagraphMemory:
     async def generate_questions(self, question: str) -> List[str]:
         # Use gpt to generate questions
         question_agent = Agent(
-            system_message=SystemMessage(
-                f"The user provides you with a question. Generate a list of sub-questions that are relevant to the question. These questions are used to retrieve memories, which are then used to answer the question."
-            ),
+            system_message=
+                f"The user provides you with a question. Generate a list of sub-questions that are relevant to the question. These questions are used to retrieve memories, which are then used to answer the question.",
             prompt_template="{question}".format,
             functions=[],
             response_openapi=RelatedQuestionList,

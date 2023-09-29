@@ -3,8 +3,8 @@ import re
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Done, Function, SystemMessage, tool
-from minichain.tools.recursive_summarizer import long_document_qa, text_scan
+from minichain.functions import tool
+from minichain.tools.recursive_summarizer import long_document_qa
 from minichain.utils.generate_docs import get_symbols, summarize_python_file
 
 
@@ -23,7 +23,6 @@ def get_visible_files(
     max_lines=100
 ):
     def should_ignore(path):
-        print("ignore? path:", path)
         for ignore in ignore_files:
             if ignore in path:
                 return True
