@@ -1,19 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import './ChatApp.css';
-import DisplayJson from './DisplayJson';
-import CodeBlock from "./CodeBlock";
+import ChatMessage from "./ChatMessage";
+import ConversationTree from "./ConversationTree";
 
 
 
-const functionsToRenderAsCode = [
-    "bash",
-    "python",
-    "view",
-    "edit",
-    "view_symbol",
-    "replace_symbol",
-];
+
 
 
 function addDiffToMessage(message, diff) {
@@ -47,6 +40,7 @@ const ChatApp = () => {
         "messages": [],
         "childrenOf": {}
     });
+    const [graphToggle, setGraphToggle] = useState(false);
 
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
     const visibleMessages = useMemo(() => {
@@ -218,12 +212,11 @@ const ChatApp = () => {
             const rect = bottom.getBoundingClientRect();
             setMinBottomTop(rect.top + 100000);
         }
-        bottom?.scrollIntoView({ behavior: "smooth" });
-        setIsAttached(true);
-        // // wait for the scroll to finish and then attach
-        // setTimeout(() => {
-        //     setIsAttached(true);
-        // }, 200);
+        // if bottom is not in view, scroll to it
+        if (!bottom || bottom.getBoundingClientRect().top > window.innerHeight) {
+            bottom?.scrollIntoView({ behavior: "smooth" })
+            setIsAttached(true);
+        }
     }, [visibleMessages, isAttached]);
 
 
@@ -277,19 +270,24 @@ const ChatApp = () => {
     return (
         <div className="main">
             <div className="header">
-                <button onClick={() => pushToPath("root")}>Main</button>
                 <button onClick={() => {
-                    if (path.length > 1) {
-                        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
-                    }
+                    setIsAttached(false);
+                    pushToPath("root")
+                }}>Main</button>
+                <button onClick={() => {
+                    setIsAttached(false);
+                    setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
                 }}>Back </button>
                 <button onClick={() => {
                     // parent
+                    setIsAttached(false);
                     const currentConversationId = path[path.length - 1];
                     if (currentConversationId !== "root") {
                         const parent = Object.keys(convTree.childrenOf).find(key => convTree.childrenOf[key].includes(currentConversationId));
-                        pushToPath(parent);
+                        const grandParent = Object.keys(convTree.childrenOf).find(key => convTree.childrenOf[key].includes(parent));
+                        pushToPath(grandParent);
                     }
+                    
                 }}>Parent</button>
                 {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {
                     setIsAttached(true);
@@ -308,6 +306,8 @@ const ChatApp = () => {
                     // Send a cancel message to the websocket
                     client.send('cancel');
                 }}>Interrupt</button>
+                {/* <button onClick={() => setGraphToggle(prev => !prev)}>Toggle Graph</button> */}
+                {currentConversationId}
                 {path[path.length - 1] === "root" && (
                     <select value={defaultAgentName} onChange={e => selectAgent(e.target.value)} style={{
                         position: "absolute",
@@ -320,7 +320,6 @@ const ChatApp = () => {
                         {availableAgents.map(agentName => <option value={agentName}>{agentName}</option>)}
                     </select>
                 )}
-                <p>{currentConversationId}</p>
                 {/* otherwise show the current agent */}
                 {path[path.length - 1] !== "root" && (
                     <div style={{
@@ -336,22 +335,19 @@ const ChatApp = () => {
                 )}
 
             </div>
+            {/* {graphToggle && (
+                <ConversationTree convTree={convTree} path={path} pushToPath={pushToPath} />
+            )} */}
             <div style={{ height: "50px" }}></div>
 
             <div className="chat">
                 {visibleMessages.map(message => {
-                    console.log({visibleMessages})
                     return (
-                        <div className={`message-${message.role}`} key={message.id}>
-                            <p>{message.id }</p>
-                            {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
-                            {message.function_call && <DisplayJson data={message.function_call} />}
-                            {convTree.childrenOf[message.id] && convTree.childrenOf[message.id].map(subConversationId => {
-                                return (
-                                    <div onClick={() => handleSubConversationClick(subConversationId)}>View thread</div>
-                                );
-                            })}
-                        </div>
+                        <ChatMessage
+                            message={message}
+                            convTree={convTree}
+                            handleSubConversationClick={handleSubConversationClick}
+                        />
                     );
                 })
                 }

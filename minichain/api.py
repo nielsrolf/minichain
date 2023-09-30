@@ -228,6 +228,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if payload.response_to == "root":
                 history = []
             else:
+                breakpoint()
                 history = message_db.get_history(payload.response_to)
             
             print("agent_name", agent_name )
@@ -241,9 +242,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     await agent.programmer.interpreter.bash(commands=[f"cd {os.getcwd()}"])
                 except Exception as e:
                     pass
-            with stream.conversation(payload.response_to) as stream:
-                with await stream.to([], role="user") as stream:
-                    await stream.set(payload.query)
+            with await stream.conversation(payload.response_to) as stream:
+                if payload.response_to == "root":
+                    with await stream.to([], role="user") as stream:
+                        await stream.set(payload.query)
                 agent.register_stream(stream)
                 await agent.run(query=payload.query, history=history)
             

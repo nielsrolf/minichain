@@ -60,18 +60,24 @@ class Agent:
     def functions_openai(self):
         return [i.openapi_json for i in self.functions]
     
-    def initialize_session(self, history=[]):
+    async def initialize_session(self, history=[]):
         agent_session = Session(
             self,
             history=self.init_history + history,
         )
+        if len(history) == 0:
+            # we are starting a new conversation
+            agent_session.stream = await self.stream.conversation()
+        else:
+            # we are following up on a conversation
+            agent_session.stream = self.stream
         return agent_session
 
     async def run(self, history=[], **arguments):
         """arguments: dict with values mentioned in the prompt template
         history: list of Message objects that are already part of the conversation, for follow up conversations
         """
-        agent_session = self.initialize_session(history=history)
+        agent_session = await self.initialize_session(history=history)
         agent_session.history.append(UserMessage(self.prompt_template(**arguments)))
         response = await agent_session.run_until_done()
         return response
@@ -103,7 +109,7 @@ class Session():
         self.history = history.copy()
 
     async def run_until_done(self):
-        with self.agent.stream.conversation() as stream:
+        with self.stream as stream:
             await self.send_initial_messages(stream)
             while True:
                 action = await self.get_next_action(stream)
@@ -151,13 +157,16 @@ class Session():
         return msg
 
     async def follow_up(self, user_message):
-        with await self.agent.stream.to(self.history, role="user") as stream:
+        with await self.stream.to(self.history, role="user") as stream:
             await stream.set(user_message.content)
         return await self.run_until_done()
     
     async def send_initial_messages(self, stream):
         for message in self.history:
             await stream.send(message)
+    
+    def register_stream(self, stream):
+        self.stream = stream
 
 
 

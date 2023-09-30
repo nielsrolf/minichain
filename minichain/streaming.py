@@ -74,7 +74,7 @@ class Stream:
             message_type = message_types[role]
             self.history.append(message_type(**self.current_message))
     
-    def conversation(self, conversation_id=None, agent=None):
+    async def conversation(self, conversation_id=None, agent=None):
         if conversation_id is None:
             conversation_id = str(uuid4().hex[:5])
         conversation_stack = self.conversation_stack
@@ -159,8 +159,12 @@ class Stream:
         await self.on_message(self.current_message)
     
     async def send(self, message):
-        with await self.to([], message.role) as stream:
-            await stream.set(message)
+        """send a complete message to the stream in one go"""
+        if not isinstance(message, dict):
+            message = message.dict()
+        stack_msg = {"type": "stack", "stack": self.conversation_stack + [message["id"]]}
+        await self.on_message(stack_msg)
+        await self.on_message(message)
     
     async def __call__(self, chunk):
         """prepare to be used by a function with no surrounding conversation"""

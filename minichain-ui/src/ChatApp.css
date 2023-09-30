@@ -59,6 +59,15 @@
   background-color: rgba(40, 71, 40, 0.2);
 }
 
+.message-header {
+  /* small italic in the top right */
+  margin-top: -5px;
+  float: right;
+  font-size: 10px;
+  color: #CCCCCC;
+  font-style: italic;
+}
+
 .input-area {
     /* position at the bottom of the parent element */
     position: fixed;
