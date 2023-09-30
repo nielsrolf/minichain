@@ -65,11 +65,14 @@ const DisplayJson = ({ data }) => {
     // arguments was not a json
   }
   if (data.name === 'upload_file_to_chat') {
+    console.log(data);
     try {
-      const parsed = JSON.parse(data.arguments);
-      const path = parsed.file;
+      const path = data.arguments.file;
+      console.log(path);
       return <MultiMedia path={path} />;
-    } catch (e) {}
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   if (data.generated_files) {

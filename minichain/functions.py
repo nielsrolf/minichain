@@ -48,7 +48,8 @@ class Function:
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments).dict()
         response = await self.function(**arguments)
-        response = json.dumps(response)
+        if not isinstance(response, str):
+            response = json.dumps(response)
         await self.stream.set(response)
         print("response", response)
         return response
