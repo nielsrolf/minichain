@@ -25,6 +25,7 @@ class MessageDB:
         os.makedirs(f"{path}/messages", exist_ok=True)
         self.saved_ids = {}
         self.childrenOf = defaultdict(list)
+        self.conversationAgents = {}
         self.messages = []
         self.load()
 
@@ -51,6 +52,8 @@ class MessageDB:
         for child in message["stack"][1:]:
             if child not in self.childrenOf[parent]:
                 self.childrenOf[parent].append(child)
+                if message.get("agent", None) is not None:
+                    self.conversationAgents[child] = message["agent"]
             parent = child
 
     def dicts_to_classes(self, dicts):
@@ -228,12 +231,19 @@ async def websocket_endpoint(websocket: WebSocket):
             if payload.response_to == "root":
                 history = []
             else:
-                breakpoint()
                 history = message_db.get_history(payload.response_to)
             
             print("agent_name", agent_name )
             agent = agents[agent_name]
             stream = Stream(on_message=add_message_to_db_and_send, on_chunk=add_chunk)
+            
+            with await stream.conversation(payload.response_to, agent=agent.name) as stream:
+                if payload.response_to == "root":
+                    with await stream.to([], role="user") as stream:
+                        await stream.set(payload.query)
+                agent.register_stream(stream)
+                await agent.run(query=payload.query, history=history)
+            
             # go to cwd if the agent has a bash
             try:
                 await agent.interpreter.bash(commands=[f"cd {agent.interpreter.bash.cwd}"])
@@ -242,12 +252,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     await agent.programmer.interpreter.bash(commands=[f"cd {os.getcwd()}"])
                 except Exception as e:
                     pass
-            with await stream.conversation(payload.response_to) as stream:
-                if payload.response_to == "root":
-                    with await stream.to([], role="user") as stream:
-                        await stream.set(payload.query)
-                agent.register_stream(stream)
-                await agent.run(query=payload.query, history=history)
             
     except Exception as e:
         traceback.print_exc()
@@ -268,6 +272,7 @@ async def get_history():
     return {
         "messages": message_db.messages_as_dicts(),
         "childrenOf": message_db.childrenOf,
+        "conversationAgents": message_db.conversationAgents,
     }
 
 

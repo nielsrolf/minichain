@@ -67,7 +67,7 @@ class Agent:
         )
         if len(history) == 0:
             # we are starting a new conversation
-            agent_session.stream = await self.stream.conversation()
+            agent_session.stream = await self.stream.conversation(agent=self.name)
         else:
             # we are following up on a conversation
             agent_session.stream = self.stream

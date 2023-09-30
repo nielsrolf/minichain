@@ -51,16 +51,19 @@ class Stream:
                 Out:
                 [{"content": "Override", conversation_id: "123", id: 1}, {"content": "hello world", conversation_id: "123", id: 2}]
     """
-    def __init__(self, on_message=print_message, conversation_stack=[], current_message=None, on_chunk=print_chunk, history=None):
+    def __init__(self, on_message=print_message, conversation_stack=[], current_message=None, on_chunk=print_chunk, history=None, agent=None):
         print("init with", conversation_stack)
         if on_message is None:
             on_message = do_nothing
         self.on_message = on_message
         self.on_chunk = on_chunk
-        self.conversation_stack = list(conversation_stack)
+        # remove duplicate entries from stack but keep the order
+        self.conversation_stack = [i for n, i in enumerate(conversation_stack) if i not in conversation_stack[:n]]
+
         self.current_message = current_message or {"id": "hidden", "role": "hidden", "conversation_id": "hidden"}
         self.history = history or []
         self.originally_streamed = {}
+        self.agent = agent
 
         self.logs = []
     
@@ -81,12 +84,15 @@ class Stream:
         if self.current_message["id"] != "hidden":
             conversation_stack += [self.current_message["id"]]
         conversation_stack += [conversation_id]
-        return self.__class__(
+        stream = self.__class__(
             on_message=self.on_message,
             conversation_stack=conversation_stack,
             current_message=None,
-            on_chunk=self.on_chunk
+            on_chunk=self.on_chunk,
+            agent=agent
         )
+        await stream.send_stack()
+        return stream
     
     async def to(self, history, role, **kwargs):
         """
@@ -101,21 +107,27 @@ class Stream:
             print(role, kwargs)
             breakpoint()
             raise e
-        # send the conversation stack update
-        stack_msg = {"type": "stack", "stack": self.conversation_stack + [current_message["id"]]}
-        await self.on_message(stack_msg)
+        # # send the conversation stack update
+        # stack_msg = {"type": "stack", "stack": self.conversation_stack + [current_message["id"]]}
+        # await self.on_message(stack_msg)
 
         message_stream = self.__class__(
             on_message=self.on_message,
-            conversation_stack=self.conversation_stack,
+            conversation_stack=self.conversation_stack + [current_message["id"]],
             current_message=current_message,
             on_chunk=self.on_chunk,
-            history=history
+            history=history,
+            agent=self.agent
         )
         # set initial msg
+        await message_stream.send_stack()
         await message_stream.set(current_message)
         message_stream.originally_streamed = dict(current_message)
         return message_stream
+    
+    async def send_stack(self):
+        stack_msg = {"type": "stack", "stack": self.conversation_stack, "agent": self.agent}
+        await self.on_message(stack_msg)
         
     async def chunk(self, diff):
         """diff: eg

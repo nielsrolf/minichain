@@ -38,7 +38,8 @@ const ChatApp = () => {
     const [availableAgents, setAvailableAgents] = useState([]);
     const [convTree, setConvTree] = useState({
         "messages": [],
-        "childrenOf": {}
+        "childrenOf": {},
+        "conversationAgents": {},
     });
     const [graphToggle, setGraphToggle] = useState(false);
 
@@ -46,6 +47,15 @@ const ChatApp = () => {
     const visibleMessages = useMemo(() => {
         return convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
     }, [convTree, currentConversationId]);
+
+    // when the path changes, we update the agent name
+    useEffect(() => {
+        if (path[path.length - 1] === "root") {
+            setAgentName(defaultAgentName);
+        } else {
+            setAgentName(convTree.conversationAgents[path[path.length - 1]]);
+        }
+    }, [path, convTree, defaultAgentName]);
 
     // fetch the available agents
     useEffect(() => {
@@ -96,6 +106,7 @@ const ChatApp = () => {
             setConvTree(prevConvTree => {
                 let updatedMessages = [...prevConvTree.messages];
                 let updatedChildrenOf = { ...prevConvTree.childrenOf };
+                let updatedConversationAgents = { ...prevConvTree.conversationAgents };
 
                 if (message.type === "stack") {
                     const { stack } = message;
@@ -110,6 +121,9 @@ const ChatApp = () => {
                             updatedChildrenOf[parent] = [child];
                         }
                         parent = child;
+                    }
+                    if (message.agent) {
+                        updatedConversationAgents[stack[stack.length - 1]] = message.agent;
                     }
                 } else if (message.type === "message") {
                     const existingMessageIndex = updatedMessages.findIndex(i => i.id === message.data.id);
@@ -131,7 +145,8 @@ const ChatApp = () => {
                 console.log({ updatedMessages, updatedChildrenOf })
                 return {
                     "messages": updatedMessages,
-                    "childrenOf": updatedChildrenOf
+                    "childrenOf": updatedChildrenOf,
+                    "conversationAgents": updatedConversationAgents,
                 };
             });
         };
