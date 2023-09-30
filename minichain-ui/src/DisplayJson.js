@@ -150,7 +150,6 @@ const DisplayJson = ({ data }) => {
         </div>
       );
     }
-    console.log({ data, parentKey });
     if (data === null || data === undefined) {
       return '';
     }

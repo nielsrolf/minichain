@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import './ChatApp.css';
 import DisplayJson from './DisplayJson';
@@ -17,7 +17,6 @@ const functionsToRenderAsCode = [
 
 
 function addDiffToMessage(message, diff) {
-    console.log("addDiffToMessage", message, diff);
     if (!message) {
         return diff;
     }
@@ -43,8 +42,22 @@ const ChatApp = () => {
     const [isAttached, setIsAttached] = useState(true);
     const [minBottomTop, setMinBottomTop] = useState(0);
     const [availableAgents, setAvailableAgents] = useState([]);
-    const [messages, setMessages] = useState([]);
-    const [childrenOf, setChildrenOf] = useState({}); // childrenOf[conversationId] = [...messageIds]
+    const [convTree, setConvTree] = useState({
+        "messages": [],
+        "childrenOf": {}
+    });
+
+    const currentConversationId = useMemo(() => path[path.length - 1], [path]);
+    const visibleMessages = useMemo(() => {
+        return convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
+        // const filteredWithDuplicates = convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
+        // // take the latest message with each id
+        // const filtered = filteredWithDuplicates.filter((message, index) => {
+        //     const firstIndex = filteredWithDuplicates.findIndex(m => m.id === message.id);
+        //     return firstIndex !== index;
+        // });
+        // return filtered;
+    }, [convTree, currentConversationId]);
 
     // fetch the available agents
     useEffect(() => {
@@ -60,17 +73,10 @@ const ChatApp = () => {
         fetch("http://localhost:8000/history")
             .then(response => response.json())
             .then(data => {
-                console.log("history", data);
-                // set the messages
-                console.log("setMessages", setMessages);
-                setMessages(data.messages);
-                // the above gives a 'setMessages is not a function' error
-                // so we use the below instead
-                
-                // set the childrenOf
-                setChildrenOf(data.childrenOf);
+                setConvTree(data);
             });
-    }, [setMessages, setChildrenOf]);
+    }, []);
+
 
     useEffect(() => {
         // get the agent name from the URL
@@ -93,60 +99,47 @@ const ChatApp = () => {
 
         client.onmessage = (messageRaw) => {
             const message = JSON.parse(messageRaw.data);
-            // check if it's
-            // - a stack message
-            // - message update
-            // - a message chunk
-            if (message.type === "stack") {
-                // each message starts with a stack message that tells us where in the tree the message belongs
-                const { stack } = message;
-                setChildrenOf(prevChildrenOf => {
-                    const newChildrenOf = { ...prevChildrenOf };
-                    // iterate over the stack
+            setConvTree(prevConvTree => {
+                let updatedMessages = [...prevConvTree.messages];
+                let updatedChildrenOf = { ...prevConvTree.childrenOf };
+
+                if (message.type === "stack") {
+                    const { stack } = message;
                     let parent = stack[0];
                     for (let i = 1; i < stack.length; i++) {
                         const child = stack[i];
-                        if (newChildrenOf[parent]) {
-                            if (!newChildrenOf[parent].includes(child)) {
-                                newChildrenOf[parent].push(child);
+                        if (updatedChildrenOf[parent]) {
+                            if (!updatedChildrenOf[parent].includes(child)) {
+                                updatedChildrenOf[parent].push(child);
                             }
                         } else {
-                            newChildrenOf[parent] = [child];
+                            updatedChildrenOf[parent] = [child];
                         }
                         parent = child;
                     }
-                    return newChildrenOf;
-                });
-            } else if (message.type === "message") {
-                setMessages(prevMessages => {
-                    const newMessages = [...prevMessages];
-                    // if the message already exists, update it
-                    const existingMessageIndex = newMessages.findIndex(i => i.id === message.data.id);
+                } else if (message.type === "message") {
+                    const existingMessageIndex = updatedMessages.findIndex(i => i.id === message.data.id);
                     if (existingMessageIndex !== -1) {
-                        newMessages[existingMessageIndex] = message.data;
+                        updatedMessages[existingMessageIndex] = message.data;
                     } else {
-                        newMessages.push(message.data);
+                        updatedMessages.push(message.data);
                     }
-                    return newMessages;
-                });
-            } else if (message.type === "chunk") {
-                // if the message already exists, update it
-                setMessages(prevMessages => {
-                    const newMessages = [...prevMessages];
-                    const existingMessageIndex = newMessages.findIndex(i => i.id === message.id);
+                } else if (message.type === "chunk") {
+                    const existingMessageIndex = updatedMessages.findIndex(i => i.id === message.id);
                     if (existingMessageIndex !== -1) {
-                        // add the diff to the existing message
-                        console.log("before add diff", newMessages[existingMessageIndex], message)
-                        newMessages[existingMessageIndex] = addDiffToMessage(newMessages[existingMessageIndex], message.diff);
-                        console.log("after add diff", newMessages[existingMessageIndex])
+                        updatedMessages[existingMessageIndex] = addDiffToMessage(updatedMessages[existingMessageIndex], message.diff);
                     } else {
-                        newMessages.push({"id": message.id, ...message.diff});
+                        updatedMessages.push({ "id": message.id, ...message.diff });
                     }
-                    return newMessages;
-                });
-            } else {
-                console.error("Unknown message type", message);
-            }
+                } else {
+                    console.error("Unknown message type", message);
+                }
+                console.log({ updatedMessages, updatedChildrenOf })
+                return {
+                    "messages": updatedMessages,
+                    "childrenOf": updatedChildrenOf
+                };
+            });
         };
 
         setClient(client);
@@ -162,7 +155,6 @@ const ChatApp = () => {
             const bottom = document.getElementById("bottom");
             if (bottom) {
                 const rect = bottom.getBoundingClientRect();
-                console.log("bottom rect", rect, rect.top)
 
                 if (rect.top > minBottomTop) {
                     setIsAttached(false);
@@ -181,7 +173,6 @@ const ChatApp = () => {
 
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
-        console.log("clicked on sub conversation: " + subConversationId)
         if (subConversationId) {
             pushToPath(subConversationId);
         }
@@ -213,17 +204,22 @@ const ChatApp = () => {
             // otherwise push the path to the stack
             return [...prevPath, id]
         });
+    };
+
+    useEffect(() => {
+        if (!isAttached) {
+            return;
+        }
         // Scroll to the bottom of the page
         const bottom = document.getElementById("bottom");
         // If we open a new conversation the upscroll detection will notice we are higher than the bottom and detach
         // so we need to set the minBottomTop to a really high value
         if (bottom) {
             const rect = bottom.getBoundingClientRect();
-            console.log("bottom rect", rect, rect.top)
             setMinBottomTop(rect.top + 100000);
         }
         bottom?.scrollIntoView({ behavior: "smooth" });
-    };
+    }, [visibleMessages, isAttached]);
 
 
     const selectAgent = (agentName) => {
@@ -245,17 +241,6 @@ const ChatApp = () => {
         );
     }
 
-    const getMessages = (conversationId, messages, childrenOf) => {
-        if (!messages) {
-            return [];
-        }
-        console.log("getMessages", conversationId, messages, childrenOf);
-        const messagesForConversation = messages.filter(message => childrenOf[conversationId].includes(message.id));
-        // sort the messages by id
-        console.log("messagesForConversation", messagesForConversation);
-        return messagesForConversation;
-    }
-
     return (
         <div className="main">
             <div className="header">
@@ -269,7 +254,7 @@ const ChatApp = () => {
                     // parent
                     const currentConversationId = path[path.length - 1];
                     if (currentConversationId !== "root") {
-                        const parent = Object.keys(childrenOf).find(key => childrenOf[key].includes(currentConversationId));
+                        const parent = Object.keys(convTree.childrenOf).find(key => convTree.childrenOf[key].includes(currentConversationId));
                         pushToPath(parent);
                     }
                 }}>Parent</button>
@@ -278,7 +263,6 @@ const ChatApp = () => {
                     const bottom = document.getElementById("bottom");
                     if (bottom) {
                         const rect = bottom.getBoundingClientRect();
-                        console.log("bottom rect", rect, rect.top)
                         setMinBottomTop(rect.top);
                     }
                 }}>Attach</button>}
@@ -303,6 +287,7 @@ const ChatApp = () => {
                         {availableAgents.map(agentName => <option value={agentName}>{agentName}</option>)}
                     </select>
                 )}
+                <p>{currentConversationId}</p>
                 {/* otherwise show the current agent */}
                 {path[path.length - 1] !== "root" && (
                     <div style={{
@@ -321,12 +306,14 @@ const ChatApp = () => {
             <div style={{ height: "50px" }}></div>
 
             <div className="chat">
-                {getMessages(path[path.length - 1], messages, childrenOf).map(message => {
+                {visibleMessages.map(message => {
+                    console.log({visibleMessages})
                     return (
                         <div className={`message-${message.role}`} key={message.id}>
+                            <p>{message.id }</p>
                             {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
                             {message.function_call && <DisplayJson data={message.function_call} />}
-                            {childrenOf[message.id] && childrenOf[message.id].map(subConversationId => {
+                            {convTree.childrenOf[message.id] && convTree.childrenOf[message.id].map(subConversationId => {
                                 return (
                                     <div onClick={() => handleSubConversationClick(subConversationId)}>View thread</div>
                                 );

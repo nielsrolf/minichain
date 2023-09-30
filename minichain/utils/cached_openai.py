@@ -147,13 +147,7 @@ async def get_openai_response_stream(
     # iterate through the stream of events
     for chunk in openai_response:
         chunk = chunk["choices"][0]["delta"].to_dict_recursive()
-        try:
-            await stream.chunk(chunk)
-        except Exception as e:
-            print(e)
-            import traceback
-            traceback.print_exc()
-            breakpoint()
+        await stream.chunk(chunk)
     response = {key: value for key, value in stream.current_message.items() if "id" not in key}
     response = fix_common_errors(response)
     await stream.set(response)

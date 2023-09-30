@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 import yaml
+from starlette.websockets import WebSocketDisconnect
 
 from minichain.dtypes import (AssistantMessage, FunctionMessage, SystemMessage,
                              UserMessage, Cancelled)
@@ -22,6 +23,7 @@ class MessageDB:
     def __init__(self, path=".minichain"):
         self.path = path
         os.makedirs(f"{path}/messages", exist_ok=True)
+        self.saved_ids = {}
         self.childrenOf = defaultdict(list)
         self.messages = []
         self.load()
@@ -39,6 +41,7 @@ class MessageDB:
                         self.update_childrenOf(message)
                     else:
                         messages.append(message)
+                        self.saved_ids[message['id']] = filename
             except Exception as e:
                 print(f"Error loading message from {filename}", e)
         self.messages = messages
@@ -65,9 +68,15 @@ class MessageDB:
         return messages
 
     def save_msg(self, message, dirname):
-        path = f"{self.path}/{dirname}"
-        filename = f"{len(os.listdir(path))}.json"
-        with open(os.path.join(path, filename), "w") as f:
+        if not message.get('id') in self.saved_ids:
+            path = f"{self.path}/{dirname}"
+            filename = f"{len(os.listdir(path))}.json"
+            filepath = os.path.join(path, filename)
+            if message.get('id', None) is not None: # could also be a stack message, which has no id
+                self.saved_ids[message['id']] = filepath
+        else:
+            filepath = self.saved_ids[message['id']]
+        with open(filepath, "w") as f:
             json.dump(message, f)
 
     def add_message(self, message):
@@ -76,7 +85,14 @@ class MessageDB:
         if message.get("stack", None):
             self.update_childrenOf(message)
         else:
-            self.messages.append(message)
+            # if the message is new, append it
+            if message.get('id') not in self.saved_ids:
+                self.messages.append(message)
+            else:
+                # if the message is already saved, update it
+                for i, m in enumerate(self.messages):
+                    if m['id'] == message['id']:
+                        self.messages[i] = message
         self.save_msg(message, "messages")
 
     def get_history(self, conversation_id):
@@ -180,9 +196,8 @@ async def websocket_endpoint(websocket: WebSocket):
             pass
         except Cancelled as e:
             raise e
-        except RuntimeError as e:
-            print(".. hopefully just websocket closed, running in background", e, type(e))
-            return
+        except (WebSocketDisconnect, RuntimeError) as e:
+            pass
         try:
             await websocket.send_json(message)
         except Exception as e:
