@@ -35,6 +35,7 @@ function addDiffToMessage(message, diff) {
 const ChatApp = () => {
     const [client, setClient] = useState(null);
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
+    const [checkConnectionStatus, setCheckConnectionStatus] = useState(false);
     const [inputValue, setInputValue] = useState("");
     const [path, setPath] = useState(["root"]);
     const [agentName, setAgentName] = useState("yopilot");
@@ -50,13 +51,6 @@ const ChatApp = () => {
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
     const visibleMessages = useMemo(() => {
         return convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
-        // const filteredWithDuplicates = convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
-        // // take the latest message with each id
-        // const filtered = filteredWithDuplicates.filter((message, index) => {
-        //     const firstIndex = filteredWithDuplicates.findIndex(m => m.id === message.id);
-        //     return firstIndex !== index;
-        // });
-        // return filtered;
     }, [convTree, currentConversationId]);
 
     // fetch the available agents
@@ -65,6 +59,9 @@ const ChatApp = () => {
             .then(response => response.json())
             .then(data => {
                 setAvailableAgents(data);
+            })
+            .catch(e => {
+                console.error(e);
             });
     }, []);
 
@@ -74,6 +71,9 @@ const ChatApp = () => {
             .then(response => response.json())
             .then(data => {
                 setConvTree(data);
+            })
+            .catch(e => {
+                console.error(e);
             });
     }, []);
 
@@ -219,13 +219,46 @@ const ChatApp = () => {
             setMinBottomTop(rect.top + 100000);
         }
         bottom?.scrollIntoView({ behavior: "smooth" });
+        setIsAttached(true);
+        // // wait for the scroll to finish and then attach
+        // setTimeout(() => {
+        //     setIsAttached(true);
+        // }, 200);
     }, [visibleMessages, isAttached]);
+
+
+    useEffect(() => {
+        if (!isAttached || convTree.messages.length === 0) {
+            return;
+        }
+        // if we are attached and a new message has been send, push its conversation to the path
+        const lastMessage = convTree.messages[convTree.messages.length - 1];
+        if (!convTree.childrenOf[currentConversationId]?.includes(lastMessage.id)) {
+            // find the conversation id
+            const conversationId = Object.keys(convTree.childrenOf).find(key => convTree.childrenOf[key].includes(lastMessage.id));
+            if (conversationId) {
+                pushToPath(conversationId);
+            }
+        }
+    }, [convTree, isAttached, currentConversationId]);
+
 
 
     const selectAgent = (agentName) => {
         setAgentName(agentName);
         setDefaultAgentName(agentName);
     }
+
+    // if the connection is not connected after 1 second, try to reload the page
+    setTimeout(() => {
+        setCheckConnectionStatus(true);
+    }, 1000);
+    useEffect(() => {
+        if (checkConnectionStatus && connectionStatus !== "CONNECTED") {
+            window.location.reload();
+        }
+    }, [checkConnectionStatus, connectionStatus]);
+        
 
     if (connectionStatus !== "CONNECTED") {
         return (
