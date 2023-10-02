@@ -15,6 +15,7 @@ async def summarize(text, instructions=[]):
         prompt_template="{text}".format,
     )
     summary = await summarizer.run(text=text)
+    summary = summary["content"]
     if summary.lower() == "skip":
         summary = ""
     return summary

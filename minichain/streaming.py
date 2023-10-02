@@ -15,7 +15,7 @@ async def print_chunk(diff, message_id, _recursive_key=None):
     global prev_chunk_id
     if isinstance(diff, dict):
         for key, value in diff.items():
-            print_chunk(value, message_id, key)
+            await print_chunk(value, message_id, key)
         return
     chunk_id = f"{message_id}[{_recursive_key}]"
     if chunk_id != prev_chunk_id:

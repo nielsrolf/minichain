@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from minichain.agent import Agent, make_return_function
-from minichain.dtypes import SystemMessage, UserMessage
+from minichain.dtypes import UserMessage
 from minichain.functions import tool
 from minichain.agents.programmer import Programmer
 from minichain.agents.webgpt import WebGPT

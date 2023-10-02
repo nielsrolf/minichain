@@ -72,30 +72,13 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
             "arguments": json.dumps({"content": response.pop("content")}),
         }
         response["content"] = ""
-    response["function_call"] = parse_function_call(response["function_call"])
-    return AssistantMessage(**response)
+    response["function_call"] = parse_function_call(response["function_call"]).dict()
+    return response
 
 
-def messages_types_to_history(chat_history: list) -> list:
-    if not isinstance(chat_history[0], dict):
-        messages = []
-        for i in chat_history:
-            # print(i)
-            message = i.dict()
-            # delete the parent field
-            messages.append(message)
-    else:
-        messages = chat_history
-    
-    # remove function calls from messages if they are None
+def format_history(messages: list) -> list:
+    """Format the history to be compatible with the openai api - json dumps all arguments"""
     for message in messages:
-        message.pop("parent", None)
-        message.pop("id", None)
-        message.pop("conversation_id", None)
-        # delete all fields that are None
-        for k, v in dict(**message).items():
-            if v is None and not k == "content":
-                message.pop(k)
         if (function_call := message.get("function_call")) is not None:
             try:
                 if isinstance(function_call['arguments'], dict):
@@ -106,17 +89,22 @@ def messages_types_to_history(chat_history: list) -> list:
     return messages
 
 
-def save_llm_call_for_debugging(messages, functions, response):
-    os.makedirs(".minichain/debug", exist_ok=True)
-    with open(".minichain/debug/last_openai_request.json", "w") as f:
-        json.dump(
-            {
-                "messages": messages,
-                "functions": functions,
-                "response": response.dict(),
-            },
-            f,
-        )
+def save_llm_call_for_debugging(messages, functions, parsed_response, raw_response):
+    try:
+        os.makedirs(".minichain/debug", exist_ok=True)
+        with open(".minichain/debug/last_openai_request.json", "w") as f:
+            json.dump(
+                {
+                    "messages": messages,
+                    "functions": functions,
+                    "parsed_response": parsed_response,
+                    "raw_response": raw_response,
+                },
+                f,
+            )
+    except Exception as e:
+        print(e)
+        breakpoint()
 
 
 @async_disk_cache
@@ -126,7 +114,7 @@ async def get_openai_response_stream(
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     if stream is None:
         stream = Stream()
-    messages = messages_types_to_history(chat_history)
+    messages = format_history(chat_history)
 
     if len(functions) > 0:
         openai_response = openai.ChatCompletion.create(
@@ -148,10 +136,10 @@ async def get_openai_response_stream(
     for chunk in openai_response:
         chunk = chunk["choices"][0]["delta"].to_dict_recursive()
         await stream.chunk(chunk)
-    response = {key: value for key, value in stream.current_message.items() if "id" not in key}
-    response = fix_common_errors(response)
+    raw_response = {key: value for key, value in stream.current_message.items() if "id" not in key}
+    response = fix_common_errors(raw_response)
     await stream.set(response)
-    save_llm_call_for_debugging(messages, functions, response)
+    save_llm_call_for_debugging(messages, functions, response, raw_response=raw_response)
     return response
 
 

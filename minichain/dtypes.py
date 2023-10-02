@@ -111,3 +111,25 @@ message_types = {
 class Cancelled(Exception):
     pass
 
+
+def messages_types_to_history(chat_history: list) -> list:
+    if not isinstance(chat_history[0], dict):
+        messages = []
+        for i in chat_history:
+            # print(i)
+            message = i.dict()
+            # delete the parent field
+            messages.append(message)
+    else:
+        messages = chat_history
+    
+    # remove function calls from messages if they are None
+    for message in messages:
+        message.pop("parent", None)
+        message.pop("id", None)
+        message.pop("conversation_id", None)
+        # delete all fields that are None
+        for k, v in dict(**message).items():
+            if v is None and not k == "content":
+                message.pop(k)
+    return messages

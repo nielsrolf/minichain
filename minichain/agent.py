@@ -8,6 +8,7 @@ from minichain.dtypes import (
     SystemMessage,
     UserMessage,
     Cancelled,
+    messages_types_to_history
 )
 from minichain.functions import Function, tool
 from minichain.streaming import Stream
@@ -116,7 +117,9 @@ class Session():
                 if action is not None:
                     output = await self.execute_action(action, stream)
                     if action.name == "return" and output is not False:
-                        return output
+                        # output is the output of the return function
+                        # since each function returns a string, we need to parse the output
+                        return json.loads(output)
     
     async def get_next_action(self, stream):
         # do the openai call
@@ -125,7 +128,10 @@ class Session():
         # TODO
         with await stream.to(history, role="assistant") as stream:
             await get_openai_response_stream(
-                history, self.agent.functions_openai, model=self.agent.llm, stream=stream
+                messages_types_to_history(history),
+                self.agent.functions_openai,
+                model=self.agent.llm,
+                stream=stream
             )
         return history[-1].function_call
 
@@ -135,6 +141,9 @@ class Session():
                 for function in self.agent.functions:
                     if function.name == action.name:
                         function.register_stream(stream)
+                        if not isinstance(action.arguments, dict):
+                            await stream.set(f"Error: arguments for {function.name} are not valid JSON.")
+                            return False
                         function_output = await function(**action.arguments)
                         return function_output
                 await stream.set(
@@ -167,6 +176,3 @@ class Session():
     
     def register_stream(self, stream):
         self.stream = stream
-
-
-
