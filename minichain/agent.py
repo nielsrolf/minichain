@@ -144,6 +144,7 @@ class Session():
                         if not isinstance(action.arguments, dict):
                             await stream.set(f"Error: arguments for {function.name} are not valid JSON.")
                             return False
+                        # breakpoint()
                         function_output = await function(**action.arguments)
                         return function_output
                 await stream.set(

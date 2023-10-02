@@ -4,7 +4,7 @@ import os
 import pickle
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -127,9 +127,12 @@ class SemanticParagraphMemory:
         )
         self.auto_save_dir = auto_save_dir
         self.agent_kwargs = agents_kwargs
+    
+    def register_stream(self, stream):
+        self.agent_kwargs["stream"] = stream
 
     async def ingest(self, content, source):
-        memories = await text_to_memory(content, source, self.agent_kwargs)
+        memories = await text_to_memory(content, source, agent_kwargs=self.agent_kwargs)
         # Add memories to vector db
         for memory in memories:
             # title
@@ -364,6 +367,12 @@ class SemanticParagraphMemory:
             elif output == "raw":
                 result = "\n\n".join([self.format_as_snippet(i) for i in results])
             return result
+        
+        def register_stream(stream):
+            self.register_stream(stream)
+            find_memory.stream = stream
+        find_memory.register_stream = register_stream
+
         return find_memory
 
     def ingest_tool(self):
@@ -377,6 +386,12 @@ class SemanticParagraphMemory:
             new_memories = await self.ingest(content, path)
             summary = self.get_content_summary(new_memories)
             return f"Ingested {path}. New memories formed:\n{summary} "
+        
+        def register_stream(stream):
+            self.register_stream(stream)
+            create_memories_from_file.stream = stream
+        create_memories_from_file.register_stream = register_stream
+
         return create_memories_from_file
             
 

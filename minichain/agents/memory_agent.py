@@ -41,6 +41,10 @@ class MemoryAgent(Agent):
             init_history=init_history,
             **kwargs,
         )
+    
+    def register_stream(self, stream):
+        self.memory.register_stream(stream)
+        super().register_stream(stream)
 
 
 async def main():

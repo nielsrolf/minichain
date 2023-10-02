@@ -52,7 +52,6 @@ class Stream:
                 [{"content": "Override", conversation_id: "123", id: 1}, {"content": "hello world", conversation_id: "123", id: 2}]
     """
     def __init__(self, on_message=print_message, conversation_stack=[], current_message=None, on_chunk=print_chunk, history=None, agent=None):
-        print("init with", conversation_stack)
         if on_message is None:
             on_message = do_nothing
         self.on_message = on_message
@@ -71,7 +70,6 @@ class Stream:
         return self
     
     def __exit__(self, type, value, traceback):
-        print("exit with", self.current_message)
         if self.current_message["role"] != "hidden":
             role = self.current_message["role"]
             message_type = message_types[role]
@@ -101,7 +99,10 @@ class Stream:
         """
         message_type = message_types[role]
         try:
-            current_message = message_type(content="", conversation_id=self.conversation_stack[-1], **kwargs).dict()
+            conv_id = self.conversation_stack[-1]
+            if self.current_message["id"] != "hidden":
+                conv_id = self.current_message["id"]
+            current_message = message_type(content="", conversation_id=conv_id, **kwargs).dict()
         except Exception as e:
             print(e)
             print(role, kwargs)
