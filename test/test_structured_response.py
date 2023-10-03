@@ -12,6 +12,5 @@ async def test_agent():
         prompt_template="{task}".format,
         response_openapi=BashQuery,
     )
-    breakpoint()
     response = await agent.run(task="Create a file named 'test.txt' in the current directory.")
     assert len(response["commands"]) == 1

@@ -113,12 +113,6 @@ class SemanticParagraphMemory:
         self.memories: List[MemoryWithMeta] = []
         self.vector_db = VectorDB()
         self.snippet_template = snippet_template
-        self.read_website = Function(
-            name="read_website",
-            openapi=IngestQuery,
-            function=self._read_website,
-            description="Read a website and create annoted memories.",
-        )
         self.recall = Function(
             name="recall",
             openapi=RecallQuery,
@@ -163,11 +157,6 @@ class SemanticParagraphMemory:
         memory_ids = [i[0] for i in top_results]
         results = [i for i in self.memories if i.id in memory_ids]
         return results[:num_results]
-
-    def get_available_tags(self, memories=None) -> List[str]:
-        if memories is None:
-            memories = self.memories
-        return list(set([i for i in memories for i in i.memory.tags]))
 
     async def generate_questions(self, question: str) -> List[str]:
         # Use gpt to generate questions
@@ -240,31 +229,6 @@ class SemanticParagraphMemory:
             content=memory.meta.content,
         )
 
-    async def _read_website(self, url: str, question: str = None):
-        text = markdown_browser(url)
-        new_memories = await self.ingest(text, url)
-        queue = []
-        for memory in new_memories:
-            queue += memory.memory.links
-
-        content_summary = ""
-
-        if len(new_memories) > 0:
-            content_summary += f"New memories were created from the website {url}:\n"
-            content_summary += self.get_content_summary(new_memories)
-
-        if len(queue) > 0:
-            content_summary += f"You encountered the following links that you can read next if needed:\n"
-            content_summary += self.get_queue_summary(queue)
-
-        if question is not None:
-            current_answer = self.answer_from_memory(question)
-            content_summary += f"A current answer to the question '{question}', based on the memories you have is: \n"
-            content_summary += f"{current_answer}\n\n"
-            content_summary += "If this is a satisfactory answer, you can stop and respond to the user. If not, continue browsing."
-
-        return content_summary
-
     async def _recall(self, query: RecallQuery):
         results = await self.answer_from_memory(query.question)
         return results
@@ -289,7 +253,7 @@ class SemanticParagraphMemory:
 
     def get_queue_summary(self, queue):
         queue = sorted(queue, reverse=True, key=lambda i: i.priority)
-        summary = "======= ENCOUNTERED LINKS =======\n"
+        summary = ""
         for item in queue:
             question_list = "\n  ".join(item.expected_answers)
             summary += f"{item.url}: {question_list}  \n"
@@ -304,7 +268,8 @@ class SemanticParagraphMemory:
             text=content_summary,
             response_openapi=TitleScore,
             system_message=f"List all titles related to the question: {question}.",
-            # TODO self.agent_kwargs
+            **self.agent_kwargs
+
         )
         titles = sorted(titles, reverse=True, key=lambda i: i["score"])[:num_results]
         titles = [i["title"] for i in titles]
