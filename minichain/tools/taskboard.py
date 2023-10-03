@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import tool
+from minichain.functions import tool
 
 
 class TasksNotDoneError(Exception):

@@ -1,4 +1,5 @@
 from pprint import pprint
+
 import pytest
 
 from minichain.memory import SemanticParagraphMemory

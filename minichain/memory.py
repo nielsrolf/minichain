@@ -3,6 +3,7 @@ import math
 import os
 import pickle
 import re
+import uuid
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
@@ -13,12 +14,14 @@ from minichain.agent import Agent
 from minichain.functions import Function, tool
 from minichain.tools.codebase import default_ignore_files, get_visible_files
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
-from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory
+from minichain.tools.text_to_memory import (MemoryWithMeta, add_line_numbers,
+                                            text_to_memory)
 from minichain.utils.cached_openai import get_embedding
+from minichain.utils.json_datetime import datetime_converter, datetime_parser
 
 snippet_template = """## {title}
 Context: {context}
-Source: {source}
+Source: {source}:{start_line}-{end_line}
 ```
 {content}
 ```
@@ -93,6 +96,16 @@ class RelatedQuestionList(BaseModel):
     )
 
 
+import difflib
+
+
+def get_diff(s1, s2):
+    d = difflib.HtmlDiff()
+    diff = difflib.ndiff(s1.split(), s2.split())
+
+    return "\n".join(diff)
+
+
 class SemanticParagraphMemory:
     def __init__(
         self,
@@ -123,8 +136,44 @@ class SemanticParagraphMemory:
     def register_stream(self, stream):
         self.agent_kwargs["stream"] = stream
 
+    def check_if_still_valid(self, memory, content):
+        # Checks if the remembered raw text still appears in the source file and potentially
+        # updates the lines
+        if memory.meta.content not in content:
+            return False
+
+        placeholder = uuid.uuid4().hex
+        content = content.replace(memory.meta.content, placeholder)
+        lines = content.split("\n")
+        if lines[memory.memory.start_line - 1] == placeholder:
+            return True
+
+        start_line = lines.index(placeholder) + 1
+        end_line = start_line + len(memory.meta.content.split("\n")) - 1
+        memory.memory.start_line = start_line
+        memory.memory.end_line = end_line
+        return True
+
     async def ingest(self, content, source):
-        memories = await text_to_memory(content, source, agent_kwargs=self.agent_kwargs)
+        existing_memories = [i for i in self.memories if i.meta.source == source]
+        existing_memories = [
+            i for i in existing_memories if self.check_if_still_valid(i, content)
+        ]
+        # Replace already memorized content with `[Hidden: {title}]`
+
+        text_with_line_numbers = add_line_numbers(content)
+        lines = text_with_line_numbers.split("\n")
+        for memory in existing_memories:
+            lines[memory.memory.start_line - 1 : memory.memory.end_line] = [
+                f"[Hidden: {memory.memory.title}]"
+            ] + [None] * (memory.memory.end_line - memory.memory.start_line)
+        lines = [i for i in lines if i is not None]
+        text_with_line_numbers = "\n".join(lines)
+        memories = await text_to_memory(
+            text_with_line_numbers=text_with_line_numbers,
+            source=source,
+            agent_kwargs=self.agent_kwargs,
+        )
         # Add memories to vector db
         for memory in memories:
             # title
@@ -158,6 +207,8 @@ class SemanticParagraphMemory:
 
     async def generate_questions(self, question: str) -> List[str]:
         # Use gpt to generate questions
+        if question.strip() == "":
+            return [""]
         question_agent = Agent(
             system_message=f"The user provides you with a question. Generate a list of sub-questions that are relevant to the question. These questions are used to retrieve memories, which are then used to answer the question.",
             prompt_template="{question}".format,
@@ -226,6 +277,8 @@ class SemanticParagraphMemory:
             title=memory.memory.title,
             context=memory.memory.context,
             content=memory.meta.content,
+            start_line=memory.memory.start_line,
+            end_line=memory.memory.end_line,
         )
 
     async def _recall(self, query: RecallQuery):
@@ -237,18 +290,29 @@ class SemanticParagraphMemory:
 
     def get_content_summary(self, memories=None):
         memories = memories or self.memories
-        summary = "======= MEMORY CONTENT =======\n"
+        summary = ""
         # group by source
         memories_by_source = {}
         for memory in memories:
             memories_by_source[memory.meta.source] = memories_by_source.get(
                 memory.meta.source, []
             ) + [memory]
-        for source, memories in memories_by_source.items():
-            summary += f"# Memories from: {source} \n"
-            for i in memories:
-                summary += i.memory.title + "\n"
-        return summary
+        if len(memories) > 15:
+            if len(memories_by_source.keys()) > 15:
+                summary += f"You have {len(memories)} memories from {len(memories_by_source.keys())} sources.\n"
+                return summary
+            summary += (
+                f"You have {len(memories)} memories from the following sources:\n"
+            )
+            for source, memories_of_source in memories_by_source.items():
+                summary += f"- {source}: {len(memories_of_source)}\n"
+            return summary
+        else:
+            for source, memories in memories_by_source.items():
+                summary += f"# Memories from: {source} \n"
+                for i in memories:
+                    summary += i.memory.title + "\n"
+            return summary
 
     def get_queue_summary(self, queue):
         queue = sorted(queue, reverse=True, key=lambda i: i.priority)
@@ -298,7 +362,8 @@ class SemanticParagraphMemory:
             pickle.dump(self.vector_db.values, f)
         # save the memories as json
         with open(os.path.join(memory_dir, "memories.json"), "w") as f:
-            json.dump([i.dict() for i in self.memories], f)
+            # we need to handle the datetime objects and save them as e.g. 2023-12-31T23:59:59.999999+00:00
+            json.dump([i.dict() for i in self.memories], f, default=datetime_converter)
 
     def load(self, memory_dir):
         # load the vector db
@@ -307,7 +372,7 @@ class SemanticParagraphMemory:
         with open(os.path.join(memory_dir, "vector_db_values.pkl"), "rb") as f:
             self.vector_db.values = pickle.load(f)
         with open(os.path.join(memory_dir, "memories.json"), "r") as f:
-            memories = json.load(f)
+            memories = json.load(f, object_hook=datetime_parser)
         self.memories = [MemoryWithMeta(**i) for i in memories]
 
     def find_memory_tool(self):

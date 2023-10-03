@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from minichain.agent import tool
+from minichain.functions import tool
 from minichain.utils.search import google_search
 
 

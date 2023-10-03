@@ -152,6 +152,7 @@ class Session:
                     action.name,
                 )
             except Exception as e:
+                breakpoint()
                 await stream.chunk(self.format_error_message(e))
         return False
 

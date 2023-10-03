@@ -21,17 +21,20 @@ class Programmer(Agent):
                 self.memory = SemanticParagraphMemory(
                     use_vector_search=True, agents_kwargs=kwargs
                 )
-            self.memory.load(load_memory_from)
+            try:
+                self.memory.load(load_memory_from)
+            except FileNotFoundError:
+                print(f"Memory file {load_memory_from} not found.")
         interpreter = CodeInterpreter()
         self.interpreter = interpreter
         print("Init history for programmer:", kwargs.get("init_history", []))
         init_history = kwargs.pop("init_history", [])
         if init_history == []:
-            init_history.append(
-                UserMessage(
-                    f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
-                )
-            )
+            init_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
+            if self.memory and len(self.memory.memories) > 0:
+                init_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}. Use the `find_memory` function to find relevant memories."
+            init_history.append(UserMessage(init_msg))
+
         functions = [
             interpreter.bash,
             interpreter,

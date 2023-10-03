@@ -45,19 +45,16 @@ from minichain.tools.document_qa import AnswerWithCitations
 from minichain.tools.google_search import google_search_function
 
 ...
-
 webgpt = Agent(
     functions=[google_search_function, scan_website],
     system_message=SystemMessage(
         "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
     ),
     prompt_template="{query}".format,
-    on_assistant_message=lambda message: print(message),
-    on_function_message=lambda message: print(message),
     response_openapi=AnswerWithCitations, # this is a pydantic.BaseModel
 )
 
-response = webgpt.run(query="What is the largest publicly known language model in terms of parameters?")
+response = await webgpt.run(query="What is the largest publicly known language model in terms of parameters?")
 print(response['content'], response['sources'])
 ```
 

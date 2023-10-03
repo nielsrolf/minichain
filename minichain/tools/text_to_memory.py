@@ -1,3 +1,5 @@
+import datetime as dt
+import hashlib
 import uuid
 from typing import Any, Dict, List, Optional, Union
 
@@ -53,6 +55,7 @@ class Memory(BaseModel):
 class MemoryMeta(BaseModel):
     source: str = Field(..., description="The source uri of the document.")
     content: str = Field(..., description="The content of the document.")
+    timestamp: dt.datetime = Field(default_factory=dt.datetime.now, description="The timestamp when the document was created.")
 
 
 class MemoryWithMeta(BaseModel):
@@ -64,21 +67,43 @@ class MemoryWithMeta(BaseModel):
     )
 
 
-async def text_to_memory(text, source=None, max_num_memories=None, agent_kwargs={}) -> List[MemoryWithMeta]:
+def add_line_numbers(text):
+    lines = text.split("\n")
+    numbered_lines = [f"{i + 1}: {line}" for i, line in enumerate(lines)]
+    text_with_line_numbers = "\n".join(numbered_lines)
+    return text_with_line_numbers
+
+
+async def text_to_memory(text=None, text_with_line_numbers=None, source=None, max_num_memories=None, agent_kwargs={}) -> List[MemoryWithMeta]:
     """
     Turn a text into a list of semantic paragraphs.
     - add line numbers to the text
     - Split the text into pages with some overlap
     - Use an agent to create structured data from the text until it is done
-    """
-    memories = []
-    lines = text.split("\n")
 
-    numbered_lines = [f"{i}: {line}" for i, line in enumerate(lines)]
-    text_with_line_numbers = "\n".join(numbered_lines)
-    paragraphs = split_document(text_with_line_numbers, words=3000)
-    current_paragraph_start = 0
-    current_paragraph_end = len(paragraphs[0].split("\n")) - 1
+    if text is specified with line numbers, lines can be skipped, which is used for updating memories of a file:
+      ```
+      1: line 1
+      [Hidden: main function]
+      20: line 20
+      ```
+    """
+    assert text is not None or text_with_line_numbers is not None
+    memories = []
+    
+    if text_with_line_numbers is None:
+        lines, text_with_line_numbers = add_line_numbers(text)
+    else:
+        # get the last line number
+        last_line_number = int(text_with_line_numbers.split("\n")[-1].split(":")[0])
+        lines = ["" for i in range(last_line_number)]
+        for line in text_with_line_numbers.split("\n"):
+            try:
+                line_number = int(line.split(": ")[0])
+                lines[line_number-1] = ": ".join(line.split(": ")[1:])
+            except ValueError:
+                # skip lines that don't have a line number
+                pass
 
     async def add_memory(**memory):
         memory = Memory(**memory)
@@ -87,7 +112,7 @@ async def text_to_memory(text, source=None, max_num_memories=None, agent_kwargs=
         progress = max(
             [0] + [i.memory.end_line for i in memories if i.meta.source == source]
         )
-        content = "\n".join(lines[memory.start_line : memory.end_line + 1])
+        content = "\n".join(lines[memory.start_line - 1 : memory.end_line])
         warning = ""
         if (
             memory.start_line < current_paragraph_start
@@ -112,7 +137,7 @@ async def text_to_memory(text, source=None, max_num_memories=None, agent_kwargs=
         memories.append(MemoryWithMeta(memory=memory, meta=meta))
         
         # print(f"Added memory: {memories[-1]}.")
-        return f"Memory added. Left to-do are lines: lines {progress}-{current_paragraph_end}.{warning}"
+        return f"Memory added.{warning}"
 
     add_memory_function = Function(
         name="add_memory",
@@ -134,6 +159,10 @@ async def text_to_memory(text, source=None, max_num_memories=None, agent_kwargs=
         response_openapi=Done,
         **agent_kwargs,
     )
+
+    paragraphs = split_document(text_with_line_numbers, words=3000)
+    current_paragraph_start = 0
+    current_paragraph_end = len(paragraphs[0].split("\n")) - 1
 
     for paragraph in paragraphs:
         current_paragraph_start = int(paragraph.split("\n")[0].split(":")[0])

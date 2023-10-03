@@ -151,7 +151,7 @@ agents = {}
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import tool
+from minichain.functions import tool
 
 
 @tool()

@@ -14,6 +14,9 @@ const functionsToRenderAsCode = [
 
 
 function ChatMessage({message, convTree, handleSubConversationClick }){
+    if (message.role === 'function' && message.name === 'return') {
+        return '';
+    }
     return (
         <div className={`message-${message.role}`} key={message.id}>
             <div className='message-header'> {message.id} {message.role } {message.name} {message.time}</div>

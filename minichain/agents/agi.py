@@ -38,10 +38,14 @@ class AGI(Agent):
             board_before = await taskboard.update_status(
                 self.board, task_id, "IN_PROGRESS"
             )
+            query = (
+                f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.\n"
+                "When you are done, return with a detailed explanation of what you did, including a list of all the files you changed and an explanation of how to test and use the new feature.\n"
+            )
             if "programmer" in assignee.lower():
                 self.programmer.register_stream(self.stream)
                 response = await self.programmer.run(
-                    query=f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.",
+                    query=query,
                 )
             elif "webgpt" in assignee.lower():
                 response = await self.webgpt.run(
@@ -49,7 +53,7 @@ class AGI(Agent):
                 )
             elif "copy-of-self" in assignee.lower():
                 response = await self.run(
-                    query=f"Please research on the following ticket: {task.title}.\n{task.description}\n{additional_info}",
+                    query=query,
                 )
             elif "artist" in assignee.lower():
                 response = await self.artist.run(
@@ -61,6 +65,13 @@ class AGI(Agent):
 
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
+
+            info_to_memorize = (
+                f"{assignee} worked on the following ticket: {task.title}.\n{task.description}\n{additional_info}. \n"
+                f"Here is the response:\n{response}"
+            )
+            await self.memory.ingest(info_to_memorize, source=task.title)
+
             return response
 
         def register_stream(stream):
