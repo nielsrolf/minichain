@@ -30,7 +30,9 @@ async def test_question_embedding_memory():
 
 @pytest.mark.asyncio
 async def test_content_scan_memory():
-    memory = SemanticParagraphMemory(use_vector_search=False, use_content_scan_search=True)
+    memory = SemanticParagraphMemory(
+        use_vector_search=False, use_content_scan_search=True
+    )
     await memory.ingest(text, example_file)
     memories = await memory.retrieve(question)
     print_memories(memories)

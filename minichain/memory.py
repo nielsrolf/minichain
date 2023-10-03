@@ -11,11 +11,10 @@ from pydantic import BaseModel, Field
 
 from minichain.agent import Agent
 from minichain.functions import Function, tool
+from minichain.tools.codebase import default_ignore_files, get_visible_files
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
 from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory
-from minichain.tools.codebase import default_ignore_files, get_visible_files
 from minichain.utils.cached_openai import get_embedding
-
 
 snippet_template = """## {title}
 Context: {context}
@@ -100,7 +99,7 @@ class SemanticParagraphMemory:
         use_vector_search=False,
         use_content_scan_search=False,
         auto_save_dir=".minichain/memory",
-        agents_kwargs={}
+        agents_kwargs={},
     ):
         assert use_vector_search or use_content_scan_search, (
             "At least one of the search methods must be enabled. "
@@ -108,10 +107,7 @@ class SemanticParagraphMemory:
         )
         self.use_vector_search = use_vector_search
         self.use_content_scan_search = use_content_scan_search
-        self.num_search_methods = (
-            int(use_vector_search)
-            + int(use_content_scan_search)
-        )
+        self.num_search_methods = int(use_vector_search) + int(use_content_scan_search)
         self.memories: List[MemoryWithMeta] = []
         self.vector_db = VectorDB()
         self.snippet_template = snippet_template
@@ -123,7 +119,7 @@ class SemanticParagraphMemory:
         )
         self.auto_save_dir = auto_save_dir
         self.agent_kwargs = agents_kwargs
-    
+
     def register_stream(self, stream):
         self.agent_kwargs["stream"] = stream
 
@@ -163,8 +159,7 @@ class SemanticParagraphMemory:
     async def generate_questions(self, question: str) -> List[str]:
         # Use gpt to generate questions
         question_agent = Agent(
-            system_message=
-                f"The user provides you with a question. Generate a list of sub-questions that are relevant to the question. These questions are used to retrieve memories, which are then used to answer the question.",
+            system_message=f"The user provides you with a question. Generate a list of sub-questions that are relevant to the question. These questions are used to retrieve memories, which are then used to answer the question.",
             prompt_template="{question}".format,
             functions=[],
             response_openapi=RelatedQuestionList,
@@ -205,7 +200,9 @@ class SemanticParagraphMemory:
         if len(results) == 0:
             return "No relevant memories found."
         elif len(results) == 1:
-            return await long_document_qa(text=results[0].meta.content, question=question)
+            return await long_document_qa(
+                text=results[0].meta.content, question=question
+            )
         else:
             return await self.summarize(results, question)
 
@@ -270,8 +267,7 @@ class SemanticParagraphMemory:
             text=content_summary,
             response_openapi=TitleScore,
             system_message=f"List all titles related to the question: {question}.",
-            **self.agent_kwargs
-
+            **self.agent_kwargs,
         )
         titles = sorted(titles, reverse=True, key=lambda i: i["score"])[:num_results]
         titles = [i["title"] for i in titles]
@@ -313,7 +309,7 @@ class SemanticParagraphMemory:
         with open(os.path.join(memory_dir, "memories.json"), "r") as f:
             memories = json.load(f)
         self.memories = [MemoryWithMeta(**i) for i in memories]
-    
+
     def find_memory_tool(self):
         @tool()
         async def find_memory(
@@ -334,24 +330,31 @@ class SemanticParagraphMemory:
             elif output == "raw":
                 result = "\n\n".join([self.format_as_snippet(i) for i in results])
             return result
-        
+
         def register_stream(stream):
             self.register_stream(stream)
             find_memory.stream = stream
+
         find_memory.register_stream = register_stream
 
         return find_memory
 
-
     def ingest_tool(self):
         @tool()
         async def create_memories_from_file(
-            path: str = Field(..., description="The path to the dir or file to ingest. If a dir is provided, all files in the dir are ingested.")
+            path: str = Field(
+                ...,
+                description="The path to the dir or file to ingest. If a dir is provided, all files in the dir are ingested.",
+            )
         ):
             """Read a file and create memories from it."""
             if os.path.isdir(path):
                 # Show the list of files that can be ingested
-                available_files = get_visible_files(path, ignore_files=default_ignore_files, extensions=[".py", ".js", ".ts", "README.md"])
+                available_files = get_visible_files(
+                    path,
+                    ignore_files=default_ignore_files,
+                    extensions=[".py", ".js", ".ts", "README.md"],
+                )
                 available_files = "\n".join(available_files)
                 return f"{path} is a dir. Please ingest the files one by one. Available files:```\n{available_files}\n```"
             with open(path, "r") as f:
@@ -359,16 +362,14 @@ class SemanticParagraphMemory:
             new_memories = await self.ingest(content, path)
             summary = self.get_content_summary(new_memories)
             return f"Ingested {path}. New memories formed:\n{summary} "
-        
+
         def register_stream(stream):
             self.register_stream(stream)
             create_memories_from_file.stream = stream
+
         create_memories_from_file.register_stream = register_stream
 
         return create_memories_from_file
-            
-
-
 
 
 async def main():
@@ -381,11 +382,13 @@ async def main():
     print(memory.get_content_summary())
     print("======================================")
     question = "with which command is the docker container started?"
+
     async def print_qa(question):
         print(question)
         answer = await memory.answer_from_memory(question)
         breakpoint()
         print(answer)
+
     await print_qa(question)
 
     print("======================================")
@@ -396,11 +399,11 @@ async def main():
             print(answer)
             question = input("Ask a question: ")
     except:
-       breakpoint()
+        breakpoint()
     print("Bye")
-
 
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

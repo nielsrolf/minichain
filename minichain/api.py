@@ -1,21 +1,21 @@
+import asyncio
 import json
 import os
 import traceback
 import uuid
-from typing import Any, Dict, Optional
-import asyncio
 from collections import defaultdict
+from typing import Any, Dict, Optional
 
+import yaml
 from fastapi import FastAPI, HTTPException, WebSocket
-from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
-import yaml
 from starlette.websockets import WebSocketDisconnect
 
-from minichain.dtypes import (AssistantMessage, FunctionMessage, SystemMessage,
-                             UserMessage, Cancelled)
+from minichain.dtypes import (AssistantMessage, Cancelled, FunctionMessage,
+                              SystemMessage, UserMessage)
 from minichain.streaming import Stream
 
 
@@ -42,11 +42,11 @@ class MessageDB:
                         self.update_childrenOf(message)
                     else:
                         messages.append(message)
-                        self.saved_ids[message['id']] = filename
+                        self.saved_ids[message["id"]] = filename
             except Exception as e:
                 print(f"Error loading message from {filename}", e)
         self.messages = messages
-    
+
     def update_childrenOf(self, message):
         parent = message["stack"][0]
         for child in message["stack"][1:]:
@@ -71,14 +71,16 @@ class MessageDB:
         return messages
 
     def save_msg(self, message, dirname):
-        if not message.get('id') in self.saved_ids:
+        if not message.get("id") in self.saved_ids:
             path = f"{self.path}/{dirname}"
             filename = f"{len(os.listdir(path))}.json"
             filepath = os.path.join(path, filename)
-            if message.get('id', None) is not None: # could also be a stack message, which has no id
-                self.saved_ids[message['id']] = filepath
+            if (
+                message.get("id", None) is not None
+            ):  # could also be a stack message, which has no id
+                self.saved_ids[message["id"]] = filepath
         else:
-            filepath = self.saved_ids[message['id']]
+            filepath = self.saved_ids[message["id"]]
         with open(filepath, "w") as f:
             json.dump(message, f)
 
@@ -89,12 +91,12 @@ class MessageDB:
             self.update_childrenOf(message)
         else:
             # if the message is new, append it
-            if message.get('id') not in self.saved_ids:
+            if message.get("id") not in self.saved_ids:
                 self.messages.append(message)
             else:
                 # if the message is already saved, update it
                 for i, m in enumerate(self.messages):
-                    if m['id'] == message['id']:
+                    if m["id"] == message["id"]:
                         self.messages[i] = message
         self.save_msg(message, "messages")
 
@@ -114,7 +116,7 @@ class MessageDB:
             if message["conversation_id"] == conversation_id:
                 conversation.append(message)
         return conversation
-    
+
     def messages_as_dicts(self):
         dicts = []
         for message in self.messages:
@@ -147,8 +149,9 @@ message_db = MessageDB()
 agents = {}
 
 
-from minichain.agent import tool
 from pydantic import BaseModel, Field
+
+from minichain.agent import tool
 
 
 @tool()
@@ -159,16 +162,15 @@ async def upload_file_to_chat(
     return f"displaying file: {file}"
 
 
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Create a websocket that sends:
-        {type: stack, stack: [123, 1]}
-        {type: message, data {id: 1, content: 'yo'},
-        {type: stack, stack: [123, 3, 456, 2]}
-        {type: chunk, diff: {"content": "hello", id: 2}
-        {type: chunk, diff: {"content": "world", id: 2}
-        {type: message, data: {id: 2, ...final message}}
+    {type: stack, stack: [123, 1]}
+    {type: message, data {id: 1, content: 'yo'},
+    {type: stack, stack: [123, 3, 456, 2]}
+    {type: chunk, diff: {"content": "hello", id: 2}
+    {type: chunk, diff: {"content": "world", id: 2}
+    {type: message, data: {id: 2, ...final message}}
     """
     await websocket.accept()
     print("websocket accepted")
@@ -183,13 +185,13 @@ async def websocket_endpoint(websocket: WebSocket):
             await send_message_raise_cancelled({"type": "stack", **message})
         else:
             await send_message_raise_cancelled({"type": "message", "data": message})
-    
+
     async def add_chunk(chunk, message_id):
         message = {"diff": chunk, "id": message_id, "type": "chunk"}
         await send_message_raise_cancelled(message)
-    
+
     async def send_message_raise_cancelled(message):
-        # check the websocket: has a cancel message been sent? if no message has 
+        # check the websocket: has a cancel message been sent? if no message has
         # been sent, avoid blocking by using asyncio.wait_for
         try:
             data = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
@@ -205,7 +207,6 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(message)
         except Exception as e:
             print("websocket closed, running in background")
-
 
     try:
         while True:
@@ -227,32 +228,38 @@ async def websocket_endpoint(websocket: WebSocket):
             if agent_name not in agents:
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
-            
+
             if payload.response_to == "root":
                 history = []
             else:
                 history = message_db.get_history(payload.response_to)
-            
-            print("agent_name", agent_name )
+
+            print("agent_name", agent_name)
             agent = agents[agent_name]
             stream = Stream(on_message=add_message_to_db_and_send, on_chunk=add_chunk)
-            
-            with await stream.conversation(payload.response_to, agent=agent.name) as stream:
+
+            with await stream.conversation(
+                payload.response_to, agent=agent.name
+            ) as stream:
                 if payload.response_to == "root":
                     with await stream.to([], role="user") as stream:
                         await stream.set(payload.query)
                 agent.register_stream(stream)
                 await agent.run(query=payload.query, history=history)
-            
+
             # go to cwd if the agent has a bash
             try:
-                await agent.interpreter.bash(commands=[f"cd {agent.interpreter.bash.cwd}"])
+                await agent.interpreter.bash(
+                    commands=[f"cd {agent.interpreter.bash.cwd}"]
+                )
             except Exception as e:
                 try:
-                    await agent.programmer.interpreter.bash(commands=[f"cd {os.getcwd()}"])
+                    await agent.programmer.interpreter.bash(
+                        commands=[f"cd {os.getcwd()}"]
+                    )
                 except Exception as e:
                     pass
-            
+
     except Exception as e:
         traceback.print_exc()
 
@@ -293,6 +300,7 @@ async def preload_agents():
         print("Copying default settings file to .minichain/settings.yml")
         os.makedirs(".minichain", exist_ok=True)
         import shutil
+
         shutil.copyfile(
             os.path.join(os.path.dirname(__file__), "default_settings.yml"),
             ".minichain/settings.yml",
@@ -313,7 +321,7 @@ async def preload_agents():
         module = __import__(module_name, fromlist=[class_name])
         agent_class = getattr(module, class_name)
         # create the agent
-        agent = agent_class(**agent_settings.get('init', {}))
+        agent = agent_class(**agent_settings.get("init", {}))
         # add the agent to the agents dict
         agents[agent_name] = agent
 
@@ -325,6 +333,7 @@ async def preload_agents():
 
 def start(port=8745):
     import uvicorn
+
     uvicorn.run(app, host="localhost", port=port)
 
 

@@ -9,6 +9,7 @@ from minichain.tools.google_search import web_search
 from minichain.tools.recursive_summarizer import text_scan
 from minichain.utils.markdown_browser import markdown_browser
 
+
 class ScanWebsiteRequest(BaseModel):
     url: str = Field(..., description="The url to read.")
     question: str = Field(..., description="The question to answer.")
@@ -29,10 +30,6 @@ class RelevantSectionOrClick(BaseModel):
 
 class Query(BaseModel):
     query: str = Field(..., description="The query to search for.")
-
-
-
-
 
 
 class WebGPT(Agent):
@@ -74,16 +71,21 @@ class WebGPT(Agent):
                 for output in outputs
                 if output["relevant_section"] is not None
             ]
-            clicks = [output["click"] for output in outputs if output["click"] is not None]
+            clicks = [
+                output["click"] for output in outputs if output["click"] is not None
+            ]
             if not url.startswith("http"):
                 url = "https://" + url
             domain = "/".join(url.split("/")[:3])  # e.g. https://www.google.com
-            clicks = [f"{domain}/{click}" for click in clicks if not click.startswith("http")]
+            clicks = [
+                f"{domain}/{click}" for click in clicks if not click.startswith("http")
+            ]
             print("clicks:", clicks)
             return {
                 "relevant_sections": sections,
                 "read_next": clicks,
             }
+
         super().__init__(
             functions=[web_search, scan_website],
             system_message="You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information to answer the question or fulfill the user request, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc.",
@@ -101,13 +103,11 @@ class SmartWebGPT(Agent):
                     "research", "Research the web in order to answer a question.", Query
                 )
             ],
-            system_message=
-                "You are SmartGPT. You get questions or requests by the user and answer them in the following way: \n"
-                + "1. If the question or request is simple, answer it directly. \n"
-                + "2. If the question or request is complex, use the 'research' function available to you \n"
-                + "3. If the initial research was insufficient, use the 'research' function with new questions, until you are able to answer the question.",
+            system_message="You are SmartGPT. You get questions or requests by the user and answer them in the following way: \n"
+            + "1. If the question or request is simple, answer it directly. \n"
+            + "2. If the question or request is complex, use the 'research' function available to you \n"
+            + "3. If the initial research was insufficient, use the 'research' function with new questions, until you are able to answer the question.",
             prompt_template="{query}".format,
             response_openapi=AnswerWithCitations,
             **kwargs,
         )
-

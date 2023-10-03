@@ -173,21 +173,21 @@ async def test_bash():
         # "sleep 1",
         # "echo hello world",
     ]
-    
-#     commands = ["""
-# echo yoyoyo
-# echo "hello world" > test.txt
-# echo '"hello world"' > test2.txt
-# echo "'hello world'" > test3.txt
-# """, "cat test.txt", "cat test2.txt", "cat test3.txt"]
-    
-#     commands = ["echo \"hello\" > test1", "echo '\"hello\"' > test2", "echo \"hello\nworld\" > test3"]
 
-#     commands = ["echo \"hello\" > test1"]
+    #     commands = ["""
+    # echo yoyoyo
+    # echo "hello world" > test.txt
+    # echo '"hello world"' > test2.txt
+    # echo "'hello world'" > test3.txt
+    # """, "cat test.txt", "cat test2.txt", "cat test3.txt"]
 
-#     commands = ["""echo "hello world" > test2
-# """]
-    
+    #     commands = ["echo \"hello\" > test1", "echo '\"hello\"' > test2", "echo \"hello\nworld\" > test3"]
+
+    #     commands = ["echo \"hello\" > test1"]
+
+    #     commands = ["""echo "hello world" > test2
+    # """]
+
     outputs = await bash(commands)
     print("outputs:", "\n".join(outputs))
 

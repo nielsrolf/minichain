@@ -1,4 +1,5 @@
 import json
+
 import tiktoken
 
 from minichain.dtypes import FunctionCall, SystemMessage
@@ -13,15 +14,27 @@ def count_tokens(text):
 
 async def summarize_chunk(history):
     from minichain.agent import Agent
+
     prompt = ""
     for i, message in enumerate(history):
         prompt += f"Message {i}: {json.dumps(message)}\n"
-    
-    example = FunctionCall(name="return", arguments=json.dumps({"messages": [{"original_message_id": 0}, {"summary": "This is a summary of messages 2-6"}, {"original_message_id": 7}]}))
+
+    example = FunctionCall(
+        name="return",
+        arguments=json.dumps(
+            {
+                "messages": [
+                    {"original_message_id": 0},
+                    {"summary": "This is a summary of messages 2-6"},
+                    {"original_message_id": 7},
+                ]
+            }
+        ),
+    )
 
     prompt += (
-        "\n\nReturn the messages you want to keep with summaries for the less relevant messages by using the return function. Specify the shortened history like in this example:\n" +
-        json.dumps(example.dict(), indent=2)
+        "\n\nReturn the messages you want to keep with summaries for the less relevant messages by using the return function. Specify the shortened history like in this example:\n"
+        + json.dumps(example.dict(), indent=2)
     )
 
     with open(".minichain/last_summarize_prompt", "w") as f:
@@ -38,19 +51,21 @@ async def summarize_chunk(history):
     print(summary)
 
     new_history = []
-    for keep in summary['messages']:
-        if keep['original_message_id'] is not None:
-            new_history.append(history[keep['original_message_id']])
+    for keep in summary["messages"]:
+        if keep["original_message_id"] is not None:
+            new_history.append(history[keep["original_message_id"]])
         else:
-            new_history.append({
-                "role": "assistant",
-                "content": f"(summarized):\n{keep['summary']}",
-            })
+            new_history.append(
+                {
+                    "role": "assistant",
+                    "content": f"(summarized):\n{keep['summary']}",
+                }
+            )
     with open(".minichain/last_summary.json", "w") as f:
-        json.dump({"history": history, "summary": summary, "new_histrory": new_history}, f)
+        json.dump(
+            {"history": history, "summary": summary, "new_histrory": new_history}, f
+        )
     return new_history
-
-
 
 
 history_summarize_prompt = (
@@ -65,11 +80,13 @@ history_summarize_prompt = (
     "- you should try to shorten the history by about 50% and reduce the number of messages by at least 1\n"
     "- end the history in a way that makes it very clear what should be done next, and make sure all the information needed to complete the task is there\n"
 )
+
+
 async def get_summarized_history(messages, functions, max_tokens=6000):
-    if messages[0]['content'] == history_summarize_prompt:
+    if messages[0]["content"] == history_summarize_prompt:
         # We are the summarizer, if we summarize at this point we go into an infinite loop
         return messages
-    
+
     original_history = list(messages)
     print("original history", len(original_history))
     tokens = count_tokens(json.dumps(functions))
@@ -77,12 +94,19 @@ async def get_summarized_history(messages, functions, max_tokens=6000):
     # while the total token number is too large, we summarize the first max_token/2 messages and try again
     step = 1
     function_tokens = count_tokens(json.dumps(functions))
-    while count_tokens(json.dumps(messages)) + function_tokens > max_tokens :
-        print("TOKENS", count_tokens(json.dumps(messages)) + function_tokens, function_tokens, max_tokens)
+    while count_tokens(json.dumps(messages)) + function_tokens > max_tokens:
+        print(
+            "TOKENS",
+            count_tokens(json.dumps(messages)) + function_tokens,
+            function_tokens,
+            max_tokens,
+        )
         print("step", step)
         # Get as many messages as possible without exceeding the token limit. We first summarize only the first 75%, if that was not enough we summarize 87.5%, 93.75%, ...
         for i in range(1, len(messages)):
-            if count_tokens(json.dumps(messages[:i])) > (max_tokens - function_tokens) * (1 - 0.5 ** (step + 1)):
+            if count_tokens(json.dumps(messages[:i])) > (
+                max_tokens - function_tokens
+            ) * (1 - 0.5 ** (step + 1)):
                 break
         step += 1
         # Try to summarize the chunk until we get a summary that is smaller than the chunk. If we fail, increase the chunk size and try again
@@ -95,15 +119,21 @@ async def get_summarized_history(messages, functions, max_tokens=6000):
         if summarized_tokens > tokens_to_summarize:
             print("FAILED")
             breakpoint()
-            continue # with increased step, and therefore larger chunk
+            continue  # with increased step, and therefore larger chunk
         messages = summary + messages[i:]
-    
+
     if messages[-1]["content"].startswith("(summarized)"):
         messages[-1]["content"] += "\n\nOkay let's continue with the task."
 
     with open(".minichain/last_summarized_history_final.json", "w") as f:
-        json.dump({"original_history": original_history, "summarized_history": messages, "length_original": count_tokens(json.dumps(original_history)), "length_shortened": count_tokens(json.dumps(messages))}, f)
-    
-    return messages
-        
+        json.dump(
+            {
+                "original_history": original_history,
+                "summarized_history": messages,
+                "length_original": count_tokens(json.dumps(original_history)),
+                "length_shortened": count_tokens(json.dumps(messages)),
+            },
+            f,
+        )
 
+    return messages

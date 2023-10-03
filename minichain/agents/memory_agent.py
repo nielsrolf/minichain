@@ -14,7 +14,9 @@ class ProgrammerResponse(BaseModel):
 
 class MemoryAgent(Agent):
     def __init__(self, memory=None, load_memory_from=None, **kwargs):
-        self.memory = memory or SemanticParagraphMemory(use_vector_search=True, agents_kwargs=kwargs)
+        self.memory = memory or SemanticParagraphMemory(
+            use_vector_search=True, agents_kwargs=kwargs
+        )
         if load_memory_from:
             self.memory.load(load_memory_from)
         print("Init history for programmer:", kwargs.get("init_history", []))
@@ -25,11 +27,7 @@ class MemoryAgent(Agent):
                 user_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}"
             else:
                 user_msg += f"\nYou don't have any memories yet."
-            init_history.append(
-                UserMessage(
-                    user_msg
-                )
-            )
+            init_history.append(UserMessage(user_msg))
         super().__init__(
             functions=[
                 self.memory.find_memory_tool(),
@@ -41,7 +39,7 @@ class MemoryAgent(Agent):
             init_history=init_history,
             **kwargs,
         )
-    
+
     def register_stream(self, stream):
         self.memory.register_stream(stream)
         super().register_stream(stream)
@@ -57,4 +55,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

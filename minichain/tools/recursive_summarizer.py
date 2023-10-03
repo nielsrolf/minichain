@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 from minichain.agent import Agent
 from minichain.functions import Function
 from minichain.schemas import Done
-
 from minichain.tools.document_qa import qa
 from minichain.tools.summarize import summarize
 from minichain.utils.document_splitter import split_document

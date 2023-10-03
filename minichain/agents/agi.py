@@ -1,14 +1,14 @@
 from pydantic import Field
 
 from minichain.agent import Agent, make_return_function
+from minichain.agents.programmer import Programmer
+from minichain.agents.replicate_multimodal import Artist, MultiModalResponse
+from minichain.agents.webgpt import WebGPT
 from minichain.dtypes import UserMessage
 from minichain.functions import tool
-from minichain.agents.programmer import Programmer
-from minichain.agents.webgpt import WebGPT
-from minichain.agents.replicate_multimodal import Artist, MultiModalResponse
 from minichain.schemas import MultiModalResponse
-from minichain.tools import codebase
-from minichain.tools import taskboard
+from minichain.tools import codebase, taskboard
+
 
 class AGI(Agent):
     """
@@ -35,7 +35,9 @@ class AGI(Agent):
         ):
             """Assign a task to a programmer or webgpt. The assignee will immediately start working on the task."""
             task = [i for i in self.board.tasks if i.id == task_id][0]
-            board_before = await taskboard.update_status(self.board, task_id, "IN_PROGRESS")
+            board_before = await taskboard.update_status(
+                self.board, task_id, "IN_PROGRESS"
+            )
             if "programmer" in assignee.lower():
                 self.programmer.register_stream(self.stream)
                 response = await self.programmer.run(
@@ -60,26 +62,33 @@ class AGI(Agent):
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
             return response
-        
+
         def register_stream(stream):
             self.stream = stream
             self.programmer.register_stream(stream)
             self.webgpt.register_stream(stream)
             self.artist.register_stream(stream)
-        
+
         assign.register_stream = register_stream
 
         board_tools = taskboard.tools(self.board)
         self.programmer.functions += board_tools
+
         def check_board(**arguments):
             """Checks if there are still tasks not done on the board"""
-            todo_tasks = [i for i in self.board.tasks if i.status in  ["TODO", "IN_PROGRESS"]]
+            todo_tasks = [
+                i for i in self.board.tasks if i.status in ["TODO", "IN_PROGRESS"]
+            ]
             if len(todo_tasks) > 0:
-                raise taskboard.TasksNotDoneError(f"There are still {len(todo_tasks)} tasks not done on the board. Please finish them first.")
+                raise taskboard.TasksNotDoneError(
+                    f"There are still {len(todo_tasks)} tasks not done on the board. Please finish them first."
+                )
 
         return_function = make_return_function(MultiModalResponse, check_board)
 
-        all_tools = self.programmer.functions #+ self.artist.functions + self.webgpt.functions
+        all_tools = (
+            self.programmer.functions
+        )  # + self.artist.functions + self.webgpt.functions
         tools_dict = {i.name: i for i in all_tools}
         tools_dict.pop("return")
         all_tools = list(tools_dict.values()) + [assign, return_function]

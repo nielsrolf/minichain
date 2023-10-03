@@ -1,8 +1,11 @@
-import replicate
 import os
 from urllib.request import urlretrieve
-from minichain.agent import Function
+
+import replicate
 from dotenv import load_dotenv
+
+from minichain.agent import Function
+
 load_dotenv()
 
 
@@ -14,7 +17,7 @@ def get_model(model_id):
 
 
 def get_model_details(model_id):
-    return get_model(model_id).openapi_schema['components']['schemas']['Input']
+    return get_model(model_id).openapi_schema["components"]["schemas"]["Input"]
 
 
 def use_model(model_id, input):
@@ -30,7 +33,9 @@ def replace_files_by_data_recursive(data):
         abs_path = os.path.abspath(data)
         cwd = os.getcwd()
         if not abs_path.startswith(cwd):
-            raise Exception("Permission denied - you can only access files in the current working directory.")
+            raise Exception(
+                "Permission denied - you can only access files in the current working directory."
+            )
         return open(data, "rb")
     elif isinstance(data, dict):
         for key, value in data.items():
@@ -57,25 +62,32 @@ def replace_urls_by_url_and_local_file_recursive(data, download_dir):
         }
     elif isinstance(data, dict):
         for key, value in data.items():
-            data[key] = replace_urls_by_url_and_local_file_recursive(value, download_dir=download_dir)
+            data[key] = replace_urls_by_url_and_local_file_recursive(
+                value, download_dir=download_dir
+            )
         return data
     elif isinstance(data, list):
-        return [replace_urls_by_url_and_local_file_recursive(i, download_dir=download_dir) for i in data]
+        return [
+            replace_urls_by_url_and_local_file_recursive(i, download_dir=download_dir)
+            for i in data
+        ]
     else:
         return data
-
-
 
 
 def replicate_model_as_tool(model_id, download_dir, name=None):
     print("replicate_model_as_tool", download_dir)
     openapi = get_model_details(model_id)
+
     async def replicate_tool(**kwargs):
         """Replicate model"""
         # Upload all files referenced in the input
         kwargs = replace_files_by_data_recursive(kwargs)
         output = use_model(model_id, kwargs)
-        return replace_urls_by_url_and_local_file_recursive(output, download_dir=download_dir)
+        return replace_urls_by_url_and_local_file_recursive(
+            output, download_dir=download_dir
+        )
+
     replicate_tool.__name__ = name or model_id.split(":")[0]
     replicate_tool.__doc__ = "Use the replicate model: " + model_id.split(":")[0]
     replicate_tool = Function(

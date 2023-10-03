@@ -7,7 +7,6 @@ from minichain.functions import tool
 from minichain.tools.recursive_summarizer import long_document_qa
 from minichain.utils.generate_docs import get_symbols, summarize_python_file
 
-
 default_ignore_files = [
     "__pycache__",
     "node_modules",
@@ -18,6 +17,7 @@ default_ignore_files = [
     "examples",
 ]
 
+
 class RelevantSection(BaseModel):
     start: int = Field(
         ...,
@@ -27,10 +27,7 @@ class RelevantSection(BaseModel):
 
 
 def get_visible_files(
-    root_dir,
-    extensions,
-    ignore_files=default_ignore_files,
-    max_lines=100
+    root_dir, extensions, ignore_files=default_ignore_files, max_lines=100
 ):
     def should_ignore(path):
         for ignore in ignore_files:
@@ -62,7 +59,9 @@ def get_visible_files(
 
     depth = 0
     files, new_files = [], []
-    while len(new_files) <= max_lines and depth < 10:  # Limiting depth to avoid infinite loops
+    while (
+        len(new_files) <= max_lines and depth < 10
+    ):  # Limiting depth to avoid infinite loops
         files = new_files
         new_files = list_files(root_dir, depth)
         depth += 1
@@ -76,9 +75,14 @@ def get_initial_summary(
     root_dir=".",
     extensions=[".py", ".js", ".ts", "README.md"],
     ignore_files=default_ignore_files,
-    max_lines=25
+    max_lines=25,
 ):
-    available_files = get_visible_files(root_dir=root_dir, extensions=extensions, ignore_files=ignore_files, max_lines=max_lines)
+    available_files = get_visible_files(
+        root_dir=root_dir,
+        extensions=extensions,
+        ignore_files=ignore_files,
+        max_lines=max_lines,
+    )
     try:
         with open("README.md") as f:
             summary = "\n".join(f.readlines()[:5]) + "...\n"
@@ -101,7 +105,7 @@ async def get_long_summary(
         "venv/",
         "env/",
         ".cache/",
-        ".minichain/"
+        ".minichain/",
     ],
 ):
     file_summaries = {}
@@ -194,10 +198,14 @@ async def edit(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
     end: int = Field(..., description="The end line."),
-    code: str = Field(..., description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON."),
+    code: str = Field(
+        ...,
+        description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON.",
+    ),
 ):
     """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!
-    To create a new file, specify the path and start,end=0. Use this method instead of bash touch or echo to create new files."""
+    To create a new file, specify the path and start,end=0. Use this method instead of bash touch or echo to create new files.
+    """
     if not os.path.exists(path):
         # check if the dir exists
         dir_path = os.path.dirname(path)
@@ -245,7 +253,10 @@ async def replace_symbol(
         ...,
         description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only.",
     ),
-    code: str = Field(..., description="The new code to replace the symbol with. Can be escaped with `ticks` to avoid formatting code as JSON."),
+    code: str = Field(
+        ...,
+        description="The new code to replace the symbol with. Can be escaped with `ticks` to avoid formatting code as JSON.",
+    ),
     is_new: bool = Field(False, description="Whether a new symbol should be created."),
 ):
     """Replace a symbol (function/class/method) in a file."""

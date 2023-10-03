@@ -1,8 +1,11 @@
 import pytest
 
-from minichain.tools.recursive_summarizer import (long_document_qa,
-                                                  long_document_summarizer)
+from minichain.tools.recursive_summarizer import (
+    long_document_qa,
+    long_document_summarizer,
+)
 from minichain.utils.markdown_browser import markdown_browser
+
 
 @pytest.mark.asyncio
 async def test_long_document_qa():

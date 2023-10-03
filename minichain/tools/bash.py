@@ -1,17 +1,16 @@
 import asyncio
+import json
 import os
 import uuid
 from typing import Callable, List, Optional, Union
-import json
 
 import docker
 from pydantic import BaseModel, Field
 
 from minichain.agent import Function
-from minichain.utils.docker_sandbox import bash
-from minichain.streaming import Stream
 from minichain.schemas import BashQuery
-
+from minichain.streaming import Stream
+from minichain.utils.docker_sandbox import bash
 
 
 def shorten_response(response: str) -> str:
@@ -85,7 +84,10 @@ class BashSession(Function):
 
 
 class CodeInterpreterQuery(BaseModel):
-    code: str = Field(..., description="Python code to run. Code can also be passed directly as a string without the surrounding 'code' field. ")
+    code: str = Field(
+        ...,
+        description="Python code to run. Code can also be passed directly as a string without the surrounding 'code' field. ",
+    )
     timeout: Optional[int] = Field(60, description="The timeout in seconds.")
 
 
@@ -98,6 +100,7 @@ def print(*args, **kwargs):
 
 last_lines = """import types
 print(", ".join([f"{k}: {v}" for k, v in locals().items() if k in <lastLine> ]))"""
+
 
 class CodeInterpreter(Function):
     def __init__(self, stream=None, **kwargs):
@@ -113,7 +116,14 @@ class CodeInterpreter(Function):
     async def __call__(self, code: str, timeout: int = 60) -> str:
         last_line = json.dumps(code.strip().split("\n")[-1])
         code = first_lines + code
-        if not "=" in last_line and not "plt" in last_line and not "print" in last_line and not "import" in last_line and not "save" in last_line and not last_line.startswith("#"):
+        if (
+            not "=" in last_line
+            and not "plt" in last_line
+            and not "print" in last_line
+            and not "import" in last_line
+            and not "save" in last_line
+            and not last_line.startswith("#")
+        ):
             code = code + "\n" + last_lines.replace("<lastLine>", last_line)
         filename = uuid.uuid4().hex[:5]
         filepath = f"{self.bash.cwd}/.minichain/{filename}.py"

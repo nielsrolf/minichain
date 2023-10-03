@@ -3,16 +3,12 @@ import traceback
 
 from pydantic import BaseModel
 
-from minichain.utils.cached_openai import get_openai_response_stream
-from minichain.dtypes import (
-    SystemMessage,
-    UserMessage,
-    Cancelled,
-    messages_types_to_history
-)
-from minichain.functions import Function, tool
-from minichain.streaming import Stream
+from minichain.dtypes import (Cancelled, SystemMessage, UserMessage,
+                              messages_types_to_history)
+from minichain.functions import Function
 from minichain.schemas import DefaultResponse
+from minichain.streaming import Stream
+from minichain.utils.cached_openai import get_openai_response_stream
 from minichain.utils.summarize_history import get_summarized_history
 
 
@@ -61,7 +57,7 @@ class Agent:
     @property
     def functions_openai(self):
         return [i.openapi_json for i in self.functions]
-    
+
     async def initialize_session(self, history=[]):
         agent_session = Session(
             self,
@@ -83,7 +79,7 @@ class Agent:
         agent_session.history.append(UserMessage(self.prompt_template(**arguments)))
         response = await agent_session.run_until_done()
         return response
-    
+
     def register_stream(self, stream):
         self.stream = stream
 
@@ -101,11 +97,12 @@ class Agent:
         return function_tool
 
 
-class Session():
+class Session:
     """
     - handle streaming
     - stateful history
     """
+
     def __init__(self, agent, history=[]):
         self.agent = agent
         self.history = history.copy()
@@ -121,17 +118,19 @@ class Session():
                         # output is the output of the return function
                         # since each function returns a string, we need to parse the output
                         return json.loads(output)
-    
+
     async def get_next_action(self, stream):
         history_without_ids = messages_types_to_history(self.history)
-        summarized_history = await get_summarized_history(history_without_ids, self.agent.functions_openai)
+        summarized_history = await get_summarized_history(
+            history_without_ids, self.agent.functions_openai
+        )
         # do the openai call
         with await stream.to(self.history, role="assistant") as stream:
             await get_openai_response_stream(
                 summarized_history,
                 self.agent.functions_openai,
                 model=self.agent.llm,
-                stream=stream
+                stream=stream,
             )
         return self.history[-1].function_call
 
@@ -142,17 +141,20 @@ class Session():
                     if function.name == action.name:
                         function.register_stream(stream)
                         if not isinstance(action.arguments, dict):
-                            await stream.set(f"Error: arguments for {function.name} are not valid JSON.")
+                            await stream.set(
+                                f"Error: arguments for {function.name} are not valid JSON."
+                            )
                             return False
                         function_output = await function(**action.arguments)
                         return function_output
                 await stream.set(
-                        f"Error: this function does not exist", action.name,
-                    )
+                    f"Error: this function does not exist",
+                    action.name,
+                )
             except Exception as e:
                 await stream.chunk(self.format_error_message(e))
         return False
-    
+
     def format_error_message(self, e):
         if isinstance(e, Cancelled):
             raise e
@@ -161,18 +163,21 @@ class Session():
             msg = f"{type(e)}: {e} - {e.msg}"
         except AttributeError:
             msg = f"{type(e)}: {e}"
-        msg = msg.replace("<class 'pydantic.error_wrappers.ValidationError'>", "Response could not be parsed, did you mean to call return?\nError:")
-        msg = '```\n' + msg + '\n```'
+        msg = msg.replace(
+            "<class 'pydantic.error_wrappers.ValidationError'>",
+            "Response could not be parsed, did you mean to call return?\nError:",
+        )
+        msg = "```\n" + msg + "\n```"
         return msg
 
     async def follow_up(self, user_message):
         with await self.stream.to(self.history, role="user") as stream:
             await stream.set(user_message.content)
         return await self.run_until_done()
-    
+
     async def send_initial_messages(self, stream):
         for message in self.history:
             await stream.send(message)
-    
+
     def register_stream(self, stream):
         self.stream = stream

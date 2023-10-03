@@ -1,9 +1,7 @@
 from minichain.agent import Agent
-from minichain.tools.bash import CodeInterpreter
-
-from minichain.tools.replicate_client import *
 from minichain.schemas import MultiModalResponse
-
+from minichain.tools.bash import CodeInterpreter
+from minichain.tools.replicate_client import *
 
 models = {
     "text_to_image": "stability-ai/sdxl:d830ba5dabf8090ec0db6c10fc862c6eb1c929e1a194a5411852d25fd954ac82",
@@ -11,7 +9,7 @@ models = {
     "text_to_music": "facebookresearch/musicgen:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906",
     "image_to_text": "andreasjansson/blip-2:4b32258c42e9efd4288bb9910bc532a69727f9acd26aa08e175713a0a857a608",
     # text_to_speech: ?
-    "speech_to_text": "openai/whisper:91ee9c0c3df30478510ff8c8a3a545add1ad0259ad3a9f78fba57fbc05ee64f7"
+    "speech_to_text": "openai/whisper:91ee9c0c3df30478510ff8c8a3a545add1ad0259ad3a9f78fba57fbc05ee64f7",
 }
 
 
@@ -23,6 +21,8 @@ Instructions:
 - use python and moviepy to generate videos if appropriate
 - when you call a function, you call a different AI model. This model knows nothing about the current conversation, so include all relevant info in the prompts
 """
+
+
 class Artist(Agent):
     def __init__(self, **kwargs):
         interpreter = CodeInterpreter()
@@ -30,9 +30,13 @@ class Artist(Agent):
         os.makedirs(".minichain/downloads", exist_ok=True)
         download_dir = f".minichain/downloads/{len(os.listdir('.minichain/downloads'))}"
         print("Artist", download_dir)
-        self.replicate_models = [replicate_model_as_tool(i, name=key, download_dir=download_dir) for key, i in models.items()]
+        self.replicate_models = [
+            replicate_model_as_tool(i, name=key, download_dir=download_dir)
+            for key, i in models.items()
+        ]
         super().__init__(
-            functions=self.replicate_models + [
+            functions=self.replicate_models
+            + [
                 interpreter.bash,
                 interpreter,
             ],
@@ -41,5 +45,3 @@ class Artist(Agent):
             response_openapi=MultiModalResponse,
             **kwargs,
         )
-
-

@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, create_model
 import inspect
 import json
+
+from pydantic import BaseModel, Field, create_model
 
 from minichain.streaming import Stream
 
@@ -35,7 +36,7 @@ class Function:
         self.name = name
         self.function = function
         self.description = description
-    
+
     # def parse(self, response):
     #     """This method is for child classes that want to add extra parsing logic to the response, e.g. python"""
     #     return response

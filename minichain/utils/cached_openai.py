@@ -1,15 +1,15 @@
 import json
 import os
+from typing import Any, Dict, Optional
 
 import numpy as np
 import openai
 from retry import retry
-from typing import Optional, Dict, Any
 
+from minichain.dtypes import AssistantMessage, FunctionCall
+from minichain.streaming import Stream
 from minichain.utils.debug import debug
 from minichain.utils.disk_cache import async_disk_cache, disk_cache
-from minichain.dtypes import FunctionCall, AssistantMessage
-from minichain.streaming import Stream
 
 
 def parse_function_call(function_call: Optional[Dict[str, Any]]):
@@ -35,7 +35,7 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
         except Exception as e:
             print(e)
             breakpoint()
-    
+
     if '"code": `' in function_call["arguments"]:
         try:
             # replace first occurrence of ``` with " and last
@@ -52,14 +52,14 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
         except Exception as e:
             print(e)
             breakpoint()
-    
-    if function_call['name'] == "python":
+
+    if function_call["name"] == "python":
         # Somehow with python we get a string instead of a dict, which is probably easier for the model to handle, so we support it
         try:
-            arguments = json.loads(function_call['arguments'])
+            arguments = json.loads(function_call["arguments"])
         except:
-            arguments = {"code": function_call['arguments']}
-        function_call['arguments'] = arguments
+            arguments = {"code": function_call["arguments"]}
+        function_call["arguments"] = arguments
 
     return FunctionCall(**function_call)
 
@@ -81,8 +81,8 @@ def format_history(messages: list) -> list:
     for message in messages:
         if (function_call := message.get("function_call")) is not None:
             try:
-                if isinstance(function_call['arguments'], dict):
-                    function_call['arguments'] = json.dumps(function_call['arguments'])
+                if isinstance(function_call["arguments"], dict):
+                    function_call["arguments"] = json.dumps(function_call["arguments"])
             except Exception as e:
                 print(e)
                 breakpoint()
@@ -136,10 +136,14 @@ async def get_openai_response_stream(
     for chunk in openai_response:
         chunk = chunk["choices"][0]["delta"].to_dict_recursive()
         await stream.chunk(chunk)
-    raw_response = {key: value for key, value in stream.current_message.items() if "id" not in key}
+    raw_response = {
+        key: value for key, value in stream.current_message.items() if "id" not in key
+    }
     response = fix_common_errors(raw_response)
     await stream.set(response)
-    save_llm_call_for_debugging(messages, functions, response, raw_response=raw_response)
+    save_llm_call_for_debugging(
+        messages, functions, response, raw_response=raw_response
+    )
     return response
 
 

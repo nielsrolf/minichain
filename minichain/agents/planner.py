@@ -3,8 +3,7 @@ from pydantic import Field
 from minichain.agent import Agent, SystemMessage, UserMessage, tool
 from minichain.agents.programmer import Programmer, ProgrammerResponse
 from minichain.agents.webgpt import WebGPT
-from minichain.tools import codebase
-from minichain.tools import taskboard
+from minichain.tools import codebase, taskboard
 
 
 class Planner(Agent):
@@ -37,7 +36,9 @@ class Planner(Agent):
             self.programmer.on_message_send = self.on_message_send
             self.webgpt.on_message_send = self.on_message_send
             task = [i for i in self.board.tasks if i.id == task_id][0]
-            board_before = await taskboard.update_status(self.board, task_id, "IN_PROGRESS")
+            board_before = await taskboard.update_status(
+                self.board, task_id, "IN_PROGRESS"
+            )
             if "programmer" in assignee.lower():
                 response = await self.programmer.run(
                     query=f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.",

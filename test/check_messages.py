@@ -3,14 +3,14 @@ import requests
 
 
 def check_api_state():
-    endpoint = 'http://localhost:8745/history'
+    endpoint = "http://localhost:8745/history"
 
     # Get all events
     events = requests.get(endpoint).json()
-    childrenOf = events['childrenOf']
-    messages = pd.DataFrame(events['messages'])
+    childrenOf = events["childrenOf"]
+    messages = pd.DataFrame(events["messages"])
     # set id as index
-    messages = messages.set_index('id')
+    messages = messages.set_index("id")
     parentOf = {}
     for parent, children in childrenOf.items():
         for child in children:
@@ -22,7 +22,7 @@ def check_api_state():
         try:
             print(messages.loc[id])
             # find the index of the message
-            
+
         except KeyError:
             pass
         try:
@@ -39,6 +39,7 @@ def check_api_state():
 
 def check_messages():
     import json
+
     events = []
     path = ".minichain/messages"
     last_valid = -1
@@ -58,7 +59,7 @@ def check_messages():
             stacks[event["stack"][-1]] = event
         else:
             messages[event["id"]] = event
-    
+
     while id := input("enter an id: "):
         try:
             print("Message", messages[id])
@@ -70,5 +71,6 @@ def check_messages():
             pass
         print("-" * 80)
     breakpoint()
+
 
 check_messages()

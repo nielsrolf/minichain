@@ -1,7 +1,7 @@
-import uuid
-from dataclasses import dataclass, asdict
-from typing import Dict, Any, Optional
 import json
+import uuid
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, Optional
 
 
 @dataclass
@@ -122,7 +122,7 @@ def messages_types_to_history(chat_history: list) -> list:
             messages.append(message)
     else:
         messages = chat_history
-    
+
     # remove function calls from messages if they are None
     for message in messages:
         message.pop("parent", None)
