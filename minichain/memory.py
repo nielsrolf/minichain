@@ -13,14 +13,16 @@ from minichain.agent import Agent
 from minichain.functions import Function, tool
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
 from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory
+from minichain.tools.codebase import default_ignore_files, get_visible_files
 from minichain.utils.cached_openai import get_embedding
-from minichain.utils.markdown_browser import markdown_browser
 
 
 snippet_template = """## {title}
 Context: {context}
 Source: {source}
-Content: {content}
+```
+{content}
+```
 """
 
 
@@ -340,12 +342,18 @@ class SemanticParagraphMemory:
 
         return find_memory
 
+
     def ingest_tool(self):
         @tool()
         async def create_memories_from_file(
-            path: str = Field(..., description="The path to the file to ingest.")
+            path: str = Field(..., description="The path to the dir or file to ingest. If a dir is provided, all files in the dir are ingested.")
         ):
             """Read a file and create memories from it."""
+            if os.path.isdir(path):
+                # Show the list of files that can be ingested
+                available_files = get_visible_files(path, ignore_files=default_ignore_files, extensions=[".py", ".js", ".ts", "README.md"])
+                available_files = "\n".join(available_files)
+                return f"{path} is a dir. Please ingest the files one by one. Available files:```\n{available_files}\n```"
             with open(path, "r") as f:
                 content = f.read()
             new_memories = await self.ingest(content, path)

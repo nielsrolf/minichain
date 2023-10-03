@@ -8,6 +8,16 @@ from minichain.tools.recursive_summarizer import long_document_qa
 from minichain.utils.generate_docs import get_symbols, summarize_python_file
 
 
+default_ignore_files = [
+    "__pycache__",
+    "node_modules",
+    "dist",
+    "build",
+    "venv",
+    "env",
+    "examples",
+]
+
 class RelevantSection(BaseModel):
     start: int = Field(
         ...,
@@ -19,7 +29,7 @@ class RelevantSection(BaseModel):
 def get_visible_files(
     root_dir,
     extensions,
-    ignore_files=[],
+    ignore_files=default_ignore_files,
     max_lines=100
 ):
     def should_ignore(path):
@@ -65,15 +75,7 @@ def get_visible_files(
 def get_initial_summary(
     root_dir=".",
     extensions=[".py", ".js", ".ts", "README.md"],
-    ignore_files=[
-        "__pycache__",
-        "node_modules",
-        "dist",
-        "build",
-        "venv",
-        "env",
-        "examples",
-    ],
+    ignore_files=default_ignore_files,
     max_lines=25
 ):
     available_files = get_visible_files(root_dir=root_dir, extensions=extensions, ignore_files=ignore_files, max_lines=max_lines)
