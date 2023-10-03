@@ -5,6 +5,10 @@ import CodeBlock from './CodeBlock';
 
 
 const MultiMedia = ({ path }) => {
+  console.log("multimedia:", {path})
+  if (!path) {
+    return '';
+  }
   const url = path.startsWith("http") ? path : `http://localhost:8000/static/${path}`;
   // get the file type
   const extension = path.split('.').pop();

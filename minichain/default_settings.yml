@@ -1,26 +1,26 @@
 agents:
-  memory:
+  MemoryAgent:
     class: minichain.agents.memory_agent.MemoryAgent
     init:
       load_memory_from: .minichain/memory
     display: true
-  yopilot:
+  Programmer:
     class: minichain.agents.programmer.Programmer
     init:
       load_memory_from: .minichain/memory
     display: true
-  chatgpt:
+  ChatGPT:
     class: minichain.agents.chatgpt.ChatGPT
-    display: false
+    display: true
   artist:
     class: minichain.agents.replicate_multimodal.Artist
-    display: false
-  webgpt:
+    display: true
+  WebGPT:
     class: minichain.agents.webgpt.WebGPT
-    display: false
-  agi:
+    display: true
+  AGI:
     class: minichain.agents.agi.AGI
-    display: false
+    display: true
   custom_agent:
     class: minichain.agent.Agent
     display: false

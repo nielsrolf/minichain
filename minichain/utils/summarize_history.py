@@ -2,6 +2,8 @@ import json
 import tiktoken
 
 from minichain.dtypes import FunctionCall, SystemMessage
+from minichain.schemas import ShortenedHistory
+
 
 def count_tokens(text):
     encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
@@ -10,6 +12,7 @@ def count_tokens(text):
 
 
 async def summarize_chunk(history):
+    from minichain.agent import Agent
     prompt = ""
     for i, message in enumerate(history):
         prompt += f"Message {i}: {json.dumps(message)}\n"
@@ -62,12 +65,7 @@ history_summarize_prompt = (
     "- you should try to shorten the history by about 50% and reduce the number of messages by at least 1\n"
     "- end the history in a way that makes it very clear what should be done next, and make sure all the information needed to complete the task is there\n"
 )
-async def get_summarized_history(history, functions, max_tokens=6000):
-    messages = [i.dict() for i in history]
-    for i in messages:
-        i.pop("id")
-        i.pop("conversation_id")
-    
+async def get_summarized_history(messages, functions, max_tokens=6000):
     if messages[0]['content'] == history_summarize_prompt:
         # We are the summarizer, if we summarize at this point we go into an infinite loop
         return messages

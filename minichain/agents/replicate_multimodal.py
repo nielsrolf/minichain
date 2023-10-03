@@ -1,11 +1,5 @@
-import asyncio
-
-from pydantic import BaseModel, Field
-
-from minichain.agent import Agent, SystemMessage, UserMessage
-# from minichain.tools.code_interpreter import code_interpreter
+from minichain.agent import Agent
 from minichain.tools.bash import CodeInterpreter
-from typing import List, Optional
 
 from minichain.tools.replicate_client import *
 from minichain.schemas import MultiModalResponse
@@ -20,12 +14,6 @@ models = {
     "speech_to_text": "openai/whisper:91ee9c0c3df30478510ff8c8a3a545add1ad0259ad3a9f78fba57fbc05ee64f7"
 }
 
-
-
-
-async def async_print(i, final=False):
-    # print(i)
-    pass
 
 artist_message = """You are a multimodal artist. You use the functions available to you to interact with media files. You also use the python interpreter and ffmpeg when needed.
 
@@ -48,9 +36,7 @@ class Artist(Agent):
                 interpreter.bash,
                 interpreter,
             ],
-            system_message=SystemMessage(
-                artist_message
-            ),
+            system_message=artist_message,
             prompt_template="{query}".format,
             response_openapi=MultiModalResponse,
             **kwargs,

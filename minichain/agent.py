@@ -13,6 +13,7 @@ from minichain.dtypes import (
 from minichain.functions import Function, tool
 from minichain.streaming import Stream
 from minichain.schemas import DefaultResponse
+from minichain.utils.summarize_history import get_summarized_history
 
 
 def make_return_function(openapi_json: BaseModel, check=None):
@@ -122,18 +123,17 @@ class Session():
                         return json.loads(output)
     
     async def get_next_action(self, stream):
+        history_without_ids = messages_types_to_history(self.history)
+        summarized_history = await get_summarized_history(history_without_ids, self.agent.functions_openai)
         # do the openai call
-        # history = await get_summarized_history(self.history, self.agent.functions_openai)
-        history = self.history
-        # TODO
-        with await stream.to(history, role="assistant") as stream:
+        with await stream.to(self.history, role="assistant") as stream:
             await get_openai_response_stream(
-                messages_types_to_history(history),
+                summarized_history,
                 self.agent.functions_openai,
                 model=self.agent.llm,
                 stream=stream
             )
-        return history[-1].function_call
+        return self.history[-1].function_call
 
     async def execute_action(self, action, stream):
         with await stream.to(self.history, role="function", name=action.name) as stream:
@@ -144,7 +144,6 @@ class Session():
                         if not isinstance(action.arguments, dict):
                             await stream.set(f"Error: arguments for {function.name} are not valid JSON.")
                             return False
-                        # breakpoint()
                         function_output = await function(**action.arguments)
                         return function_output
                 await stream.set(

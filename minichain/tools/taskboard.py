@@ -11,12 +11,10 @@ class Task(BaseModel):
     id: Optional[int] = Field(
         None, description="The id of the task - only specify when updating a task."
     )
-    title: str = Field(..., description="The title of the task.")
     description: str = Field(
         ...,
         description="The description of the task - be verbose and make sure to mention every piece of information that might be relevant to the assignee.",
     )
-    priority: int = Field(..., description="The priority of the task.")
     status: str = Field(
         "TODO",
         description="The status of the task.",
@@ -26,7 +24,7 @@ class Task(BaseModel):
     comments: List[str] = []
 
     def __str__(self):
-        result = f"#{self.id} {self.title} ({self.status})\n{self.description}"
+        result = f"#{self.id} ({self.status})\n{self.description}"
         if self.comments:
             result += "\nComments:\n" + "\n".join(self.comments)
         return result
@@ -52,8 +50,7 @@ async def add_task(
 
 async def get_board(board: TaskBoard = None):
     """Get the task board."""
-    tasks_sorted = sorted(board.tasks, key=lambda t: -t.priority)
-    return "# Tasks\n" + "\n".join([str(t) for t in tasks_sorted])
+    return "# Tasks\n" + "\n".join([str(t) for t in board.tasks])
 
 
 async def update_status(

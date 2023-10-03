@@ -34,11 +34,10 @@ class AGI(Agent):
             ),
         ):
             """Assign a task to a programmer or webgpt. The assignee will immediately start working on the task."""
-            self.programmer.on_message_send = self.on_message_send
-            self.webgpt.on_message_send = self.on_message_send
             task = [i for i in self.board.tasks if i.id == task_id][0]
             board_before = await taskboard.update_status(self.board, task_id, "IN_PROGRESS")
             if "programmer" in assignee.lower():
+                self.programmer.register_stream(self.stream)
                 response = await self.programmer.run(
                     query=f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.",
                 )
@@ -61,10 +60,17 @@ class AGI(Agent):
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
             return response
+        
+        def register_stream(stream):
+            self.stream = stream
+            self.programmer.register_stream(stream)
+            self.webgpt.register_stream(stream)
+            self.artist.register_stream(stream)
+        
+        assign.register_stream = register_stream
 
         board_tools = taskboard.tools(self.board)
         self.programmer.functions += board_tools
-        all_tools = self.programmer.functions #+ self.artist.functions + self.webgpt.functions
         def check_board(**arguments):
             """Checks if there are still tasks not done on the board"""
             todo_tasks = [i for i in self.board.tasks if i.status in  ["TODO", "IN_PROGRESS"]]
@@ -72,7 +78,11 @@ class AGI(Agent):
                 raise taskboard.TasksNotDoneError(f"There are still {len(todo_tasks)} tasks not done on the board. Please finish them first.")
 
         return_function = make_return_function(MultiModalResponse, check_board)
-        all_tools = list({i.name: i for i in all_tools}.values())
+
+        all_tools = self.programmer.functions #+ self.artist.functions + self.webgpt.functions
+        tools_dict = {i.name: i for i in all_tools}
+        tools_dict.pop("return")
+        all_tools = list(tools_dict.values()) + [assign, return_function]
 
         init_history = kwargs.pop("init_history", [])
         if init_history == []:
