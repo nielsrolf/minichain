@@ -1,13 +1,8 @@
-import asyncio
-
-from pydantic import BaseModel, Field
-
-from minichain.agent import Agent, SystemMessage, UserMessage
-# from minichain.tools.code_interpreter import code_interpreter
+from minichain.agent import Agent
 from minichain.tools.bash import CodeInterpreter
-from typing import List, Optional
 
 from minichain.tools.replicate_client import *
+from minichain.schemas import MultiModalResponse
 
 
 models = {
@@ -20,16 +15,6 @@ models = {
 }
 
 
-
-class MultiModalResponse(BaseModel):
-    content: str = Field(..., description="The final response to the user.")
-    generated_files: List[str] = Field(..., description="Media files that have been generated.")
-
-
-async def async_print(i, final=False):
-    # print(i)
-    pass
-
 artist_message = """You are a multimodal artist. You use the functions available to you to interact with media files. You also use the python interpreter and ffmpeg when needed.
 
 Instructions:
@@ -39,8 +24,8 @@ Instructions:
 - when you call a function, you call a different AI model. This model knows nothing about the current conversation, so include all relevant info in the prompts
 """
 class Artist(Agent):
-    def __init__(self, silent=False, on_stream_message=async_print, **kwargs):
-        interpreter = CodeInterpreter(stream=on_stream_message)
+    def __init__(self, **kwargs):
+        interpreter = CodeInterpreter()
         self.interpreter = interpreter
         os.makedirs(".minichain/downloads", exist_ok=True)
         download_dir = f".minichain/downloads/{len(os.listdir('.minichain/downloads'))}"
@@ -51,11 +36,8 @@ class Artist(Agent):
                 interpreter.bash,
                 interpreter,
             ],
-            system_message=SystemMessage(
-                artist_message
-            ),
+            system_message=artist_message,
             prompt_template="{query}".format,
-            silent=silent,
             response_openapi=MultiModalResponse,
             **kwargs,
         )

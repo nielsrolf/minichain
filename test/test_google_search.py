@@ -9,10 +9,9 @@ from minichain.tools.recursive_summarizer import long_document_qa
 async def test_google_search():
     agent = Agent(
         functions=[web_search, long_document_qa],
-        system_message=SystemMessage("Use google to search the web for a query."),
+        system_message="Use google to search the web for a query.",
         prompt_template="{query}".format,
     )
     query = "What is the capital of France?"
     result = await agent.run(query=query)
     print(result)
-    breakpoint()

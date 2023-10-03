@@ -1,4 +1,5 @@
 from pprint import pprint
+import pytest
 
 from minichain.memory import SemanticParagraphMemory
 from minichain.utils.markdown_browser import markdown_browser
@@ -9,36 +10,29 @@ def print_memories(memories):
         pprint(i.dict())
 
 
-url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
-question = "What is the latest version of Python?"
+example_file = "minichain/utils/docker_sandbox.py"
+with open(example_file, "r") as f:
+    text = f.read()
+question = "In which line is the docker container started?"
 
 
-def test_question_embedding_memory():
+@pytest.mark.asyncio
+async def test_question_embedding_memory():
     memory = SemanticParagraphMemory(
-        use_keywords_search=False, use_content_scan_search=False
+        use_vector_search=True, use_content_scan_search=False
     )
-    text = markdown_browser(url)
-    memory.ingest(text, url)
-    memories = memory.retrieve(question)
+    await memory.ingest(text, example_file)
+    memories = await memory.retrieve(question)
     print_memories(memories)
-    print(memory.rank_or_summarize(memories, question))
+    answer = await memory.rank_or_summarize(memories, question)
+    print(answer)
 
 
-def test_keyword_memory():
-    memory = SemanticParagraphMemory(
-        use_vector_search=False, use_content_scan_search=False
-    )
-    text = markdown_browser(url)
-    memory.ingest(text, url)
-    memories = memory.retrieve(question)
+@pytest.mark.asyncio
+async def test_content_scan_memory():
+    memory = SemanticParagraphMemory(use_vector_search=False, use_content_scan_search=True)
+    await memory.ingest(text, example_file)
+    memories = await memory.retrieve(question)
     print_memories(memories)
-    print(memory.rank_or_summarize(memories, question))
-
-
-def test_content_scan_memory():
-    memory = SemanticParagraphMemory(use_keywords_search=False, use_vector_search=False)
-    text = markdown_browser(url)
-    memory.ingest(text, url)
-    memories = memory.retrieve(question)
-    print_memories(memories)
-    print(memory.rank_or_summarize(memories, question))
+    answer = await memory.rank_or_summarize(memories, question)
+    print(answer)

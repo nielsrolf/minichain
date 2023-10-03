@@ -73,13 +73,12 @@ class AsyncDiskCache(DiskCache):
             cached_value = self.load_from_cache(key)
             if cached_value is not None:
                 if stream:
-                    await stream(cached_value)
+                    await stream.set(cached_value)
                 return cached_value
             else:
                 print(f"Cache miss")
                 if stream:
                     result = await func(*args, **kwargs, stream=stream)
-                    await stream(result)
                 else:
                     result = await func(*args, **kwargs)
                 self.save_to_cache(key, args, kwargs, result)

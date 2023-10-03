@@ -5,7 +5,11 @@ import CodeBlock from './CodeBlock';
 
 
 const MultiMedia = ({ path }) => {
-  const url = path.startsWith("http") ? path : `http://localhost:8000/static/${path}`;
+  console.log("multimedia:", {path})
+  if (!path) {
+    return '';
+  }
+  const url = path.startsWith("http") ? path : `http://localhost:8745/static/${path}`;
   // get the file type
   const extension = path.split('.').pop();
   if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
@@ -43,6 +47,9 @@ const MultiMedia = ({ path }) => {
 const DisplayJson = ({ data }) => {
   const [isFolded, setIsFolded] = useState({});
   // First: all the special cases
+  if (!data) {
+    return '';
+  }
   if (data.name === 'python') {
     try {
       const parsed = JSON.parse(data.arguments);
@@ -62,11 +69,14 @@ const DisplayJson = ({ data }) => {
     // arguments was not a json
   }
   if (data.name === 'upload_file_to_chat') {
+    console.log(data);
     try {
-      const parsed = JSON.parse(data.arguments);
-      const path = parsed.file;
+      const path = data.arguments.file;
+      console.log(path);
       return <MultiMedia path={path} />;
-    } catch (e) {}
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   if (data.generated_files) {
@@ -147,7 +157,6 @@ const DisplayJson = ({ data }) => {
         </div>
       );
     }
-    console.log({ data, parentKey });
     if (data === null || data === undefined) {
       return '';
     }

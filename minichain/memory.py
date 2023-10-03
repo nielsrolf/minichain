@@ -4,28 +4,25 @@ import os
 import pickle
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional
 
 import numpy as np
 from pydantic import BaseModel, Field
 
-from minichain.agent import (Agent, AssistantMessage, Function, FunctionCall,
-                             FunctionMessage, SystemMessage, UserMessage)
+from minichain.agent import Agent
+from minichain.functions import Function, tool
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
-from minichain.tools.text_to_memory import (Memory, MemoryWithMeta,
-                                            text_to_memory)
+from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory
+from minichain.tools.codebase import default_ignore_files, get_visible_files
 from minichain.utils.cached_openai import get_embedding
-from minichain.utils.markdown_browser import markdown_browser
-
-
-class KeywordList(BaseModel):
-    keywords: List[str] = Field(..., description="A list of keywords.")
 
 
 snippet_template = """## {title}
 Context: {context}
 Source: {source}
-Content: {content}
+```
+{content}
+```
 """
 
 
@@ -100,48 +97,53 @@ class RelatedQuestionList(BaseModel):
 class SemanticParagraphMemory:
     def __init__(
         self,
-        use_vector_search=True,
-        use_keywords_search=False,
-        use_content_scan_search=True,
+        use_vector_search=False,
+        use_content_scan_search=False,
+        auto_save_dir=".minichain/memory",
+        agents_kwargs={}
     ):
+        assert use_vector_search or use_content_scan_search, (
+            "At least one of the search methods must be enabled. "
+            "Set use_vector_search or use_content_scan_search to True."
+        )
         self.use_vector_search = use_vector_search
-        self.use_keywords_search = use_keywords_search
         self.use_content_scan_search = use_content_scan_search
         self.num_search_methods = (
             int(use_vector_search)
-            + int(use_keywords_search)
             + int(use_content_scan_search)
         )
         self.memories: List[MemoryWithMeta] = []
         self.vector_db = VectorDB()
         self.snippet_template = snippet_template
-        self.read_website = Function(
-            name="read_website",
-            openapi=IngestQuery,
-            function=self._read_website,
-            description="Read a website and create annoted memories.",
-        )
         self.recall = Function(
             name="recall",
             openapi=RecallQuery,
             function=self._recall,
             description="Recall memories based on a question.",
         )
+        self.auto_save_dir = auto_save_dir
+        self.agent_kwargs = agents_kwargs
+    
+    def register_stream(self, stream):
+        self.agent_kwargs["stream"] = stream
 
     async def ingest(self, content, source):
-        memories = await text_to_memory(content, source)
+        memories = await text_to_memory(content, source, agent_kwargs=self.agent_kwargs)
         # Add memories to vector db
         for memory in memories:
             # title
             self.vector_db.add(memory.memory.title, memory)
             # questions
             for question in memory.memory.relevant_questions:
-                self.vector_db.add(question, memory)
+                key = f"({memory.meta.source}): {question}"
+                self.vector_db.add(key, memory)
         self.memories += memories
+        if self.auto_save_dir is not None:
+            self.save(self.auto_save_dir)
         return memories
 
-    def search_by_vector(self, question, num_results) -> List[MemoryWithMeta]:
-        query_questions = self.generate_questions(question)
+    async def search_by_vector(self, question, num_results) -> List[MemoryWithMeta]:
+        query_questions = await self.generate_questions(question)
         query_embeddings = self.vector_db.encode(query_questions)
         matches = self.vector_db.search(query_embeddings, num_results=num_results * 2)
         # Get the highest score for each memory-id (memories can occur multiple times)
@@ -158,49 +160,18 @@ class SemanticParagraphMemory:
         results = [i for i in self.memories if i.id in memory_ids]
         return results[:num_results]
 
-    async def search_by_keywords(self, question, num_results) -> List[MemoryWithMeta]:
-        keywords = await self.generate_keywords(question)
-        scores = [len(set(keywords) & set(i.memory.tags)) for i in self.memories]
-        highest_scoring_memories = sorted(
-            zip(scores, self.memories), reverse=True, key=lambda i: i[0]
-        )[:num_results]
-        results = [i[1] for i in highest_scoring_memories]
-        return results
-
-    def get_available_tags(self, memories=None) -> List[str]:
-        if memories is None:
-            memories = self.memories
-        return list(set([i for i in memories for i in i.memory.tags]))
-
-    async def generate_keywords(self, question) -> List[str]:
-        # Use gpt to generate keywords
-        available_tags = self.get_available_tags()
-        keyword_agent = Agent(
-            # system_message=SystemMessage(
-            #     f"You are a memory retrieval assistant. You have memories with the following tags: {available_tags}. Your task is to list all tags from the list that might be associated with information relevant to the question provided by the user. Do not respond with tags that are not in the list. Respond with the most relevant tags first. When in doubt, respond with more tags rather than less."
-            # ),
-            system_message=SystemMessage(
-                f"You are a memory retrieval assistant. You select tags of memories related to the question: '{question}'. When the user sends a list of tags, reply with a subset of those keywords that are most relevant to the question. When in doubt, respond with more tags rather than less. Respond with a json structure with one 'keywords' fields."
-            ),
-            prompt_template="{available_tags}".format,
-            functions=[],
-            response_openapi=KeywordList,
-        )
-        keywords = await keyword_agent.run(available_tags=available_tags)["keywords"]
-        print("looking for keywords", keywords)
-        return keywords
-
     async def generate_questions(self, question: str) -> List[str]:
         # Use gpt to generate questions
         question_agent = Agent(
-            system_message=SystemMessage(
-                f"The user provides you with a question. Generate a list of sub-questions that are relevant to the question. These questions are used to retrieve memories, which are then used to answer the question."
-            ),
+            system_message=
+                f"The user provides you with a question. Generate a list of sub-questions that are relevant to the question. These questions are used to retrieve memories, which are then used to answer the question.",
             prompt_template="{question}".format,
             functions=[],
             response_openapi=RelatedQuestionList,
+            **self.agent_kwargs,
         )
-        questions = await question_agent.run(question=question)["sub_questions"]
+        questions = await question_agent.run(question=question)
+        questions = questions["sub_questions"]
         print("Question: ", question)
         print("Sub-questions: ", questions)
         if question not in questions:
@@ -210,8 +181,6 @@ class SemanticParagraphMemory:
     async def retrieve(self, question: str, num_results=8) -> List[MemoryWithMeta]:
         results = []
         num_results_per_search = math.ceil(num_results / self.num_search_methods)
-        if self.use_keywords_search:
-            results += await self.search_by_keywords(question, num_results_per_search)
         if self.use_vector_search:
             results += await self.search_by_vector(question, num_results_per_search)
         if self.use_content_scan_search:
@@ -232,10 +201,11 @@ class SemanticParagraphMemory:
         return result
 
     async def rank_or_summarize(self, results, question) -> str:
+        # TODO
         if len(results) == 0:
             return "No relevant memories found."
         elif len(results) == 1:
-            return results[0]
+            return await long_document_qa(text=results[0].meta.content, question=question)
         else:
             return await self.summarize(results, question)
 
@@ -249,6 +219,7 @@ class SemanticParagraphMemory:
         print("-" * 80)
         print("-" * 80)
         print(document)
+        # TODO
         summary = await long_document_qa(text=document, question=question)
         return summary
 
@@ -259,31 +230,6 @@ class SemanticParagraphMemory:
             context=memory.memory.context,
             content=memory.meta.content,
         )
-
-    async def _read_website(self, url: str, question: str = None):
-        text = markdown_browser(url)
-        new_memories = await self.ingest(text, url)
-        queue = []
-        for memory in new_memories:
-            queue += memory.memory.links
-
-        content_summary = ""
-
-        if len(new_memories) > 0:
-            content_summary += f"New memories were created from the website {url}:\n"
-            content_summary += self.get_content_summary(new_memories)
-
-        if len(queue) > 0:
-            content_summary += f"You encountered the following links that you can read next if needed:\n"
-            content_summary += self.get_queue_summary(queue)
-
-        if question is not None:
-            current_answer = self.answer_from_memory(question)
-            content_summary += f"A current answer to the question '{question}', based on the memories you have is: \n"
-            content_summary += f"{current_answer}\n\n"
-            content_summary += "If this is a satisfactory answer, you can stop and respond to the user. If not, continue browsing."
-
-        return content_summary
 
     async def _recall(self, query: RecallQuery):
         results = await self.answer_from_memory(query.question)
@@ -305,12 +251,11 @@ class SemanticParagraphMemory:
             summary += f"# Memories from: {source} \n"
             for i in memories:
                 summary += i.memory.title + "\n"
-                summary += f"    {i.memory.tags}\n"
         return summary
 
     def get_queue_summary(self, queue):
         queue = sorted(queue, reverse=True, key=lambda i: i.priority)
-        summary = "======= ENCOUNTERED LINKS =======\n"
+        summary = ""
         for item in queue:
             question_list = "\n  ".join(item.expected_answers)
             summary += f"{item.url}: {question_list}  \n"
@@ -325,6 +270,8 @@ class SemanticParagraphMemory:
             text=content_summary,
             response_openapi=TitleScore,
             system_message=f"List all titles related to the question: {question}.",
+            **self.agent_kwargs
+
         )
         titles = sorted(titles, reverse=True, key=lambda i: i["score"])[:num_results]
         titles = [i["title"] for i in titles]
@@ -366,25 +313,94 @@ class SemanticParagraphMemory:
         with open(os.path.join(memory_dir, "memories.json"), "r") as f:
             memories = json.load(f)
         self.memories = [MemoryWithMeta(**i) for i in memories]
+    
+    def find_memory_tool(self):
+        @tool()
+        async def find_memory(
+            question: str = Field(..., description="The question to search for."),
+            num_results: int = Field(
+                1,
+                description="The number of memories to return. The results are ranked by relevance.",
+            ),
+            output: str = Field(
+                "answer",
+                description="The output format. Allowed values are: ['answer', 'raw']. Select 'raw' in order to retrieve the content of the original memory, e.g. in order to retrieve code.",
+            ),
+        ):
+            """Search memories related to a question."""
+            results = await self.retrieve(question, num_results=num_results)
+            if output == "answer":
+                result = await self.rank_or_summarize(results, question)
+            elif output == "raw":
+                result = "\n\n".join([self.format_as_snippet(i) for i in results])
+            return result
+        
+        def register_stream(stream):
+            self.register_stream(stream)
+            find_memory.stream = stream
+        find_memory.register_stream = register_stream
+
+        return find_memory
+
+
+    def ingest_tool(self):
+        @tool()
+        async def create_memories_from_file(
+            path: str = Field(..., description="The path to the dir or file to ingest. If a dir is provided, all files in the dir are ingested.")
+        ):
+            """Read a file and create memories from it."""
+            if os.path.isdir(path):
+                # Show the list of files that can be ingested
+                available_files = get_visible_files(path, ignore_files=default_ignore_files, extensions=[".py", ".js", ".ts", "README.md"])
+                available_files = "\n".join(available_files)
+                return f"{path} is a dir. Please ingest the files one by one. Available files:```\n{available_files}\n```"
+            with open(path, "r") as f:
+                content = f.read()
+            new_memories = await self.ingest(content, path)
+            summary = self.get_content_summary(new_memories)
+            return f"Ingested {path}. New memories formed:\n{summary} "
+        
+        def register_stream(stream):
+            self.register_stream(stream)
+            create_memories_from_file.stream = stream
+        create_memories_from_file.register_stream = register_stream
+
+        return create_memories_from_file
+            
+
+
+
+
+async def main():
+    memory = SemanticParagraphMemory(use_vector_search=True)
+    test_file = "minichain/utils/docker_sandbox.py"
+    with open(test_file, "r") as f:
+        content = f.read()
+    await memory.ingest(content, test_file)
+    memory.save("test_memory")
+    print(memory.get_content_summary())
+    print("======================================")
+    question = "with which command is the docker container started?"
+    async def print_qa(question):
+        print(question)
+        answer = await memory.answer_from_memory(question)
+        breakpoint()
+        print(answer)
+    await print_qa(question)
+
+    print("======================================")
+    try:
+        question = input("Ask a question: ")
+        while question != "exit":
+            answer = await memory.answer_from_memory(question)
+            print(answer)
+            question = input("Ask a question: ")
+    except:
+       breakpoint()
+    print("Bye")
+
 
 
 if __name__ == "__main__":
-    url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
-    memory = SemanticParagraphMemory(
-        use_content_scan_search=input("Use content scan search? (y/n) ") == "y",
-        use_keywords_search=input("Use keywords search? (y/n) ") == "y",
-        use_vector_search=input("Use vector search? (y/n) ") == "y",
-    )
-    text = markdown_browser(url)
-    memory.ingest(text, url)
-    memory.print()
-    try:
-        while question := input("Question: "):
-            print(memory.answer_from_memory(question))
-    except KeyboardInterrupt:
-        from pprint import pprint
-
-        retrieved = memory.retrieve(question)
-        for i in retrieved:
-            pprint(i.dict())
-        breakpoint()
+    import asyncio
+    asyncio.run(main())

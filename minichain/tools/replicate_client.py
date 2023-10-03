@@ -1,6 +1,6 @@
 import replicate
-import requests
 import os
+from urllib.request import urlretrieve
 from minichain.agent import Function
 from dotenv import load_dotenv
 load_dotenv()
@@ -41,8 +41,6 @@ def replace_files_by_data_recursive(data):
     else:
         return data
 
-from urllib.request import urlretrieve
-import uuid
 
 def replace_urls_by_url_and_local_file_recursive(data, download_dir):
     print("replace_urls_by_url_and_local_file_recursive", download_dir)
@@ -87,6 +85,3 @@ def replicate_model_as_tool(model_id, download_dir, name=None):
         description=replicate_tool.__doc__,
     )
     return replicate_tool
-
-
-

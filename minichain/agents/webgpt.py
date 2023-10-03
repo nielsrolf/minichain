@@ -2,11 +2,11 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Function, SystemMessage, tool
+from minichain.agent import Agent
+from minichain.functions import tool
 from minichain.tools.document_qa import AnswerWithCitations
 from minichain.tools.google_search import web_search
 from minichain.tools.recursive_summarizer import text_scan
-from minichain.tools.text_to_memory import Memory
 from minichain.utils.markdown_browser import markdown_browser
 
 class ScanWebsiteRequest(BaseModel):
@@ -52,7 +52,7 @@ class WebGPT(Agent):
             website_with_line_numbers = "\n".join(
                 f"{i+1} {line}" for i, line in enumerate(lines)
             )
-            scan_kwargs = dict(**kwargs, on_message_send=self.on_message_send)
+            scan_kwargs = dict(**kwargs)
 
             outputs = await text_scan(
                 website_with_line_numbers,
@@ -86,9 +86,7 @@ class WebGPT(Agent):
             }
         super().__init__(
             functions=[web_search, scan_website],
-            system_message=SystemMessage(
-                "You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information to answer the question or fulfill the user request, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc."
-            ),
+            system_message="You are webgpt. You research by using google search, reading websites, and recalling memories of websites you read. Once you gathered enough information to answer the question or fulfill the user request, you end the conversation by answering the question. You cite sources in the answer text as [1], [2] etc.",
             prompt_template="{query}".format,
             response_openapi=AnswerWithCitations,
             **kwargs,
@@ -103,30 +101,13 @@ class SmartWebGPT(Agent):
                     "research", "Research the web in order to answer a question.", Query
                 )
             ],
-            system_message=SystemMessage(
+            system_message=
                 "You are SmartGPT. You get questions or requests by the user and answer them in the following way: \n"
                 + "1. If the question or request is simple, answer it directly. \n"
                 + "2. If the question or request is complex, use the 'research' function available to you \n"
-                + "3. If the initial research was insufficient, use the 'research' function with new questions, until you are able to answer the question."
-            ),
+                + "3. If the initial research was insufficient, use the 'research' function with new questions, until you are able to answer the question.",
             prompt_template="{query}".format,
             response_openapi=AnswerWithCitations,
-            silent=silent,
             **kwargs,
         )
 
-
-if __name__ == "__main__":
-    webgpt = WebGPT()
-    # webgpt = SmartWebGPT(silent=True)
-
-    # Using elementary.audio, can you implement a new React component called SyncedAudioStemPlayer that plays a list of stems in a synced loop? The stems are specified by a public URL and need to be loaded into the virtual file system first
-    # Can you show me how to use this component in an example?
-
-    while query := input("# User: \n"):
-        response = webgpt.run(query=query, keep_session=True)
-        print("# WebGPT:\n", response["content"])
-        if len(response["citations"]) > 0:
-            print("Sources:", response["citations"])
-        webgpt = response["session"]
-        print("")

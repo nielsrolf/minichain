@@ -205,7 +205,8 @@ def symbol_as_markdown(symbol, prefix=""):
 
 def summarize_python_file(path):
     symbols = get_symbols(path)
-    return "\n\n".join([symbol_as_markdown(i) for i in symbols])
+    symbols = "\n\n".join([symbol_as_markdown(i) for i in symbols])
+    return f"The file {path} contains the following symbols:\n\n{symbols}"
 
 
 @click.command()

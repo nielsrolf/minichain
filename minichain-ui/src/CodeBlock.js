@@ -43,6 +43,12 @@ const languages = [
 
 const CodeBlock = ({ code }) => {
     const [hasCopied, setHasCopied] = useState(false);
+    if (typeof code !== 'string') {
+        code = code.code;
+    }
+    if (!code) {
+        return '';
+    }
     // check if the code starts with a language name
     let language = languages.find(l => code.startsWith(l));
     // if it does, remove the language name from the code

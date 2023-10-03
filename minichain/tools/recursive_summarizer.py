@@ -2,7 +2,10 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent, Done, Function, SystemMessage
+from minichain.agent import Agent
+from minichain.functions import Function
+from minichain.schemas import Done
+
 from minichain.tools.document_qa import qa
 from minichain.tools.summarize import summarize
 from minichain.utils.document_splitter import split_document
@@ -95,16 +98,14 @@ async def text_scan(
 
     document_to_json = Agent(
         functions=[add_output_function],
-        system_message=SystemMessage(system_message),
+        system_message=system_message,
         prompt_template="{text}".format,
         response_openapi=Done,
-        keep_last_messages=20,
         **kwargs,
     )
 
     paragraphs = split_document(text)
     for paragraph in paragraphs:
-        breakpoint()
         await document_to_json.run(text=paragraph)
     return outputs
 
@@ -134,15 +135,3 @@ long_document_summarizer = Function(
     function=recursive_summarizer,
     description="Summarize a long document recursively.",
 )
-
-
-# question = "what was the role of russia in world war 2?"
-# url = "https://en.wikipedia.org/wiki/Russia"
-# url = "https://www.tagesschau.de/ausland/putin-prigoschin-gespraech-100.html"
-
-# question = "how can i play an audio file on a public s3 bucket using elementary audio?"
-# url = "https://www.elementary.audio/docs/packages/web-renderer"
-
-# summary = recursive_web_summarizer(url, question)
-# print(summary)
-# print(len(summary.split()))

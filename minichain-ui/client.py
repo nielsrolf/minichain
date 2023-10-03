@@ -11,7 +11,7 @@ async def heartbeat(websocket):
 
 
 async def websocket_client():
-    uri = "ws://localhost:8000/ws/webgpt"  # Replace with your server URL and agent name
+    uri = "ws://localhost:8745/ws/webgpt"  # Replace with your server URL and agent name
 
     async with websockets.connect(uri) as websocket:
         # Start the heartbeat task

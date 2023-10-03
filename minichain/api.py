@@ -2,39 +2,35 @@ import json
 import os
 import traceback
 import uuid
-from collections import defaultdict
 from typing import Any, Dict, Optional
 import asyncio
+from collections import defaultdict
 
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
+import yaml
+from starlette.websockets import WebSocketDisconnect
 
-from minichain.agent import (AssistantMessage, FunctionMessage, SystemMessage,
+from minichain.dtypes import (AssistantMessage, FunctionMessage, SystemMessage,
                              UserMessage, Cancelled)
-from minichain.agents.chatgpt import ChatGPT
-from minichain.agents.planner import Planner
-from minichain.agents.programmer import Programmer
-from minichain.agents.webgpt import SmartWebGPT, WebGPT
-from minichain.agents.replicate_multimodal import Artist
-from minichain.agents.agi import AGI
+from minichain.streaming import Stream
 
 
 class MessageDB:
-    def __init__(self, path=".minichain/"):
+    def __init__(self, path=".minichain"):
         self.path = path
         os.makedirs(f"{path}/messages", exist_ok=True)
-        os.makedirs(f"{path}/logs", exist_ok=True)
+        self.saved_ids = {}
+        self.childrenOf = defaultdict(list)
+        self.conversationAgents = {}
+        self.messages = []
         self.load()
 
     def load(self):
-        path = self.path
-        self.messages = self.load_dir_as_list(f"{path}/messages")
-        self.logs = self.load_dir_as_list(f"{path}/logs")
-
-    def load_dir_as_list(self, path):
+        path = f"{self.path}/messages"
         messages = []
         paths = os.listdir(path)
         paths_sorted = sorted(paths, key=lambda x: int(x.split(".")[0]))
@@ -42,11 +38,23 @@ class MessageDB:
             try:
                 with open(os.path.join(path, filename), "r") as f:
                     message = json.load(f)
-                    # message = classes[message.get('role', None)](**message)
-                    messages.append(message)
+                    if message.get("stack", None):
+                        self.update_childrenOf(message)
+                    else:
+                        messages.append(message)
+                        self.saved_ids[message['id']] = filename
             except Exception as e:
                 print(f"Error loading message from {filename}", e)
-        return messages
+        self.messages = messages
+    
+    def update_childrenOf(self, message):
+        parent = message["stack"][0]
+        for child in message["stack"][1:]:
+            if child not in self.childrenOf[parent]:
+                self.childrenOf[parent].append(child)
+                if message.get("agent", None) is not None:
+                    self.conversationAgents[child] = message["agent"]
+            parent = child
 
     def dicts_to_classes(self, dicts):
         classes = {
@@ -63,36 +71,35 @@ class MessageDB:
         return messages
 
     def save_msg(self, message, dirname):
-        dir_items = self.__dict__[dirname]
-        def get_id(d):
-            if "id" in d:
-                return d["id"]
-            return f"{d['type']}-{d['conversation_id']}"
-        try:
-            pos = [get_id(i) for i in dir_items].index(get_id(message))
-            dir_items[pos] = message
-        except ValueError:
-            pos = len(dir_items)
-            dir_items.append(message)
-        path = f"{self.path}/{dirname}"
-        filename = f"{pos}.json"
-        with open(os.path.join(path, filename), "w") as f:
+        if not message.get('id') in self.saved_ids:
+            path = f"{self.path}/{dirname}"
+            filename = f"{len(os.listdir(path))}.json"
+            filepath = os.path.join(path, filename)
+            if message.get('id', None) is not None: # could also be a stack message, which has no id
+                self.saved_ids[message['id']] = filepath
+        else:
+            filepath = self.saved_ids[message['id']]
+        with open(filepath, "w") as f:
             json.dump(message, f)
 
     def add_message(self, message):
         if not isinstance(message, dict):
             message = message.dict()
-        self.save_msg(message, "logs")
-        if "role" in message:
-            self.save_msg(message, "messages")
-
-    def get_history(self, conversation_id, no_init=False):
-        dicts = self.get_conversation(conversation_id)
-        if no_init:
-            dicts = [i for i in dicts if i.get("is_init", False) == False]
+        if message.get("stack", None):
+            self.update_childrenOf(message)
         else:
-            for i in dicts:
-                i.pop("is_init", None)
+            # if the message is new, append it
+            if message.get('id') not in self.saved_ids:
+                self.messages.append(message)
+            else:
+                # if the message is already saved, update it
+                for i, m in enumerate(self.messages):
+                    if m['id'] == message['id']:
+                        self.messages[i] = message
+        self.save_msg(message, "messages")
+
+    def get_history(self, conversation_id):
+        dicts = self.get_conversation(conversation_id)
         return self.dicts_to_classes(dicts)
 
     def get_message(self, message_id):
@@ -107,6 +114,14 @@ class MessageDB:
             if message["conversation_id"] == conversation_id:
                 conversation.append(message)
         return conversation
+    
+    def messages_as_dicts(self):
+        dicts = []
+        for message in self.messages:
+            if not isinstance(message, dict):
+                message = message.dict()
+            dicts.append(message)
+        return dicts
 
 
 app = FastAPI()
@@ -122,7 +137,7 @@ app.add_middleware(
 
 class Payload(BaseModel):
     query: str
-    response_to: Optional[str] = None
+    response_to: Optional[str] = "root"
     agent: str
 
 
@@ -145,34 +160,37 @@ async def upload_file_to_chat(
 
 
 
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Create a websocket that sends:
-    {type: start, conversation_id: 123}
-    {...message, id: 1},
-    {...message, id: 2},
-    {...message, id: 3}
-    {type: start, conversation_id: 456}
-    {...message, id: 5}
-    {type: end, conversation_id: 123}
+        {type: stack, stack: [123, 1]}
+        {type: message, data {id: 1, content: 'yo'},
+        {type: stack, stack: [123, 3, 456, 2]}
+        {type: chunk, diff: {"content": "hello", id: 2}
+        {type: chunk, diff: {"content": "world", id: 2}
+        {type: message, data: {id: 2, ...final message}}
     """
     await websocket.accept()
     print("websocket accepted")
 
-    # replay logs
-    print("start/end conversation", [i for i in message_db.logs if i.get("type", None) in ["start", "end"]])
-    for message in message_db.logs:
-        if not isinstance(message, dict):
-            message = message.dict()
-        await websocket.send_json(message)
-
     async def add_message_to_db_and_send(message: dict):
+        """message: {id: 1, content: 'yo'} / {stack: [123, 1]}"""
         print("add_message_to_db_and_send", message)
         message_db.add_message(message)
         if not isinstance(message, dict):
             message = message.dict()
-        # check the websocket: has a cancel message been sent? if no message has been sent, avoid blocking by using asyncio.wait
+        if message.get("stack", None):
+            await send_message_raise_cancelled({"type": "stack", **message})
+        else:
+            await send_message_raise_cancelled({"type": "message", "data": message})
+    
+    async def add_chunk(chunk, message_id):
+        message = {"diff": chunk, "id": message_id, "type": "chunk"}
+        await send_message_raise_cancelled(message)
+    
+    async def send_message_raise_cancelled(message):
+        # check the websocket: has a cancel message been sent? if no message has 
+        # been sent, avoid blocking by using asyncio.wait_for
         try:
             data = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
             if data == "cancel":
@@ -181,14 +199,14 @@ async def websocket_endpoint(websocket: WebSocket):
             pass
         except Cancelled as e:
             raise e
-        except RuntimeError as e:
-            print(".. hopefully just websocket closed, running in background", e, type(e))
-            return
-
+        except (WebSocketDisconnect, RuntimeError) as e:
+            pass
         try:
             await websocket.send_json(message)
         except Exception as e:
             print("websocket closed, running in background")
+
+
     try:
         while True:
             try:
@@ -200,6 +218,8 @@ async def websocket_endpoint(websocket: WebSocket):
             print("received data", data)
             try:
                 payload = Payload(**json.loads(data))
+                if not payload.response_to:
+                    payload.response_to = "root"
             except ValidationError as e:
                 # probably a heart beat
                 continue
@@ -207,11 +227,23 @@ async def websocket_endpoint(websocket: WebSocket):
             if agent_name not in agents:
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
-
-            history = message_db.get_history(payload.response_to, no_init=True)
+            
+            if payload.response_to == "root":
+                history = []
+            else:
+                history = message_db.get_history(payload.response_to)
             
             print("agent_name", agent_name )
             agent = agents[agent_name]
+            stream = Stream(on_message=add_message_to_db_and_send, on_chunk=add_chunk)
+            
+            with await stream.conversation(payload.response_to, agent=agent.name) as stream:
+                if payload.response_to == "root":
+                    with await stream.to([], role="user") as stream:
+                        await stream.set(payload.query)
+                agent.register_stream(stream)
+                await agent.run(query=payload.query, history=history)
+            
             # go to cwd if the agent has a bash
             try:
                 await agent.interpreter.bash(commands=[f"cd {agent.interpreter.bash.cwd}"])
@@ -220,25 +252,28 @@ async def websocket_endpoint(websocket: WebSocket):
                     await agent.programmer.interpreter.bash(commands=[f"cd {os.getcwd()}"])
                 except Exception as e:
                     pass
-            print("agent", agent)
-            # agent.on_message_send = add_message_to_db_and_send
-            agent.register_on_message_send(add_message_to_db_and_send)
-            conversation_id = payload.response_to or f"root.{uuid.uuid4().hex[:5]}"
-            print("CALLING:", payload.dict(), conversation_id)
-            response = await agent.run(query=payload.query, history=history, conversation_id=conversation_id)
             
     except Exception as e:
         traceback.print_exc()
-
-        # await websocket.send_json(response.dict())
-        # except Exception as e:
-        #     await websocket.send_text(str(e))
-        #     continue
 
 
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+
+@app.get("/agents")
+async def get_agents():
+    return list(agents.keys())
+
+
+@app.get("/history")
+async def get_history():
+    return {
+        "messages": message_db.messages_as_dicts(),
+        "childrenOf": message_db.childrenOf,
+        "conversationAgents": message_db.conversationAgents,
+    }
 
 
 @app.get("/static/{path:path}")
@@ -248,28 +283,39 @@ async def static(path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path)
 
+
 @app.on_event("startup")
 async def preload_agents():
     """This function should run after the async event loop has started."""
-    to_load = {
-        "webgpt": WebGPT,
-        # # "smartgpt": SmartWebGPT(),
-        "yopilot": Programmer,
-        # "planner": Planner,
-        "chatgpt": ChatGPT,
-        "artist": Artist,
-        "agi": AGI,
-    }
-    loaded_agents = {}
-    for name, agent in to_load.items():
-        try:
-            loaded_agents[name] = agent()
-            print("Loaded", name)
-        except Exception as e:
-            print(f"Error loading agent {name}", e)
-    agents.update(
-        loaded_agents
-    )
+    # load the ./minichain/settings.yml file
+    if not os.path.exists(".minichain/settings.yml"):
+        # copy the default settings file from the modules install dir (minichain/default_settings.yml) to the cwd ./minichain/settings.yml
+        print("Copying default settings file to .minichain/settings.yml")
+        os.makedirs(".minichain", exist_ok=True)
+        import shutil
+        shutil.copyfile(
+            os.path.join(os.path.dirname(__file__), "default_settings.yml"),
+            ".minichain/settings.yml",
+        )
+
+    with open(".minichain/settings.yml", "r") as f:
+        settings = yaml.load(f, Loader=yaml.FullLoader)
+
+    # load the agents
+    for agent_name, agent_settings in settings.get("agents", {}).items():
+        if not agent_settings.get("display", False):
+            continue
+        print("Loading agent", agent_name)
+        class_name = agent_settings.pop("class")
+        # class name is e.g. minichain.agents.programmer.Programmer
+        # import the agent class
+        module_name, class_name = class_name.rsplit(".", 1)
+        module = __import__(module_name, fromlist=[class_name])
+        agent_class = getattr(module, class_name)
+        # create the agent
+        agent = agent_class(**agent_settings.get('init', {}))
+        # add the agent to the agents dict
+        agents[agent_name] = agent
 
     for agent in list(agents.values()):
         agent.functions.append(upload_file_to_chat)
@@ -279,7 +325,7 @@ async def preload_agents():
 
 def start(port=8745):
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="localhost", port=port)
 
 
 # We want to run this via python -m minichain.api
