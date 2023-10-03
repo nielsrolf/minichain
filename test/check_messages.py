@@ -3,7 +3,7 @@ import requests
 
 
 def check_api_state():
-    endpoint = 'http://localhost:8000/history'
+    endpoint = 'http://localhost:8745/history'
 
     # Get all events
     events = requests.get(endpoint).json()

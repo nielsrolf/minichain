@@ -9,7 +9,7 @@ const MultiMedia = ({ path }) => {
   if (!path) {
     return '';
   }
-  const url = path.startsWith("http") ? path : `http://localhost:8000/static/${path}`;
+  const url = path.startsWith("http") ? path : `http://localhost:8745/static/${path}`;
   // get the file type
   const extension = path.split('.').pop();
   if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {

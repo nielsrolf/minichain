@@ -323,7 +323,7 @@ async def preload_agents():
         agents[agent.name] = agent
 
 
-def start(port=8000):
+def start(port=8745):
     import uvicorn
     uvicorn.run(app, host="localhost", port=port)
 
