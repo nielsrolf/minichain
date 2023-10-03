@@ -2,10 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import './ChatApp.css';
 import ChatMessage from "./ChatMessage";
-import ConversationTree from "./ConversationTree";
-
-
-
 
 
 
@@ -31,17 +27,15 @@ const ChatApp = () => {
     const [checkConnectionStatus, setCheckConnectionStatus] = useState(false);
     const [inputValue, setInputValue] = useState("");
     const [path, setPath] = useState(["root"]);
-    const [agentName, setAgentName] = useState("yopilot");
-    const [defaultAgentName, setDefaultAgentName] = useState("yopilot");
+    const [agentName, setAgentName] = useState("Programmer");
+    const [defaultAgentName, setDefaultAgentName] = useState("Programmer");
     const [isAttached, setIsAttached] = useState(true);
-    const [minBottomTop, setMinBottomTop] = useState(0);
     const [availableAgents, setAvailableAgents] = useState([]);
     const [convTree, setConvTree] = useState({
         "messages": [],
         "childrenOf": {},
         "conversationAgents": {},
     });
-    const [graphToggle, setGraphToggle] = useState(false);
 
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
     const visibleMessages = useMemo(() => {
@@ -158,28 +152,6 @@ const ChatApp = () => {
         };
     }, []);
 
-    // // when the user scrolls up, detach
-    const detachOnScrollUp = () => {
-        const handleScrollUp = () => {
-            const bottom = document.getElementById("bottom");
-            if (bottom) {
-                const rect = bottom.getBoundingClientRect();
-
-                if (rect.top > minBottomTop) {
-                    setIsAttached(false);
-                } else if(rect.top < minBottomTop) {
-                    setMinBottomTop(rect.top);
-                }
-            }
-        }
-        window.addEventListener("scroll", handleScrollUp);
-        return () => {
-            window.removeEventListener("scroll", handleScrollUp);
-        }
-    };
-    // run this shorty after the component is mounted
-    useEffect(detachOnScrollUp, []);
-
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
         if (subConversationId) {
@@ -205,6 +177,7 @@ const ChatApp = () => {
     };
 
     const pushToPath = (id) => {
+        console.log("pushing to path", id)
         setPath(prevPath => {
             // if we are already on that path, do nothing
             if (prevPath[prevPath.length - 1] === id) {
@@ -221,12 +194,6 @@ const ChatApp = () => {
         }
         // Scroll to the bottom of the page
         const bottom = document.getElementById("bottom");
-        // If we open a new conversation the upscroll detection will notice we are higher than the bottom and detach
-        // so we need to set the minBottomTop to a really high value
-        if (bottom) {
-            const rect = bottom.getBoundingClientRect();
-            setMinBottomTop(rect.top + 100000);
-        }
         // if bottom is not in view, scroll to it
         if (!bottom || bottom.getBoundingClientRect().top > window.innerHeight) {
             bottom?.scrollIntoView({ behavior: "smooth" })
@@ -235,6 +202,7 @@ const ChatApp = () => {
     }, [visibleMessages, isAttached]);
 
 
+    // if we are attached 
     useEffect(() => {
         if (!isAttached || convTree.messages.length === 0) {
             return;
@@ -306,11 +274,6 @@ const ChatApp = () => {
                 }}>Parent</button>
                 {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {
                     setIsAttached(true);
-                    const bottom = document.getElementById("bottom");
-                    if (bottom) {
-                        const rect = bottom.getBoundingClientRect();
-                        setMinBottomTop(rect.top);
-                    }
                 }}>Attach</button>}
                 <button onClick={() => {
                     // Scroll to the last message using scrollIntoView
@@ -350,9 +313,6 @@ const ChatApp = () => {
                 )}
 
             </div>
-            {/* {graphToggle && (
-                <ConversationTree convTree={convTree} path={path} pushToPath={pushToPath} />
-            )} */}
             <div style={{ height: "50px" }}></div>
 
             <div className="chat">
