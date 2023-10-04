@@ -118,7 +118,7 @@ async def text_to_memory(text=None, source=None, max_num_memories=None, agent_kw
         functions=[
             add_memory_function,
         ],
-        system_message=f"Turn a text into a list of memories. A memory is one piece of information that is self-contained to understand but also atomic. You will use these memories later: you will be able to generate questions or keywords, and find the memories you are creating now. Remember only informative bits of information. The text has line numberes added at the beginning of each line, make sure to reference them when you create a memory. If the user provided text is a website, you will encounter navigation elements or sections with many outgoing links - especially to docs - remember them so you can read the referenced urls later. You can only see a section of a larger text at a time, so it can happen the the entirely text is irrelevant / consists out of references etc. In that case, directly end the session so that we can move on to the interesting parts.",
+        system_message=f"Turn a text into a list of memories. A memory is one piece of information that is self-contained to understand but also atomic. You will use these memories later: you will be able to generate questions or keywords, and find the memories you are creating now. Remember only informative bits of information. The text has line numberes added at the beginning of each line, make sure to reference them when you create a memory. Parts of the text that you already created memories for are hidden (the memory title is added for context, but don't make new memories for the hidden sections). If the user provided text is a website, you will encounter navigation elements or sections with many outgoing links - especially to docs - remember them so you can read the referenced urls later. You can only see a section of a larger text at a time, so it can happen the the entirely text is irrelevant / consists out of references etc. In that case, directly end the session so that we can move on to the interesting parts. If most of the content is hidden and only single lines remain, don't memorize them unless they are super important - just end the conversation.",
         prompt_template="```\n{text}\n```".format,
         response_openapi=Done,
         **agent_kwargs,
@@ -127,6 +127,9 @@ async def text_to_memory(text=None, source=None, max_num_memories=None, agent_kw
     while not done:
         # Create one more memory
         to_remember = hide_already_memorized(text, existing_memories + memories)
+        if not something_to_remember(to_remember):
+            print("Nothing to remember.")
+            break
         paragraphs = split_document(to_remember)
         try:
             for paragraph in paragraphs:
@@ -144,11 +147,24 @@ def hide_already_memorized(content, existing_memories):
     text_with_line_numbers = add_line_numbers(content)
     lines = text_with_line_numbers.split("\n")
     for memory in existing_memories:
+        if memory.memory.start_line == memory.memory.end_line:
+            # do not show first line of memory if the memory is only one line long
+            lines[memory.memory.start_line - 1] = f"[Hidden: {memory.memory.title}]"
+        fill_up_lines = memory.memory.end_line - memory.memory.start_line
         lines[
             memory.memory.start_line - 1 : memory.memory.end_line
-        ] = [f"[Hidden: {memory.memory.title}]"] + [None] * (memory.memory.end_line - memory.memory.start_line)
+        ] = [f"[{memory.meta.content.splitlines()[0]}\n" + \
+                f"    Hidden: {memory.memory.title}]"] + \
+                [None] * fill_up_lines
+            
     lines = [i for i in lines if i is not None]
     text_with_line_numbers = "\n".join(lines)
     return text_with_line_numbers
 
-
+def something_to_remember(content):
+    lines = content.split("\n")
+    # keep only lines that start with a number
+    lines = [i for i in lines if len(i) > 0 and i[0].isdigit()]
+    if len(lines) < 3:
+        return False
+    return True

@@ -365,7 +365,10 @@ class SemanticParagraphMemory:
             memories = json.load(f, object_hook=datetime_parser)
         try:
             with open(os.path.join(memory_dir, "ingested_hashed.json"), "r") as f:
-                self.ingested_hashed = json.load(f)
+                ingested_hashed = json.load(f)
+                for key, hash in ingested_hashed.items():
+                    if any([i.meta.source == key for i in self.memories]):
+                        self.ingested_hashed[key] = hash
         except:
             pass
         self.memories = [MemoryWithMeta(**i) for i in memories]
@@ -400,6 +403,7 @@ class SemanticParagraphMemory:
         return find_memory
     
     async def ingest_rec(self, path):
+        print("Ingesting: ", path)
         new_memories = []
         if os.path.isdir(path):
             files = get_visible_files(path)
