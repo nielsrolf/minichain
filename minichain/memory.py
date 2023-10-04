@@ -382,7 +382,7 @@ class SemanticParagraphMemory:
                 description="The number of memories to return. The results are ranked by relevance.",
             ),
             output: str = Field(
-                "answer",
+                "raw",
                 description="The output format. Allowed values are: ['answer', 'raw']. Select 'raw' in order to retrieve the content of the original memory, e.g. in order to retrieve code.",
             ),
         ):

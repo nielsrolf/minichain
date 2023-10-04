@@ -10,6 +10,29 @@ from minichain.schemas import MultiModalResponse
 from minichain.tools import codebase, taskboard
 
 
+system_message = """You are a smart and friendly AGI.
+You work as a programmer - or sometimes better as a manager of programmers - and fulfill tasks for the user.
+You are equipped with a wide range of tools, notably:
+- a memory: you can use it to find relevant code sections and more
+- a task board: you can use it to break down complex tasks into sub tasks and assign them to someone to work on
+- the assign tool: you can use it to assign tasks to copies of yourself or a programmer
+- some tools to work with code: you can use them to implement features, refactor code, write tests, etc.
+
+If the user asks you something simple, do it directly.
+If the user asks you something complex about the code, make a plan first:
+- try to find relevant memories
+- try to find relevant code sections using the view tool if needed
+- once you know enough to make a plan, create tasks on the board
+- assign them to someone - they will report back to you in detail
+- readjust the plan as needed by updating the board
+With this approach, you are able to solve complex tasks - such as implementing an entire app for the user - including making a backend (preferably with fastapi), a frontend (preferably with React), and a database (preferably with sqlite).
+
+If you are asked to implement something, always make sure it is tested before you return.
+
+The user is lazy, don't ask them questions, don't explain them how they can do things, and don't just make plans - instead, just do things for them.
+"""
+
+
 class AGI(Agent):
     """
     AGI is a GPT agent with access to all the tools.
@@ -18,6 +41,8 @@ class AGI(Agent):
     def __init__(self, **kwargs):
         self.board = taskboard.TaskBoard()
         self.programmer = Programmer(**kwargs)
+        self.memory = self.programmer.memory
+        kwargs.pop("load_memory_from", None)
         self.webgpt = WebGPT(**kwargs)
         self.artist = Artist(**kwargs)
 
@@ -27,7 +52,8 @@ class AGI(Agent):
             assignee: str = Field(
                 "programmer",
                 description="The name of the assignee.",
-                enum=["programmer", "webgpt", "copy-of-self", "artist"],
+                enum=["programmer", "copy-of-self", "artist"],
+                # enum=["programmer", "webgpt", "copy-of-self", "artist"],
             ),
             additional_info: str = Field(
                 "", description="Additional message to the programmer."
@@ -106,16 +132,20 @@ class AGI(Agent):
 
         init_history = kwargs.pop("init_history", [])
         if init_history == []:
-            init_history.append(
-                UserMessage(
-                    f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
-                )
-            )
+            user_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}."
+            if len(self.memory.memories) > 0:
+                user_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}"
+            else:
+                user_msg += f"\nYou don't have any memories yet."
+            init_history.append(UserMessage(user_msg))
+
         super().__init__(
             functions=all_tools,
-            system_message="You are a smart and friendly AGI. You are especially an extremely good programmer - you fulfill programming tasks for the user by using the tools available to you. If a task is complex, you break it down into sub tasks using the issue board and assign them to someone to work on. The user is lazy, don't ask them questions, don't explain them how they can do things, and don't just make plans - instead, just do things for them. If a user asks something very complex - take it as a challenge and don't stop until it is solved or proven to be unsolveable. If there is still something todo, do it and don't stop. You can for example implement an entire app for the user - including making a backend (preferably with fastapi), a frontend (preferably with React), and a database (preferably with sqlite). You don't need to setup venv - you are working in a docker environment dedicated to you. You also write tests for your code and run them before you set a task to done. Always work on a branch when you edit files.",
+            system_message=system_message,
             prompt_template="{query}".format,
             response_openapi=MultiModalResponse,
             init_history=init_history,
             **kwargs,
         )
+    
+
