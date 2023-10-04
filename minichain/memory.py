@@ -3,9 +3,10 @@ import math
 import os
 import pickle
 import re
-import uuid
 from dataclasses import dataclass
 from typing import Any, List, Optional
+import uuid
+import hashlib
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -14,10 +15,10 @@ from minichain.agent import Agent
 from minichain.functions import Function, tool
 from minichain.tools.codebase import default_ignore_files, get_visible_files
 from minichain.tools.recursive_summarizer import long_document_qa, text_scan
-from minichain.tools.text_to_memory import (MemoryWithMeta, add_line_numbers,
-                                            text_to_memory)
+from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory, add_line_numbers
 from minichain.utils.cached_openai import get_embedding
-from minichain.utils.json_datetime import datetime_converter, datetime_parser
+from minichain.utils.json_datetime import datetime_parser, datetime_converter
+
 
 snippet_template = """## {title}
 Context: {context}
@@ -26,7 +27,6 @@ Source: {source}:{start_line}-{end_line}
 {content}
 ```
 """
-
 
 @dataclass
 class VectorSearchScore:
@@ -96,15 +96,8 @@ class RelatedQuestionList(BaseModel):
     )
 
 
-import difflib
-
-
-def get_diff(s1, s2):
-    d = difflib.HtmlDiff()
-    diff = difflib.ndiff(s1.split(), s2.split())
-
-    return "\n".join(diff)
-
+def hash_string(string):
+        return hashlib.sha256(string.encode("utf-8")).hexdigest()
 
 class SemanticParagraphMemory:
     def __init__(
@@ -132,22 +125,23 @@ class SemanticParagraphMemory:
         )
         self.auto_save_dir = auto_save_dir
         self.agent_kwargs = agents_kwargs
+        self.ingested_hashed = {}
 
     def register_stream(self, stream):
         self.agent_kwargs["stream"] = stream
-
+    
     def check_if_still_valid(self, memory, content):
-        # Checks if the remembered raw text still appears in the source file and potentially
+        # Checks if the remembered raw text still appears in the source file and potentially 
         # updates the lines
         if memory.meta.content not in content:
             return False
-
+                
         placeholder = uuid.uuid4().hex
         content = content.replace(memory.meta.content, placeholder)
         lines = content.split("\n")
         if lines[memory.memory.start_line - 1] == placeholder:
             return True
-
+        
         start_line = lines.index(placeholder) + 1
         end_line = start_line + len(memory.meta.content.split("\n")) - 1
         memory.memory.start_line = start_line
@@ -155,25 +149,20 @@ class SemanticParagraphMemory:
         return True
 
     async def ingest(self, content, source):
+        """Ingest a text and create memories from it.
+        
+        If memories for this source exist already, this method updates the memories by:
+        - returning if the content has not changed since last ingestion
+        - updating line ranges of existing memories
+        - deleting memories that are not valid anymore
+        - adding new memories on the diff since the last ingestion
+        """
+        content_hash = hash_string(content)
         existing_memories = [i for i in self.memories if i.meta.source == source]
-        existing_memories = [
-            i for i in existing_memories if self.check_if_still_valid(i, content)
-        ]
-        # Replace already memorized content with `[Hidden: {title}]`
-
-        text_with_line_numbers = add_line_numbers(content)
-        lines = text_with_line_numbers.split("\n")
-        for memory in existing_memories:
-            lines[memory.memory.start_line - 1 : memory.memory.end_line] = [
-                f"[Hidden: {memory.memory.title}]"
-            ] + [None] * (memory.memory.end_line - memory.memory.start_line)
-        lines = [i for i in lines if i is not None]
-        text_with_line_numbers = "\n".join(lines)
-        memories = await text_to_memory(
-            text_with_line_numbers=text_with_line_numbers,
-            source=source,
-            agent_kwargs=self.agent_kwargs,
-        )
+        if self.ingested_hashed.get(source) == content_hash:
+            return existing_memories
+        existing_memories = [i for i in existing_memories if self.check_if_still_valid(i, content)]
+        memories = await text_to_memory(text=content, source=source, agent_kwargs=self.agent_kwargs, existing_memories=existing_memories)
         # Add memories to vector db
         for memory in memories:
             # title
@@ -183,6 +172,7 @@ class SemanticParagraphMemory:
                 key = f"({memory.meta.source}): {question}"
                 self.vector_db.add(key, memory)
         self.memories += memories
+        self.ingested_hashed[source] = content_hash
         if self.auto_save_dir is not None:
             self.save(self.auto_save_dir)
         return memories
@@ -301,9 +291,7 @@ class SemanticParagraphMemory:
             if len(memories_by_source.keys()) > 15:
                 summary += f"You have {len(memories)} memories from {len(memories_by_source.keys())} sources.\n"
                 return summary
-            summary += (
-                f"You have {len(memories)} memories from the following sources:\n"
-            )
+            summary += f"You have {len(memories)} memories from the following sources:\n"
             for source, memories_of_source in memories_by_source.items():
                 summary += f"- {source}: {len(memories_of_source)}\n"
             return summary
@@ -364,6 +352,8 @@ class SemanticParagraphMemory:
         with open(os.path.join(memory_dir, "memories.json"), "w") as f:
             # we need to handle the datetime objects and save them as e.g. 2023-12-31T23:59:59.999999+00:00
             json.dump([i.dict() for i in self.memories], f, default=datetime_converter)
+        with open(os.path.join(memory_dir, "ingested_hashed.json"), "w") as f:
+            json.dump(self.ingested_hashed, f)
 
     def load(self, memory_dir):
         # load the vector db
@@ -373,6 +363,11 @@ class SemanticParagraphMemory:
             self.vector_db.values = pickle.load(f)
         with open(os.path.join(memory_dir, "memories.json"), "r") as f:
             memories = json.load(f, object_hook=datetime_parser)
+        try:
+            with open(os.path.join(memory_dir, "ingested_hashed.json"), "r") as f:
+                self.ingested_hashed = json.load(f)
+        except:
+            pass
         self.memories = [MemoryWithMeta(**i) for i in memories]
 
     def find_memory_tool(self):
@@ -403,28 +398,30 @@ class SemanticParagraphMemory:
         find_memory.register_stream = register_stream
 
         return find_memory
+    
+    async def ingest_rec(self, path):
+        new_memories = []
+        if os.path.isdir(path):
+            files = get_visible_files(path)
+            for file in files:
+                filepath = os.path.join(path, file)
+                new_memories += await self.ingest_rec(filepath)
+        else:
+            with open(path, "r") as f:
+                content = f.read()
+            new_memories += await self.ingest(content, path)
+        return new_memories
 
     def ingest_tool(self):
         @tool()
         async def create_memories_from_file(
             path: str = Field(
                 ...,
-                description="The path to the dir or file to ingest. If a dir is provided, all files in the dir are ingested.",
+                description="The path to the dir or file to ingest. If a dir is provided, all files in the dir are ingested. If memories already exist, they are updated.",
             )
         ):
             """Read a file and create memories from it."""
-            if os.path.isdir(path):
-                # Show the list of files that can be ingested
-                available_files = get_visible_files(
-                    path,
-                    ignore_files=default_ignore_files,
-                    extensions=[".py", ".js", ".ts", "README.md"],
-                )
-                available_files = "\n".join(available_files)
-                return f"{path} is a dir. Please ingest the files one by one. Available files:```\n{available_files}\n```"
-            with open(path, "r") as f:
-                content = f.read()
-            new_memories = await self.ingest(content, path)
+            new_memories = await self.ingest_rec(path)
             summary = self.get_content_summary(new_memories)
             return f"Ingested {path}. New memories formed:\n{summary} "
 

@@ -2,6 +2,7 @@ import json
 import traceback
 
 from pydantic import BaseModel
+import pydantic.error_wrappers
 
 from minichain.dtypes import (Cancelled, SystemMessage, UserMessage,
                               messages_types_to_history)
@@ -121,9 +122,10 @@ class Session:
 
     async def get_next_action(self, stream):
         history_without_ids = messages_types_to_history(self.history)
-        summarized_history = await get_summarized_history(
-            history_without_ids, self.agent.functions_openai
-        )
+        # summarized_history = await get_summarized_history(
+        #     history_without_ids, self.agent.functions_openai
+        # )
+        summarized_history = history_without_ids
         # do the openai call
         with await stream.to(self.history, role="assistant") as stream:
             await get_openai_response_stream(
@@ -151,8 +153,8 @@ class Session:
                     f"Error: this function does not exist",
                     action.name,
                 )
-            except Exception as e:
-                breakpoint()
+            # catch pydantic validation errors
+            except pydantic.error_wrappers.ValidationError as e:
                 await stream.chunk(self.format_error_message(e))
         return False
 

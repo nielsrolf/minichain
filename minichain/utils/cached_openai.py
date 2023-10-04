@@ -108,7 +108,7 @@ def save_llm_call_for_debugging(messages, functions, parsed_response, raw_respon
 
 
 @async_disk_cache
-# @retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
+@retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
 async def get_openai_response_stream(
     chat_history, functions, model="gpt-4-0613", stream=None
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
@@ -116,26 +116,32 @@ async def get_openai_response_stream(
         stream = Stream()
     messages = format_history(chat_history)
 
-    if len(functions) > 0:
-        openai_response = openai.ChatCompletion.create(
-            model=model,
-            messages=messages,
-            functions=functions,
-            temperature=0.1,
-            stream=True,
-        )
-    else:
-        openai_response = openai.ChatCompletion.create(
-            model=model,
-            messages=messages,
-            temperature=0.1,
-            stream=True,
-        )
+    try:
+        if len(functions) > 0:
+            openai_response = openai.ChatCompletion.create(
+                model=model,
+                messages=messages,
+                functions=functions,
+                temperature=0.1,
+                stream=True,
+            )
+        else:
+            openai_response = openai.ChatCompletion.create(
+                model=model,
+                messages=messages,
+                temperature=0.1,
+                stream=True,
+            )
 
-    # iterate through the stream of events
-    for chunk in openai_response:
-        chunk = chunk["choices"][0]["delta"].to_dict_recursive()
-        await stream.chunk(chunk)
+        # iterate through the stream of events
+        for chunk in openai_response:
+            chunk = chunk["choices"][0]["delta"].to_dict_recursive()
+            await stream.chunk(chunk)
+    except openai.error.RateLimitError as e:
+        import time
+        print("We got rate limited, chilling for a minute...")
+        time.sleep(60)
+        raise e
     raw_response = {
         key: value for key, value in stream.current_message.items() if "id" not in key
     }
