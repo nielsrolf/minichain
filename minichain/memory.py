@@ -92,7 +92,7 @@ class RecallQuery(BaseModel):
 class RelatedQuestionList(BaseModel):
     sub_questions: List[str] = Field(
         ...,
-        description="A list of all question that should be answered in order to answer the original question.",
+        description="A list of all question that should be answered in order to answer the original question. Should be 1-4 questions.",
     )
 
 
@@ -130,10 +130,22 @@ class SemanticParagraphMemory:
     def register_stream(self, stream):
         self.agent_kwargs["stream"] = stream
     
-    def check_if_still_valid(self, memory, content):
+    def check_if_still_valid(self, memory, content=None):
         # Checks if the remembered raw text still appears in the source file and potentially 
         # updates the lines
+        if not memory.meta.watch_source:
+            return True
+        if content is None:
+            try:
+                with open(memory.meta.source, "r") as f:
+                    content = f.read()
+            except FileNotFoundError:
+                content = ""
         if memory.meta.content not in content:
+            try:
+                self.memories.remove(memory)
+            except ValueError:
+                pass
             return False
                 
         placeholder = uuid.uuid4().hex
@@ -148,7 +160,7 @@ class SemanticParagraphMemory:
         memory.memory.end_line = end_line
         return True
 
-    async def ingest(self, content, source):
+    async def ingest(self, content, source, watch_source=True):
         """Ingest a text and create memories from it.
         
         If memories for this source exist already, this method updates the memories by:
@@ -165,6 +177,7 @@ class SemanticParagraphMemory:
         memories = await text_to_memory(text=content, source=source, agent_kwargs=self.agent_kwargs, existing_memories=existing_memories)
         # Add memories to vector db
         for memory in memories:
+            memory.meta.watch_source = watch_source
             # title
             self.vector_db.add(memory.memory.title, memory)
             # questions
@@ -178,7 +191,8 @@ class SemanticParagraphMemory:
         return memories
 
     async def search_by_vector(self, question, num_results) -> List[MemoryWithMeta]:
-        query_questions = await self.generate_questions(question)
+        # query_questions = await self.generate_questions(question)
+        query_questions = [question]
         query_embeddings = self.vector_db.encode(query_questions)
         matches = self.vector_db.search(query_embeddings, num_results=num_results * 2)
         # Get the highest score for each memory-id (memories can occur multiple times)
@@ -229,6 +243,13 @@ class SemanticParagraphMemory:
             for n, i in enumerate(results)
             if i.id not in [x.id for x in results[n + 1 :]]
         ]
+        update_needed = False
+        for i in results:
+            if not self.check_if_still_valid(i):
+                update_needed = True
+                await self.ingest_rec(i.meta.source)
+        if update_needed:
+            results = await self.retrieve(question, num_results)
         return results
 
     async def answer_from_memory(self, question: str):
@@ -240,10 +261,6 @@ class SemanticParagraphMemory:
         # TODO
         if len(results) == 0:
             return "No relevant memories found."
-        elif len(results) == 1:
-            return await long_document_qa(
-                text=results[0].meta.content, question=question
-            )
         else:
             return await self.summarize(results, question)
 
@@ -253,12 +270,17 @@ class SemanticParagraphMemory:
             for memory in results
             if memory.memory.type == "content"
         ]
-        document = "\n\n".join(snippets)
+        document = f"Here are the memories that I found that might be relevant to the question: {question}"
+        document += "\n\n".join(snippets)
+        document += f"\nIf these memories are insufficient to answer the question, they may contain some information that will help decide where to look for the answer (such as `I couldn't find the relevant info but it seems like the answer could be in this file: ...`)"
         print("-" * 80)
         print("-" * 80)
         print(document)
         # TODO
-        summary = await long_document_qa(text=document, question=question)
+        summary = await long_document_qa(
+            text=document,
+            question=question,
+        )
         return summary
 
     def format_as_snippet(self, memory) -> str:
@@ -378,13 +400,13 @@ class SemanticParagraphMemory:
         async def find_memory(
             question: str = Field(..., description="The question to search for."),
             num_results: int = Field(
-                1,
-                description="The number of memories to return. The results are ranked by relevance.",
+                5,
+                description="The number of raw memories to return or consider before answering. The results are ranked by relevance.",
             ),
             output: str = Field(
-                "raw",
+                "answer",
                 description="The output format. Allowed values are: ['answer', 'raw']. Select 'raw' in order to retrieve the content of the original memory, e.g. in order to retrieve code.",
-            ),
+            )
         ):
             """Search memories related to a question."""
             results = await self.retrieve(question, num_results=num_results)

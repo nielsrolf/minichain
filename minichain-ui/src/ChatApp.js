@@ -39,8 +39,12 @@ const ChatApp = () => {
 
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
     const visibleMessages = useMemo(() => {
-        return convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
-    }, [convTree, currentConversationId]);
+        let visible = convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
+        if (currentConversationId === "root") {
+            visible = visible.filter(message => convTree.conversationAgents[message.id] === defaultAgentName);
+        }
+        return visible;
+    }, [convTree, currentConversationId, defaultAgentName]);
 
     // when the path changes, we update the agent name
     useEffect(() => {

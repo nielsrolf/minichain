@@ -79,7 +79,7 @@ def get_initial_summary(
     root_dir=".",
     extensions=default_extensions,
     ignore_files=default_ignore_files,
-    max_lines=25,
+    max_lines=40,
 ):
     available_files = get_visible_files(
         root_dir=root_dir,
@@ -148,8 +148,11 @@ async def get_file_summary(path: str = Field(..., description="The path to the f
         summary = summarize_python_file(path)
     else:
         print("Summary:", path)
-        with open(path, "r") as f:
-            text = f.read()
+        try:
+            with open(path, "r") as f:
+                text = f.read()
+        except Exception as e:
+            return f"Could not read file: {e}"
         summary = await long_document_qa(
             text=text,
             question="Summarize the following file in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important sections. When referencing files, always use the path (rather than the filename).",
@@ -208,7 +211,9 @@ async def edit(
     ),
 ):
     """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!
-    To create a new file, specify the path and start,end=0. Use this method instead of bash touch or echo to create new files.
+    Creates the file if it does not exist, then replaces the lines (including start and end line) with the new code.
+    Use this method instead of bash touch or echo to create new files.
+    Keep the correct indention, especially in python files.
     """
     if not os.path.exists(path):
         # check if the dir exists

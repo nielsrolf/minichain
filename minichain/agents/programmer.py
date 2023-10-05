@@ -32,7 +32,7 @@ class Programmer(Agent):
         if init_history == []:
             init_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
             if self.memory and len(self.memory.memories) > 0:
-                init_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}. Use the `find_memory` function to find relevant memories."
+                init_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}\nUse the `find_memory` function to find relevant memories."
             init_history.append(UserMessage(init_msg))
 
         functions = [

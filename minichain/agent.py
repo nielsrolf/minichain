@@ -150,8 +150,7 @@ class Session:
                         function_output = await function(**action.arguments)
                         return function_output
                 await stream.set(
-                    f"Error: this function does not exist",
-                    action.name,
+                    f"Error: this function does not exist. Available functions: {', '.join([i.name for i in self.agent.functions])}"
                 )
             # catch pydantic validation errors
             except pydantic.error_wrappers.ValidationError as e:

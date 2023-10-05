@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import Field
 
 from minichain.agent import Agent, make_return_function
@@ -23,7 +25,7 @@ If the user asks you something complex about the code, make a plan first:
 - try to find relevant memories
 - try to find relevant code sections using the view tool if needed
 - once you know enough to make a plan, create tasks on the board
-- assign them to someone - they will report back to you in detail
+- assign them to someone - they will report back to you in detail. Tell them all the relevant code sections you found.
 - readjust the plan as needed by updating the board
 With this approach, you are able to solve complex tasks - such as implementing an entire app for the user - including making a backend (preferably with fastapi), a frontend (preferably with React), and a database (preferably with sqlite).
 
@@ -55,11 +57,15 @@ class AGI(Agent):
                 enum=["programmer", "copy-of-self", "artist"],
                 # enum=["programmer", "webgpt", "copy-of-self", "artist"],
             ),
+            relevant_code: List[str] = Field(
+                [],
+                description="A list of relevant code sections in format 'path/to/file.py:start_line-end_line'",
+            ),
             additional_info: str = Field(
                 "", description="Additional message to the programmer."
             ),
         ):
-            """Assign a task to a programmer or webgpt. The assignee will immediately start working on the task."""
+            """Assign a task to an agent (copy-of-self: for complex tasks with sub tasks, programmer: to work on the codebase, webgpt (rarely): to research something on the web). The assignee will immediately start working on the task."""
             task = [i for i in self.board.tasks if i.id == task_id][0]
             board_before = await taskboard.update_status(
                 self.board, task_id, "IN_PROGRESS"
@@ -68,6 +74,9 @@ class AGI(Agent):
                 f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.\n"
                 "When you are done, return with a detailed explanation of what you did, including a list of all the files you changed and an explanation of how to test and use the new feature.\n"
             )
+            if len(relevant_code) > 0:
+                code_context = "\n".join(relevant_code)
+                query += f"Here is some relevant code:\n{code_context}"
             if "programmer" in assignee.lower():
                 self.programmer.register_stream(self.stream)
                 response = await self.programmer.run(
@@ -75,7 +84,7 @@ class AGI(Agent):
                 )
             elif "webgpt" in assignee.lower():
                 response = await self.webgpt.run(
-                    query=f"Please research on the following ticket: {task.title}.\n{task.description}\n{additional_info}",
+                    query=f"Please research on the following ticket:\n{task.description}\n{additional_info}",
                 )
             elif "copy-of-self" in assignee.lower():
                 response = await self.run(
@@ -83,20 +92,23 @@ class AGI(Agent):
                 )
             elif "artist" in assignee.lower():
                 response = await self.artist.run(
-                    query=f"Please research on the following ticket: {task.title}.\n{task.description}\n{additional_info}",
+                    query=f"Please research on the following ticket:\n{task.description}\n{additional_info}",
                 )
             else:
                 return f"Error: Unknown assignee: {assignee}"
+            
+            response = response['content']
             board_after = await taskboard.get_board(self.board)
 
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
 
             info_to_memorize = (
-                f"{assignee} worked on the following ticket: {task.title}.\n{task.description}\n{additional_info}. \n"
+                f"{assignee} worked on the following ticket:\n{task.description}\n{additional_info}. \n"
                 f"Here is the response:\n{response}"
             )
-            await self.memory.ingest(info_to_memorize, source=task.title)
+            source = f"Task: {task.description}"
+            await self.memory.ingest(info_to_memorize, source=source, watch_source=False)
 
             return response
 
@@ -132,11 +144,12 @@ class AGI(Agent):
 
         init_history = kwargs.pop("init_history", [])
         if init_history == []:
-            user_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}."
-            if len(self.memory.memories) > 0:
-                user_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}"
-            else:
-                user_msg += f"\nYou don't have any memories yet."
+            user_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
+            if self.memory:
+                if len(self.memory.memories) > 0:
+                    user_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}"
+                else:
+                    user_msg += f"\nYou don't have any memories yet."
             init_history.append(UserMessage(user_msg))
 
         super().__init__(

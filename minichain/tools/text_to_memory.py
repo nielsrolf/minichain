@@ -56,6 +56,7 @@ class Memory(BaseModel):
 class MemoryMeta(BaseModel):
     source: str = Field(..., description="The source uri of the document.")
     content: str = Field(..., description="The content of the document.")
+    watch_source: bool = Field(True, description="Whether to watch the source for changes - set to true for source files, set to False for conversational memories.")
     timestamp: dt.datetime = Field(default_factory=dt.datetime.now, description="The timestamp when the document was created.")
 
 
@@ -150,12 +151,13 @@ def hide_already_memorized(content, existing_memories):
         if memory.memory.start_line == memory.memory.end_line:
             # do not show first line of memory if the memory is only one line long
             lines[memory.memory.start_line - 1] = f"[Hidden: {memory.memory.title}]"
-        fill_up_lines = memory.memory.end_line - memory.memory.start_line
-        lines[
-            memory.memory.start_line - 1 : memory.memory.end_line
-        ] = [f"[{memory.meta.content.splitlines()[0]}\n" + \
-                f"    Hidden: {memory.memory.title}]"] + \
-                [None] * fill_up_lines
+        else:
+            fill_up_lines = memory.memory.end_line - memory.memory.start_line
+            lines[
+                memory.memory.start_line - 1 : memory.memory.end_line
+            ] = [f"[{memory.meta.content.splitlines()[0]}\n" + \
+                    f"    Hidden: {memory.memory.title}]"] + \
+                    [None] * fill_up_lines
             
     lines = [i for i in lines if i is not None]
     text_with_line_numbers = "\n".join(lines)
