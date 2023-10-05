@@ -94,6 +94,12 @@ class Stream:
             role = self.current_message["role"]
             message_type = message_types[role]
             self.history.append(message_type(**self.current_message))
+        self.conversation_stack = ["Trash"]
+        self.current_message = {
+            "id": "hidden",
+            "role": "hidden",
+            "conversation_id": "hidden",
+        }
 
     async def conversation(self, conversation_id=None, agent=None):
         if conversation_id is None:
