@@ -229,7 +229,7 @@ async def edit(
     code = remove_line_numbers(code)
     with open(path, "r") as f:
         lines = f.read().split("\n")
-        lines[start - 1 : end] = code.split("\n")
+        lines[start - 1 : end - 1] = code.split("\n")
     with open(path, "w") as f:
         f.write("\n".join(lines))
     updated_in_context = await view(
