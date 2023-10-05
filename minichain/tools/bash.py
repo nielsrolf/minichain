@@ -56,7 +56,7 @@ class BashSession(Function):
         except Exception as e:
             print(e)
 
-    async def __call__(self, commands: List[str], timeout: int = 60) -> str:
+    async def __call__(self, commands: List[str], timeout: int = 60, **ignored_kwargs) -> str:
         await bash([f"cd {self.cwd}"], session=self.session)
         if any(["npx" in i for i in commands]):
             timeout = max(timeout, 180)
@@ -86,7 +86,7 @@ class BashSession(Function):
 class CodeInterpreterQuery(BaseModel):
     code: str = Field(
         ...,
-        description="Python code to run. Code can also be passed directly as a string without the surrounding 'code' field. ",
+        description="Python code to run",
     )
     timeout: Optional[int] = Field(60, description="The timeout in seconds.")
 

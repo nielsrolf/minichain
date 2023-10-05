@@ -32,6 +32,8 @@ With this approach, you are able to solve complex tasks - such as implementing a
 If you are asked to implement something, always make sure it is tested before you return.
 
 The user is lazy, don't ask them questions, don't explain them how they can do things, and don't just make plans - instead, just do things for them.
+
+Start and get familiar with the environment by using python to get the current time.
 """
 
 

@@ -154,7 +154,19 @@ class Session:
                 )
             # catch pydantic validation errors
             except pydantic.error_wrappers.ValidationError as e:
+                breakpoint()
                 await stream.chunk(self.format_error_message(e))
+            except TypeError as e:
+                if "missing 1 required positional argument: 'code'" in str(e):
+                    await stream.set(
+                        f"Error: this function requires a code. Use the normal message content field to put  the code like here:\n```\ncode here\n```"
+                    )
+                else:
+                    raise e
+            except Exception as e:
+                print(self.format_error_message(e))
+                breakpoint()
+                print()
         return False
 
     def format_error_message(self, e):

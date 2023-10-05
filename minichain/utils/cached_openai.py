@@ -73,6 +73,16 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
         }
         response["content"] = ""
     response["function_call"] = parse_function_call(response["function_call"]).dict()
+    if "```" in response["content"]:
+        # move the code to the arguments
+        raw = response["content"]
+        for language in ["python", "bash", "javascript", "html", "css", "json", "yaml", "sql", "markdown", "latex", "c", "cpp", "csharp", "go", "java", "kotlin", "php", "ruby", "rust", "scala", "swift", "py", "sh", "js"]:
+            raw = raw.replace(f"```{language}", "```")
+        content, code = raw.split("```\n", 1)
+        response["content"] = content
+        # remove the last ``` and everything after it
+        code, content_after = code.rsplit("\n```", 1)
+        response["function_call"]["arguments"]["code"] = code
     return response
 
 
@@ -82,6 +92,11 @@ def format_history(messages: list) -> list:
         if (function_call := message.get("function_call")) is not None:
             try:
                 if isinstance(function_call["arguments"], dict):
+                    content = function_call["arguments"].pop("content", None)
+                    message["content"] = content or message["content"]
+                    code = function_call["arguments"].pop("code", None)
+                    if code is not None:
+                        message["content"] = message["content"] + f"\n```\n{code}\n```"
                     function_call["arguments"] = json.dumps(function_call["arguments"])
             except Exception as e:
                 print(e)

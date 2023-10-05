@@ -32,6 +32,17 @@ class Function:
         except:
             print(openapi, type(openapi))
             breakpoint()
+        else:
+            self.description = description
+        self.has_code_argument = False
+        if "code" in parameters_openapi["properties"]:
+            self.has_code_argument = True
+            code_param = parameters_openapi["properties"].pop("code")
+            description = (
+                description + 
+                f"\nUse the normal message content fiield to put ```{code_param['description']}```"
+            )
+            parameters_openapi["required"].remove("code")
         self.parameters_openapi = parameters_openapi
         self.name = name
         self.function = function
@@ -46,6 +57,8 @@ class Function:
         _stream: a function that is expected to be called with new parts of the output of the function string
                 (e.g. new lines of a bash command)
         """
+        if "code" in arguments and not self.has_code_argument:
+            arguments.pop("code")
         if self.pydantic_model is not None:
             arguments = self.pydantic_model(**arguments).dict()
         response = await self.function(**arguments)

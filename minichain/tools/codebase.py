@@ -207,7 +207,7 @@ async def edit(
     end: int = Field(..., description="The end line."),
     code: str = Field(
         ...,
-        description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON.",
+        description="The code to replace the lines with.",
     ),
 ):
     """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!
@@ -218,7 +218,11 @@ async def edit(
     if not os.path.exists(path):
         # check if the dir exists
         dir_path = os.path.dirname(path)
-        os.makedirs(dir_path, exist_ok=True)
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+        except:
+            # maybe we are trying to write to cwd, in which case this fails for some reason
+            pass
         # create the file
         with open(path, "w") as f:
             f.write("")

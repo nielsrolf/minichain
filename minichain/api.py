@@ -158,7 +158,20 @@ from minichain.functions import tool
 async def upload_file_to_chat(
     file: str = Field(..., description="The path to the file to upload."),
 ):
-    """Upload a file to the chat."""
+    """Upload a file to the chat. You can only upload files in the cwd or a sub dir - move files from /tmp to .minichain/downloads/ before uploading them if needed."""
+    # if the file is not in the cwd or a sub dir, we need to copy it to a download folder
+    if not os.path.exists(file):
+        return f"Error: File {file} not found. Move it to s subfolder of {os.getcwd()} and try again."
+    full_path = os.path.abspath(file)
+    if not full_path.startswith(os.getcwd()):
+        # copy it to ./minichain/downloads/{len(os.listdir('./minichain/downloads'))}/{filename}
+        filename = os.path.basename(file)
+        downloads_path = "./minichain/downloads"
+        os.makedirs(downloads_path, exist_ok=True)
+        new_path = f"{downloads_path}/{len(os.listdir(downloads_path))}_{filename}"
+        import shutil
+        shutil.copyfile(file, new_path)
+        file = new_path
     return f"displaying file: {file}"
 
 
