@@ -164,7 +164,7 @@ class Session:
                         await stream.chunk(self.format_error_message(e))
                     else:
                         print(self.format_error_message(e))
-                        breakpoint()
+                        # breakpoint()
                         raise e
         return False
 
