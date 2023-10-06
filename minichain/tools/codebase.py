@@ -191,14 +191,14 @@ async def view(
     ),
 ):
     """View a section of a file, specified by line range."""
-    if start < 0:
-        start = 0
+    if start < 1:
+        start = 1
     with open(path, "r") as f:
         lines = f.readlines()
         # add line numbers
         if with_line_numbers:
             lines = [f"{i+1} {line}" for i, line in enumerate(lines)]
-        response = f"{path} {start}-{end}:\n" + "".join(lines[start:end])
+        response = f"{path} {start}-{end}:\n" + "".join(lines[start-1:end])
     return response
 
 
@@ -206,7 +206,8 @@ async def view(
 async def edit(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
-    end: int = Field(..., description="The end line."),
+    end: int = Field(..., description="The end line. If end = start, you insert without replacing. To replace a line, set end = start + 1."),
+    indent: str = Field("", description="Prefix of spaces for each line to use as indention. Example: '    '"),
     code: str = Field(
         ...,
         description="The code to replace the lines with.",
@@ -229,6 +230,8 @@ async def edit(
         with open(path, "w") as f:
             f.write("")
     code = remove_line_numbers(code)
+    # add indention
+    code = "\n".join([indent + line for line in code.split("\n")])
     with open(path, "r") as f:
         lines = f.read().split("\n")
         lines[start - 1 : end - 1] = code.split("\n")
