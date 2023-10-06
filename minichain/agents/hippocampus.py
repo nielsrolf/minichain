@@ -18,8 +18,8 @@ Use the following strategy:
 
 class CodeSection(BaseModel):
     path: str = Field(..., description="The path to the file.")
-    start_line: int = Field(..., description="The start line of the code section.")
-    end_line: int = Field(..., description="The end line of the code section.")
+    start: int = Field(..., description="The start line of the code section.")
+    end: int = Field(..., description="The end line of the code section.")
     summary: str = Field(..., description="Very brief summary of what happens in the code section.")
 
 

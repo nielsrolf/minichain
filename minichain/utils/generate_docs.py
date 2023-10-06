@@ -15,9 +15,10 @@ def parse_function(code, file, id_prefix=""):
     lines = code.split("\n")
     end_line = 0
     try:
-        while not lines[end_line].startswith("def "):
+        while not (lines[end_line].startswith("def ") or lines[end_line].startswith("async def ")):
             end_line += 1
     except IndexError:
+        breakpoint()
         return None, len(lines)
     line = lines[end_line]
     try:
@@ -27,7 +28,7 @@ def parse_function(code, file, id_prefix=""):
     function_signature = ""
     for potential_signature_end in lines[end_line:]:
         end_line += 1
-        function_signature += potential_signature_end
+        function_signature += potential_signature_end + "\n"
         if potential_signature_end.split("#")[0].strip().endswith(":"):
             break
     docstring = ""
@@ -76,7 +77,7 @@ def get_symbols(file):
     while i < len(lines):
         line = lines[i]
         # print(line)
-        if line.startswith("def "):
+        if line.startswith("def ") or line.startswith("async def "):
             function, j = parse_function("\n".join(lines[i:]), file)
             function["start"] += i
             function["end"] += i
@@ -189,13 +190,15 @@ def symbol_as_markdown(symbol, prefix=""):
         response += " ".join([str(i) for i in args]) + "\n"
 
     try:
-        print(f"{prefix}{symbol['signature']} {symbol['start']}-{symbol['end']}")
+        print(f"{prefix}{symbol['signature']}Lines: {symbol['start']}-{symbol['end']}")
     except:
         breakpoint()
     if symbol["docstring"]:
-        print(f"{prefix}  docstring: {symbol['docstring']}")
+        print(f"{prefix}{symbol['docstring']}")
     if symbol.get("fields"):
-        print(symbol["fields"])
+        fields = symbol["fields"].split("\n")
+        fields = "\n".join([f"{prefix}    {i}" for i in fields])
+        print(fields)
     if symbol.get("methods"):
         for method in symbol["methods"]:
             print(symbol_as_markdown(method, prefix=f"    "))
@@ -225,4 +228,5 @@ def main(src):
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    print(summarize_python_file("minichain/memory.py"))

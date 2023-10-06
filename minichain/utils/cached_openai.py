@@ -73,7 +73,7 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
         }
         response["content"] = ""
     response["function_call"] = parse_function_call(response["function_call"]).dict()
-    if "```" in response["content"]:
+    if "```" in response["content"] and response["function_call"]["name"] in ["python", "edit"]:
         # move the code to the arguments
         raw = response["content"]
         for language in ["python", "bash", "javascript", "html", "css", "json", "yaml", "sql", "markdown", "latex", "c", "cpp", "csharp", "go", "java", "kotlin", "php", "ruby", "rust", "scala", "swift", "py", "sh", "js"]:

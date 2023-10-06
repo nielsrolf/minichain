@@ -168,16 +168,13 @@ async def scan_file_for_info(
     question: str = Field(..., description="The question to ask."),
 ):
     """Search a file for specific information"""
-    if path.endswith(".py"):
-        summary = summarize_python_file(path)
-    else:
-        print("Summary:", path)
-        with open(path, "r") as f:
-            text = f.read()
-        summary = await long_document_qa(
-            text=text,
-            question=question,
-        )
+    print("Summary:", path)
+    with open(path, "r") as f:
+        text = f.read()
+    summary = await long_document_qa(
+        text=text,
+        question=question,
+    )
     return f"# {path}\n{summary}\n\n"
 
 
