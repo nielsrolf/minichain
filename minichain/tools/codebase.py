@@ -144,6 +144,8 @@ async def get_long_summary(
 @tool()
 async def get_file_summary(path: str = Field(..., description="The path to the file.")):
     """Summarize a file."""
+    if not os.path.exists(path):
+        return f"File not found: {path}"
     if path.endswith(".py"):
         summary = summarize_python_file(path)
     else:

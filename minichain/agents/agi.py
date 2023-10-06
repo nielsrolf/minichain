@@ -45,7 +45,7 @@ class AGI(Agent):
     def __init__(self, **kwargs):
         self.board = taskboard.TaskBoard()
         self.programmer = Programmer(**kwargs)
-        self.memory = self.programmer.memory
+        self.memory = self.programmer.hippocampus.memory
         kwargs.pop("load_memory_from", None)
         self.webgpt = WebGPT(**kwargs)
         self.artist = Artist(**kwargs)
@@ -105,25 +105,16 @@ class AGI(Agent):
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
 
-            info_to_memorize = (
-                f"{assignee} worked on the following ticket:\n{task.description}\n{additional_info}. \n"
-                f"Here is the response:\n{response}"
-            )
-            source = f"Task: {task.description}"
-            await self.memory.ingest(info_to_memorize, source=source, watch_source=False)
-
+            # info_to_memorize = (
+            #     f"{assignee} worked on the following ticket:\n{task.description}\n{additional_info}. \n"
+            #     f"Here is the response:\n{response}"
+            # )
+            # source = f"Task: {task.description}"
+            # await self.memory.ingest_as_single_memory(info_to_memorize, source=source, watch_source=False)
             return response
 
-        def register_stream(stream):
-            self.stream = stream
-            self.programmer.register_stream(stream)
-            self.webgpt.register_stream(stream)
-            self.artist.register_stream(stream)
+        assign.manager = self
 
-        assign.register_stream = register_stream
-
-        board_tools = taskboard.tools(self.board)
-        self.programmer.functions += board_tools
 
         def check_board(**arguments):
             """Checks if there are still tasks not done on the board"""
@@ -137,9 +128,8 @@ class AGI(Agent):
 
         return_function = make_return_function(MultiModalResponse, check_board)
 
-        all_tools = (
-            self.programmer.functions
-        )  # + self.artist.functions + self.webgpt.functions
+        board_tools = taskboard.tools(self.board)
+        all_tools = self.programmer.functions + board_tools
         tools_dict = {i.name: i for i in all_tools}
         tools_dict.pop("return")
         all_tools = list(tools_dict.values()) + [assign, return_function]
