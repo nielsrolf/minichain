@@ -58,6 +58,7 @@ class MemoryMeta(BaseModel):
     content: str = Field(..., description="The content of the document.")
     watch_source: bool = Field(True, description="Whether to watch the source for changes - set to true for source files, set to False for conversational memories.")
     timestamp: dt.datetime = Field(default_factory=dt.datetime.now, description="The timestamp when the document was created.")
+    scope: str = "root" # if scope is a conversation id, this memory will only appear for (sub)conversations with the same id
 
 
 class MemoryWithMeta(BaseModel):
@@ -142,6 +143,19 @@ async def text_to_memory(text=None, source=None, max_num_memories=None, agent_kw
         except EndThisMemorySession:
             continue
     return memories
+
+
+async def text_to_single_memory(text=None, source=None, agent_kwargs={}) -> MemoryWithMeta:
+    agent = Agent(
+        functions=[],
+        system_message="Describe the content of this text and turn provide structured metadata about it.",
+        prompt_template="{text}".format,
+        response_openapi=Memory,
+        **agent_kwargs,
+    )
+    memory = await agent.run(text=text)
+    meta = MemoryMeta(source=source, content=text)
+    return MemoryWithMeta(memory=memory, meta=meta)
 
 
 def hide_already_memorized(content, existing_memories):

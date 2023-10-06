@@ -30,9 +30,7 @@ class RelevantInfos(BaseModel):
 
 class Hippocampus(Agent):
     def __init__(self, load_memory_from=None, **kwargs):
-        self.memory = SemanticParagraphMemory(
-            use_vector_search=True, agents_kwargs=kwargs
-        )
+        self.memory = SemanticParagraphMemory(agents_kwargs=kwargs)
         try:
             self.memory.load(load_memory_from)
         except FileNotFoundError:

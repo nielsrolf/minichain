@@ -105,12 +105,17 @@ class AGI(Agent):
             if board_before != board_after:
                 response += f"\nHere is the updated task board:\n{board_after}"
 
-            # info_to_memorize = (
-            #     f"{assignee} worked on the following ticket:\n{task.description}\n{additional_info}. \n"
-            #     f"Here is the response:\n{response}"
-            # )
-            # source = f"Task: {task.description}"
-            # await self.memory.ingest_as_single_memory(info_to_memorize, source=source, watch_source=False)
+            info_to_memorize = (
+                f"{assignee} worked on the following ticket:\n{task.description}\n{additional_info}. \n"
+                f"Here is the response:\n{response}"
+            )
+            source = f"Task: {task.description}"
+            await self.memory.add_single_memory(
+                content=info_to_memorize,
+                source=source,
+                watch_source=False,
+                scope=self.stream.conversation_stack[-2]
+            )
             return response
 
         assign.manager = self

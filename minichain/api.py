@@ -55,6 +55,14 @@ class MessageDB:
                 if message.get("agent", None) is not None:
                     self.conversationAgents[child] = message["agent"]
             parent = child
+    
+    def get_path(self, id):
+        # return the conversation stack to the conversation of the message id
+        path = []
+        while id != "root":
+            path = [id] + path
+            id = [i for i in self.childrenOf if id in self.childrenOf[i]][0]
+        return ["root"] + path
 
     def dicts_to_classes(self, dicts):
         classes = {
@@ -253,6 +261,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 history = []
             else:
                 history = message_db.get_history(payload.response_to)
+                conversation_stack = message_db.get_path(payload.response_to)
 
             print("agent_name", agent_name)
             agent = agents[agent_name]
@@ -264,6 +273,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 if payload.response_to == "root":
                     with await stream.to([], role="user") as stream:
                         await stream.set(payload.query)
+                else:
+                    stream.conversation_stack = conversation_stack
+
                 agent.register_stream(stream)
                 await agent.run(query=payload.query, history=history)
 

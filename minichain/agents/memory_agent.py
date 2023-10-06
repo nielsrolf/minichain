@@ -14,9 +14,7 @@ class ProgrammerResponse(BaseModel):
 
 class MemoryAgent(Agent):
     def __init__(self, memory=None, load_memory_from=None, **kwargs):
-        self.memory = memory or SemanticParagraphMemory(
-            use_vector_search=True, agents_kwargs=kwargs
-        )
+        self.memory = memory or SemanticParagraphMemory(agents_kwargs=kwargs)
         if load_memory_from:
             try:
                 self.memory.load(load_memory_from)
