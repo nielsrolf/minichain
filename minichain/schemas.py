@@ -3,6 +3,10 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class DefaultQuery(BaseModel):
+    query: str = Field(..., description="Query")
+
+
 class DefaultResponse(BaseModel):
     content: str = Field(..., description="The final response to the user.")
 

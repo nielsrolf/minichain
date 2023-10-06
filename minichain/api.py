@@ -55,6 +55,14 @@ class MessageDB:
                 if message.get("agent", None) is not None:
                     self.conversationAgents[child] = message["agent"]
             parent = child
+    
+    def get_path(self, id):
+        # return the conversation stack to the conversation of the message id
+        path = []
+        while id != "root":
+            path = [id] + path
+            id = [i for i in self.childrenOf if id in self.childrenOf[i]][0]
+        return ["root"] + path
 
     def dicts_to_classes(self, dicts):
         classes = {
@@ -151,7 +159,8 @@ agents = {}
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import tool
+from minichain.functions import tool
+from minichain.utils.docker_sandbox import bash
 
 
 @tool()
@@ -159,6 +168,25 @@ async def upload_file_to_chat(
     file: str = Field(..., description="The path to the file to upload."),
 ):
     """Upload a file to the chat."""
+    # if the file is not in the cwd or a sub dir, we need to copy it to a download folder
+    full_path = os.path.abspath(file)
+    if not full_path.startswith(os.getcwd()):
+        # copy it to ./minichain/downloads/{len(os.listdir('./minichain/downloads'))}/{filename}
+        filename = os.path.basename(file)
+        downloads_path = "./minichain/downloads"
+        os.makedirs(downloads_path, exist_ok=True)
+        new_path = f"{downloads_path}/{len(os.listdir(downloads_path))}_{filename}"
+        await bash(
+            [f"cp {file} {new_path}"],
+            session=(
+                os.getcwd().replace("/", "")
+                .replace(".", "")
+                .replace("-", "")
+                .replace("_", "")
+                .replace(" ", "")
+            )
+        )
+        file = new_path
     return f"displaying file: {file}"
 
 
@@ -233,6 +261,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 history = []
             else:
                 history = message_db.get_history(payload.response_to)
+                conversation_stack = message_db.get_path(payload.response_to)
 
             print("agent_name", agent_name)
             agent = agents[agent_name]
@@ -244,6 +273,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 if payload.response_to == "root":
                     with await stream.to([], role="user") as stream:
                         await stream.set(payload.query)
+                else:
+                    stream.conversation_stack = conversation_stack
+
                 agent.register_stream(stream)
                 await agent.run(query=payload.query, history=history)
 

@@ -2,10 +2,11 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from minichain.agent import tool
+from minichain.functions import tool
+from minichain.dtypes import ExceptionForAgent
 
 
-class TasksNotDoneError(Exception):
+class TasksNotDoneError(ExceptionForAgent):
     pass
 
 

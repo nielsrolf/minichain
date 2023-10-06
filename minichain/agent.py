@@ -2,11 +2,12 @@ import json
 import traceback
 
 from pydantic import BaseModel
+import pydantic.error_wrappers
 
-from minichain.dtypes import (Cancelled, SystemMessage, UserMessage,
+from minichain.dtypes import (Cancelled, SystemMessage, UserMessage, ExceptionForAgent,
                               messages_types_to_history)
 from minichain.functions import Function
-from minichain.schemas import DefaultResponse
+from minichain.schemas import DefaultResponse, DefaultQuery
 from minichain.streaming import Stream
 from minichain.utils.cached_openai import get_openai_response_stream
 from minichain.utils.summarize_history import get_summarized_history
@@ -83,9 +84,12 @@ class Agent:
     def register_stream(self, stream):
         self.stream = stream
 
-    def as_function(self, name, description, prompt_openapi):
-        def function(**arguments):
-            return self.run(**arguments)
+    def as_function(self, name, description, prompt_openapi=DefaultQuery):
+        async def function(**arguments):
+            result = await self.run(**arguments)
+            if len(result.keys()) == 1:
+                return list(result.values())[0]
+            return json.dumps(result)
 
         function_tool = Function(
             prompt_openapi,
@@ -94,6 +98,8 @@ class Agent:
             description,
             stream=self.stream,
         )
+        # Make sure both the functions register_stream and the agent's register_stream are called
+        function_tool.from_agent = self
         return function_tool
 
 
@@ -121,9 +127,10 @@ class Session:
 
     async def get_next_action(self, stream):
         history_without_ids = messages_types_to_history(self.history)
-        summarized_history = await get_summarized_history(
-            history_without_ids, self.agent.functions_openai
-        )
+        # summarized_history = await get_summarized_history(
+        #     history_without_ids, self.agent.functions_openai
+        # )
+        summarized_history = history_without_ids
         # do the openai call
         with await stream.to(self.history, role="assistant") as stream:
             await get_openai_response_stream(
@@ -148,11 +155,24 @@ class Session:
                         function_output = await function(**action.arguments)
                         return function_output
                 await stream.set(
-                    f"Error: this function does not exist",
-                    action.name,
+                    f"Error: this function does not exist. Available functions: {', '.join([i.name for i in self.agent.functions])}"
                 )
+            # catch pydantic validation errors
+            except ExceptionForAgent as e:
+                await stream.set(self.format_error_message(e))
             except Exception as e:
-                await stream.chunk(self.format_error_message(e))
+                if "missing 1 required positional argument: 'code'" in str(e) or "validation error for edit\ncode\n  field required" in str(e):
+                    await stream.set(
+                        f"Error: this function requires a code. Use the normal message content field to put  the code like here:\n```\ncode here\n```"
+                    )
+                else:
+                    print(self.format_error_message(e))
+                    if isinstance(e, pydantic.error_wrappers.ValidationError):
+                        await stream.chunk(self.format_error_message(e))
+                    else:
+                        print(self.format_error_message(e))
+                        # breakpoint()
+                        raise e
         return False
 
     def format_error_message(self, e):

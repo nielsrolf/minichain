@@ -47,7 +47,7 @@ class Stream:
                 [{"content": "Override", conversation_id: "123", id: 1}]
         with stream.to(history, type=FunctionMessage) as stream:
             function.stream = stream
-            function()
+            # in function():
                 stream.chunk("hello")
                 stream.chunk("world")
             print(history)
@@ -94,13 +94,19 @@ class Stream:
             role = self.current_message["role"]
             message_type = message_types[role]
             self.history.append(message_type(**self.current_message))
+        # self.conversation_stack = ["Trash"]
+        # self.current_message = {
+        #     "id": "hidden",
+        #     "role": "hidden",
+        #     "conversation_id": "hidden",
+        # }
 
     async def conversation(self, conversation_id=None, agent=None):
         if conversation_id is None:
             conversation_id = str(uuid4().hex[:5])
         conversation_stack = self.conversation_stack
         if self.current_message["id"] != "hidden":
-            conversation_stack += [self.current_message["id"]]
+            conversation_stack = conversation_stack + [self.current_message["id"]]
         conversation_stack += [conversation_id]
         stream = self.__class__(
             on_message=self.on_message,

@@ -1,8 +1,6 @@
 import asyncio
 import json
 import os
-import threading
-from time import sleep
 from typing import List
 
 import docker

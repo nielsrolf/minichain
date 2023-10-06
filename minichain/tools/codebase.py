@@ -7,6 +7,7 @@ from minichain.functions import tool
 from minichain.tools.recursive_summarizer import long_document_qa
 from minichain.utils.generate_docs import get_symbols, summarize_python_file
 
+
 default_ignore_files = [
     "__pycache__",
     "node_modules",
@@ -15,7 +16,10 @@ default_ignore_files = [
     "venv",
     "env",
     "examples",
+    "htmlcov",
 ]
+
+default_extensions = [".py", ".js", ".ts", ".css", "README.md"]
 
 
 class RelevantSection(BaseModel):
@@ -27,7 +31,7 @@ class RelevantSection(BaseModel):
 
 
 def get_visible_files(
-    root_dir, extensions, ignore_files=default_ignore_files, max_lines=100
+    root_dir, extensions=default_extensions, ignore_files=default_ignore_files, max_lines=100
 ):
     def should_ignore(path):
         for ignore in ignore_files:
@@ -73,9 +77,9 @@ def get_visible_files(
 
 def get_initial_summary(
     root_dir=".",
-    extensions=[".py", ".js", ".ts", "README.md"],
+    extensions=default_extensions,
     ignore_files=default_ignore_files,
-    max_lines=25,
+    max_lines=40,
 ):
     available_files = get_visible_files(
         root_dir=root_dir,
@@ -140,12 +144,17 @@ async def get_long_summary(
 @tool()
 async def get_file_summary(path: str = Field(..., description="The path to the file.")):
     """Summarize a file."""
+    if not os.path.exists(path):
+        return f"File not found: {path}"
     if path.endswith(".py"):
         summary = summarize_python_file(path)
     else:
         print("Summary:", path)
-        with open(path, "r") as f:
-            text = f.read()
+        try:
+            with open(path, "r") as f:
+                text = f.read()
+        except Exception as e:
+            return f"Could not read file: {e}"
         summary = await long_document_qa(
             text=text,
             question="Summarize the following file in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important sections. When referencing files, always use the path (rather than the filename).",
@@ -182,14 +191,14 @@ async def view(
     ),
 ):
     """View a section of a file, specified by line range."""
-    if start < 0:
-        start = 0
+    if start < 1:
+        start = 1
     with open(path, "r") as f:
         lines = f.readlines()
         # add line numbers
         if with_line_numbers:
             lines = [f"{i+1} {line}" for i, line in enumerate(lines)]
-        response = f"{path} {start}-{end}:\n" + "".join(lines[start:end])
+        response = f"{path} {start}-{end}:\n" + "".join(lines[start-1:end])
     return response
 
 
@@ -197,26 +206,35 @@ async def view(
 async def edit(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
-    end: int = Field(..., description="The end line."),
+    end: int = Field(..., description="The end line. If end = start, you insert without replacing. To replace a line, set end = start + 1."),
+    indent: str = Field("", description="Prefix of spaces for each line to use as indention. Example: '    '"),
     code: str = Field(
         ...,
-        description="The code to replace the lines with. Can be escaped with `ticks` to avoid formatting code as JSON.",
+        description="The code to replace the lines with.",
     ),
 ):
     """Edit a section of a file, specified by line range. NEVER edit lines of files before viewing them first!
-    To create a new file, specify the path and start,end=0. Use this method instead of bash touch or echo to create new files.
+    Creates the file if it does not exist, then replaces the lines (including start and end line) with the new code.
+    Use this method instead of bash touch or echo to create new files.
+    Keep the correct indention, especially in python files.
     """
     if not os.path.exists(path):
         # check if the dir exists
         dir_path = os.path.dirname(path)
-        os.makedirs(dir_path, exist_ok=True)
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+        except:
+            # maybe we are trying to write to cwd, in which case this fails for some reason
+            pass
         # create the file
         with open(path, "w") as f:
             f.write("")
     code = remove_line_numbers(code)
+    # add indention
+    code = "\n".join([indent + line for line in code.split("\n")])
     with open(path, "r") as f:
         lines = f.read().split("\n")
-        lines[start - 1 : end] = code.split("\n")
+        lines[start - 1 : end - 1] = code.split("\n")
     with open(path, "w") as f:
         f.write("\n".join(lines))
     updated_in_context = await view(

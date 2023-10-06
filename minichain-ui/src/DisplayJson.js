@@ -51,10 +51,14 @@ const DisplayJson = ({ data }) => {
     return '';
   }
   if (data.name === 'python') {
+    console.log(data);
+    if (data.arguments.content) {
+      return <CodeBlock code={data.arguments.content} />;
+    }
     try {
       const parsed = JSON.parse(data.arguments);
       if (parsed.code) {
-        return <CodeBlock code={parsed.code} />;
+        return <CodeBlock code={parsed.content} />;
       }
     } catch (e) {
       // code was not wrapped in {code: ...}
@@ -68,15 +72,9 @@ const DisplayJson = ({ data }) => {
   } catch (e) {
     // arguments was not a json
   }
-  if (data.name === 'upload_file_to_chat') {
-    console.log(data);
-    try {
-      const path = data.arguments.file;
-      console.log(path);
-      return <MultiMedia path={path} />;
-    } catch (e) {
-      console.log(e);
-    }
+  if (typeof data === 'string' && data.startsWith('displaying file:')) {
+    const path = data.split('displaying file:')[1].trim();
+    return <MultiMedia path={path} />;
   }
 
   if (data.generated_files) {

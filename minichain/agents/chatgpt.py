@@ -10,3 +10,16 @@ class ChatGPT(Agent):
         )
         kwargs["prompt_template"] = "{query}".format
         super().__init__(**kwargs)
+
+
+async def main():
+    chatgpt = ChatGPT()
+    while query := input("You: "):
+        response = await chatgpt.run(query=query)
+        print(response["content"])
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(main())

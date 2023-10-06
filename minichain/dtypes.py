@@ -112,6 +112,12 @@ class Cancelled(Exception):
     pass
 
 
+class ExceptionForAgent(Exception):
+    """Base class for all exceptions that may occur inside a function that should be passed
+    through to the agent, rather than stop the conversation."""
+    pass
+
+
 def messages_types_to_history(chat_history: list) -> list:
     if not isinstance(chat_history[0], dict):
         messages = []
@@ -133,3 +139,4 @@ def messages_types_to_history(chat_history: list) -> list:
             if v is None and not k == "content":
                 message.pop(k)
     return messages
+

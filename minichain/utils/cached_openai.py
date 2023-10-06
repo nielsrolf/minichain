@@ -73,6 +73,16 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
         }
         response["content"] = ""
     response["function_call"] = parse_function_call(response["function_call"]).dict()
+    if "```" in response["content"]:
+        # move the code to the arguments
+        raw = response["content"]
+        for language in ["python", "bash", "javascript", "html", "css", "json", "yaml", "sql", "markdown", "latex", "c", "cpp", "csharp", "go", "java", "kotlin", "php", "ruby", "rust", "scala", "swift", "py", "sh", "js"]:
+            raw = raw.replace(f"```{language}", "```")
+        content, code = raw.split("```\n", 1)
+        response["content"] = content
+        # remove the last ``` and everything after it
+        code, content_after = code.rsplit("\n```", 1)
+        response["function_call"]["arguments"]["code"] = code
     return response
 
 
@@ -82,6 +92,11 @@ def format_history(messages: list) -> list:
         if (function_call := message.get("function_call")) is not None:
             try:
                 if isinstance(function_call["arguments"], dict):
+                    content = function_call["arguments"].pop("content", None)
+                    message["content"] = content or message["content"]
+                    code = function_call["arguments"].pop("code", None)
+                    if code is not None:
+                        message["content"] = message["content"] + f"\n```\n{code}\n```"
                     function_call["arguments"] = json.dumps(function_call["arguments"])
             except Exception as e:
                 print(e)
@@ -108,7 +123,7 @@ def save_llm_call_for_debugging(messages, functions, parsed_response, raw_respon
 
 
 @async_disk_cache
-# @retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
+@retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
 async def get_openai_response_stream(
     chat_history, functions, model="gpt-4-0613", stream=None
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
@@ -116,26 +131,32 @@ async def get_openai_response_stream(
         stream = Stream()
     messages = format_history(chat_history)
 
-    if len(functions) > 0:
-        openai_response = openai.ChatCompletion.create(
-            model=model,
-            messages=messages,
-            functions=functions,
-            temperature=0.1,
-            stream=True,
-        )
-    else:
-        openai_response = openai.ChatCompletion.create(
-            model=model,
-            messages=messages,
-            temperature=0.1,
-            stream=True,
-        )
+    try:
+        if len(functions) > 0:
+            openai_response = openai.ChatCompletion.create(
+                model=model,
+                messages=messages,
+                functions=functions,
+                temperature=0.1,
+                stream=True,
+            )
+        else:
+            openai_response = openai.ChatCompletion.create(
+                model=model,
+                messages=messages,
+                temperature=0.1,
+                stream=True,
+            )
 
-    # iterate through the stream of events
-    for chunk in openai_response:
-        chunk = chunk["choices"][0]["delta"].to_dict_recursive()
-        await stream.chunk(chunk)
+        # iterate through the stream of events
+        for chunk in openai_response:
+            chunk = chunk["choices"][0]["delta"].to_dict_recursive()
+            await stream.chunk(chunk)
+    except openai.error.RateLimitError as e:
+        import time
+        print("We got rate limited, chilling for a minute...")
+        time.sleep(60)
+        raise e
     raw_response = {
         key: value for key, value in stream.current_message.items() if "id" not in key
     }

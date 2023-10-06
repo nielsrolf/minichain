@@ -120,6 +120,7 @@ async def get_summarized_history(messages, functions, max_tokens=6000):
             print("FAILED")
             breakpoint()
             continue  # with increased step, and therefore larger chunk
+        breakpoint()
         messages = summary + messages[i:]
 
     if messages[-1]["content"].startswith("(summarized)"):
