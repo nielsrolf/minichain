@@ -31,10 +31,12 @@ const ChatApp = () => {
     const [defaultAgentName, setDefaultAgentName] = useState("Programmer");
     const [isAttached, setIsAttached] = useState(true);
     const [availableAgents, setAvailableAgents] = useState([]);
+    const [showInitMessages, setShowInitMessages] = useState(false);
     const [convTree, setConvTree] = useState({
         "messages": [],
         "childrenOf": {},
         "conversationAgents": {},
+        "init_message_ids": [],
     });
 
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
@@ -43,8 +45,11 @@ const ChatApp = () => {
         if (currentConversationId === "root") {
             visible = visible.filter(message => convTree.conversationAgents[message.id] === defaultAgentName);
         }
+        if (!showInitMessages) {
+            visible = visible.filter(message => !convTree.init_message_ids.includes(message.id));
+        }
         return visible;
-    }, [convTree, currentConversationId, defaultAgentName]);
+    }, [convTree, currentConversationId, defaultAgentName, showInitMessages]);
 
     // when the path changes, we update the agent name
     useEffect(() => {
@@ -105,9 +110,13 @@ const ChatApp = () => {
                 let updatedMessages = [...prevConvTree.messages];
                 let updatedChildrenOf = { ...prevConvTree.childrenOf };
                 let updatedConversationAgents = { ...prevConvTree.conversationAgents };
+                let updatedInitMessageIds = [...prevConvTree.init_message_ids];
 
                 if (message.type === "stack") {
                     const { stack } = message;
+                    if (message.is_initial) {
+                        updatedInitMessageIds = [...updatedInitMessageIds, stack[stack.length - 1]];
+                    }
                     let parent = stack[0];
                     for (let i = 1; i < stack.length; i++) {
                         const child = stack[i];
@@ -145,6 +154,7 @@ const ChatApp = () => {
                     "messages": updatedMessages,
                     "childrenOf": updatedChildrenOf,
                     "conversationAgents": updatedConversationAgents,
+                    "init_message_ids": updatedInitMessageIds,
                 };
             });
         };
@@ -289,6 +299,7 @@ const ChatApp = () => {
                     client.send('cancel');
                 }}>Interrupt</button>
                 {/* <button onClick={() => setGraphToggle(prev => !prev)}>Toggle Graph</button> */}
+                <button onClick={() => setShowInitMessages(prev => !prev)}>Toggle Init Messages</button>
                 {currentConversationId}
                 {path[path.length - 1] === "root" && (
                     <select value={defaultAgentName} onChange={e => selectAgent(e.target.value)} style={{

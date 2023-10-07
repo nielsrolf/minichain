@@ -27,6 +27,7 @@ class MessageDB:
         self.childrenOf = defaultdict(list)
         self.conversationAgents = {}
         self.messages = []
+        self.init_message_ids = []
         self.load()
 
     def load(self):
@@ -48,6 +49,8 @@ class MessageDB:
         self.messages = messages
 
     def update_childrenOf(self, message):
+        if message.get('is_initial', False):
+            self.init_message_ids += [message["stack"][-1]]
         parent = message["stack"][0]
         for child in message["stack"][1:]:
             if child not in self.childrenOf[parent]:
@@ -252,32 +255,33 @@ async def websocket_endpoint(websocket: WebSocket):
             except ValidationError as e:
                 # probably a heart beat
                 continue
+
             agent_name = payload.agent
             if agent_name not in agents:
                 await websocket.send_text(f"Agent {agent_name} not found")
                 continue
+            print("agent_name", agent_name)
+            agent = agents[agent_name]
+
+            stream = Stream(on_message=add_message_to_db_and_send, on_chunk=add_chunk)
 
             if payload.response_to == "root":
                 history = []
+                # We make a new conversation with only the user message (such that it appears in root)
+                # and then we do the actual conversation as sub conversation
+                with await stream.conversation("root", agent=agent.name) as stream:
+                    with await stream.to([], role="user") as stream:
+                        await stream.set(payload.query)
+                        conversation_stack = stream.conversation_stack
             else:
                 history = message_db.get_history(payload.response_to)
                 conversation_stack = message_db.get_path(payload.response_to)
 
-            print("agent_name", agent_name)
-            agent = agents[agent_name]
-            stream = Stream(on_message=add_message_to_db_and_send, on_chunk=add_chunk)
 
-            with await stream.conversation(
-                payload.response_to, agent=agent.name
-            ) as stream:
-                if payload.response_to == "root":
-                    with await stream.to([], role="user") as stream:
-                        await stream.set(payload.query)
-                else:
-                    stream.conversation_stack = conversation_stack
-
-                agent.register_stream(stream)
-                await agent.run(query=payload.query, history=history)
+            # Now conversation stack is either the stack pulled from the reply_to message, or the stack of the new conversation   
+            stream.conversation_stack = conversation_stack
+            agent.register_stream(stream)
+            await agent.run(query=payload.query, history=history)
 
             # go to cwd if the agent has a bash
             try:
@@ -312,6 +316,7 @@ async def get_history():
         "messages": message_db.messages_as_dicts(),
         "childrenOf": message_db.childrenOf,
         "conversationAgents": message_db.conversationAgents,
+        "init_message_ids": message_db.init_message_ids,
     }
 
 

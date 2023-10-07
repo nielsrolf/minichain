@@ -204,13 +204,14 @@ class Stream:
         nested("set", self.current_message, value)
         await self.on_message(self.current_message)
 
-    async def send(self, message):
+    async def send(self, message, **stack_msg_kwargs):
         """send a complete message to the stream in one go"""
         if not isinstance(message, dict):
             message = message.dict()
         stack_msg = {
             "type": "stack",
             "stack": self.conversation_stack + [message["id"]],
+            **stack_msg_kwargs,
         }
         await self.on_message(stack_msg)
         await self.on_message(message)

@@ -196,8 +196,10 @@ class Session:
         return await self.run_until_done()
 
     async def send_initial_messages(self, stream):
-        for message in self.history:
-            await stream.send(message)
+        for message in self.history[:-1]:
+            await stream.send(message, is_initial=True)
+        # The last init message is the actual user message
+        await stream.send(self.history[-1], is_initial=False)
 
     def register_stream(self, stream):
         self.stream = stream
