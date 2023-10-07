@@ -1,5 +1,7 @@
 import os
 import re
+import difflib
+import subprocess
 
 from pydantic import BaseModel, Field
 
@@ -144,17 +146,13 @@ async def get_long_summary(
 @tool()
 async def get_file_summary(path: str = Field(..., description="The path to the file.")):
     """Summarize a file."""
-    if not os.path.exists(path):
-        return f"File not found: {path}"
+    text, error = open_or_search_file(path)
+    if error is not None:
+        return error
     if path.endswith(".py"):
         summary = summarize_python_file(path)
     else:
         print("Summary:", path)
-        try:
-            with open(path, "r") as f:
-                text = f.read()
-        except Exception as e:
-            return f"Could not read file: {e}"
         summary = await long_document_qa(
             text=text,
             question="Summarize the following file in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important sections. When referencing files, always use the path (rather than the filename).",
@@ -169,14 +167,35 @@ async def scan_file_for_info(
 ):
     """Search a file for specific information"""
     print("Summary:", path)
-    with open(path, "r") as f:
-        text = f.read()
+    text, error = open_or_search_file(path)
+    if error is not None:
+        return error
     summary = await long_document_qa(
         text=text,
         question=question,
     )
     return f"# {path}\n{summary}\n\n"
 
+
+def open_or_search_file(path):
+    if not os.path.exists(path):
+        # find it in subfolders
+        matches = []
+        for root, dirs, filenames in os.walk("."):
+            for filename in filenames:
+                if filename == path:
+                    matches.append(os.path.join(root, filename))
+        if len(matches) == 0:
+            return None, f"File not found: {path}"
+        elif len(matches) > 1:
+            matches = "\n".join(matches)
+            return None, f"File not found: {path}. Did you mean one of: {matches}"
+        else:
+            return None, f"File not found: {path}. Did you mean: {matches[0]}"
+    else:
+        with open(path, "r") as f:
+            content = f.read()
+        return content, None
 
 @tool()
 async def view(
@@ -190,6 +209,10 @@ async def view(
     """View a section of a file, specified by line range."""
     if start < 1:
         start = 1
+    content, error = open_or_search_file(path)
+    if error is not None:
+        return error
+    lines = content.split("\n")
     with open(path, "r") as f:
         lines = f.readlines()
         # add line numbers
@@ -197,6 +220,40 @@ async def view(
             lines = [f"{i+1} {line}" for i, line in enumerate(lines)]
         response = f"{path} {start}-{end}:\n" + "".join(lines[start-1:end])
     return response
+
+
+def extract_diff_content(line):
+    """
+    Extract the part of the diff line without the line number.
+    For example, for line "-bla.py:3:0: C0116: Missing function or method docstring (missing-function-docstring)",
+    it will return "-bla.py::0: C0116: Missing function or method docstring (missing-function-docstring)"
+    """
+    return re.sub(r'(?<=:)\d+(?=:)', '', line)
+
+
+def filtered_diff(before, after):
+    """
+    Generate a diff and filter out lines that only differ by their line number.
+    """
+    diff = list(difflib.unified_diff(before.splitlines(), after.splitlines()))
+    filtered = []
+    skip_next = False
+    
+    for i in range(len(diff)):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if not diff[i].startswith('-') and not diff[i].startswith('+') or diff[i].startswith('---') or diff[i].startswith('+++'):
+            continue
+
+        if i < len(diff) - 1 and (diff[i].startswith('-') and diff[i+1].startswith('+')) and \
+           extract_diff_content(diff[i][1:]) == extract_diff_content(diff[i+1][1:]):
+            skip_next = True
+            continue
+        filtered.append(diff[i])
+
+    return filtered
 
 
 @tool()
@@ -226,6 +283,12 @@ async def edit(
         # create the file
         with open(path, "w") as f:
             f.write("")
+    
+    # Check if the file is a python file
+    if path.endswith('.py'):
+        # Run pylint on the file before making any changes
+        pylint_before = subprocess.run(['pylint', "--score=no", path], capture_output=True, text=True).stdout
+
     code = remove_line_numbers(code)
     # add indention
     code = "\n".join([indent + line for line in code.split("\n")])
@@ -240,6 +303,16 @@ async def edit(
         end=start + len(code.split("\n")) + 4,
         with_line_numbers=True,
     )
+    if path.endswith('.py'):
+        pylint_after = subprocess.run(['pylint', "--score=no", path], capture_output=True, text=True).stdout
+    
+        # Return the diff of the pylint outputs before and after the changes
+        diff = "\n".join(filtered_diff(pylint_before, pylint_after))
+        # diff = difflib.unified_diff(pylint_before.splitlines(), pylint_after.splitlines())
+        # diff = "\n".join(list(diff))
+        if diff == "":
+            return 'Edit done successfully.'
+        return 'Edit done. Here is the diff of pylint before and after the edit:\n' + diff
     return truncate_updated(updated_in_context)
 
 
@@ -354,14 +427,16 @@ async def view_symbol(
 async def test_codebase():
     print(get_initial_summary())
     # out = replace_symbol(path="./minichain/tools/bla.py", symbol="foo", code="test\n", is_new=False)
-    print(await view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
-    print(
-        await view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json")
-    )
-    print(await view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
+    # print(await view_symbol(path="./minichain/agent.py", symbol="Agent.as_function"))
+    # print(
+    #     await view_symbol(path="./minichain/agent.py", symbol="Function.openapi_json")
+    # )
+    # print(await view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
+    out = await edit(path="./bla.py", start=1, end=1, code="hello(\n", indent="")
+    breakpoint()
+    print(out)
 
 
-# if __name__ == "__main__":
-#     import asyncio
-
-#     asyncio.run(test_codebase())
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_codebase())

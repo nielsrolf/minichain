@@ -81,7 +81,13 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
         content, code = raw.split("```\n", 1)
         response["content"] = content
         # remove the last ``` and everything after it
-        code, content_after = code.rsplit("\n```", 1)
+        try:
+            if not ("\n```" in code):
+                code, content_after = code.rsplit("```", 1)[0]
+            else:
+                code, content_after = code.rsplit("\n```", 1)
+        except:
+            breakpoint()
         response["function_call"]["arguments"]["code"] = code
     return response
 
