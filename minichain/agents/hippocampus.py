@@ -6,7 +6,7 @@ from minichain.agent import Agent
 from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage
 from minichain.memory import SemanticParagraphMemory
 from minichain.tools import codebase
-from minichain.tools.bash import CodeInterpreter, BashSession
+from minichain.tools.bash import CodeInterpreter #, BashSession
 
 
 system_message = """You are the memory assistant.
@@ -36,11 +36,11 @@ class Hippocampus(Agent):
         except FileNotFoundError:
             print(f"Memory file {load_memory_from} not found.")
         interpreter = CodeInterpreter()
-        bash = BashSession()
+        # bash = BashSession()
 
         functions = [
             self.memory.find_memory_tool(),
-            bash,
+            # bash,
             interpreter,
             codebase.get_file_summary,
             codebase.view,
@@ -60,7 +60,7 @@ class Hippocampus(Agent):
             **kwargs,
         )
 
-    def register_stream(self, stream):
-        self.memory.register_stream(stream)
-        return super().register_stream(stream)
+    def register_message_handler(self, message_handler):
+        self.memory.register_message_handler(message_handler)
+        return super().register_message_handler(message_handler)
 

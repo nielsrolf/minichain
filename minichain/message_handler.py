@@ -48,8 +48,13 @@ class StreamCollector():
         """Create a new conversation"""
         return Conversation(meta=meta, shared=self.shared, path=self.path)
 
-    async def chunk(self, diff):
+    async def chunk(self, diff=None, meta=None):
         if not self.active:
+            return
+        if meta is not None:
+            nested("add", self.meta, meta)
+            # we don't stream meta updates
+        if diff is None:
             return
         if isinstance(diff, str):
             diff = {"content": diff}
@@ -334,7 +339,13 @@ def nested(mode, dictionary, value):
             return None
         if dictionary is None and isinstance(value, str):
             dictionary = ""
-        if mode == "add":
+        if mode == "add" and isinstance(dictionary, list):
+            return dictionary + (value or [])
+        elif mode == "add" and isinstance(value, list):
+            print(dictionary, ",", value)
+            return (dictionary or []) + value
+        elif mode == "add":
+            print(dictionary, ",", value)
             return dictionary + (value or "")
         elif mode == "set":
             return value

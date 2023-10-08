@@ -50,21 +50,10 @@ const DisplayJson = ({ data }) => {
   if (!data) {
     return '';
   }
-  if (data.name === 'python') {
-    console.log(data);
-    if (data.arguments.content) {
-      return <CodeBlock code={data.arguments.content} />;
-    }
-    try {
-      const parsed = JSON.parse(data.arguments);
-      if (parsed.code) {
-        return <CodeBlock code={parsed.content} />;
-      }
-    } catch (e) {
-      // code was not wrapped in {code: ...}
-    }
-    return <CodeBlock code={data.arguments} />;
-  }
+  // if (data.name === 'python') {
+  //   console.log(data);
+  //   return <CodeBlock code={data.arguments} />;
+  // }
   try {
     if (data.name === 'return' && JSON.parse(data.arguments).content) {
       return;

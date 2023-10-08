@@ -157,7 +157,6 @@ async def get_openai_response_stream(
         # iterate through the stream of events
         for chunk in openai_response:
             chunk = chunk["choices"][0]["delta"].to_dict_recursive()
-            print(chunk)
             await stream.chunk(chunk)
     except openai.error.RateLimitError as e:
         import time

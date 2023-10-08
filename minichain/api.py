@@ -47,7 +47,6 @@ agents = {}
 from pydantic import BaseModel, Field
 
 from minichain.functions import tool
-from minichain.utils.docker_sandbox import bash
 
 
 @tool()
@@ -63,33 +62,14 @@ async def upload_file_to_chat(
         downloads_path = "./minichain/downloads"
         os.makedirs(downloads_path, exist_ok=True)
         new_path = f"{downloads_path}/{len(os.listdir(downloads_path))}_{filename}"
-        await bash(
-            [f"cp {file} {new_path}"],
-            session=(
-                os.getcwd().replace("/", "")
-                .replace(".", "")
-                .replace("-", "")
-                .replace("_", "")
-                .replace(" ", "")
-            )
-        )
         file = new_path
     return f"displaying file: {file}"
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """Create a websocket that sends:
-    {type: stack, stack: [123, 1]}
-    {type: message, data {id: 1, content: 'yo'},
-    {type: stack, stack: [123, 3, 456, 2]}
-    {type: chunk, diff: {"content": "hello", id: 2}
-    {type: chunk, diff: {"content": "world", id: 2}
-    {type: message, data: {id: 2, ...final message}}
-    """
     await websocket.accept()
     print("websocket accepted")
-
 
     async def send_message_raise_cancelled(message):
         # check the websocket: has a cancel message been sent? if no message has
