@@ -22,7 +22,7 @@ class StreamCollector():
     def __init__(self, path: List[str] = ["Trash"], current_message: Dict = None, meta: Dict = None, shared: Dict = None):
         self.path = path
         self.current_message = current_message or {}
-        self.ignore_keys = [k for k, v in self.current_message.items() if v is not None and v != ""]
+        self.ignore_keys = [k for k, v in self.current_message.items() if v is not None and v != "" and k!='function_call']
         self.shared = shared or {'on_message': do_nothing}
         self.active = True
         self.meta = meta or {}

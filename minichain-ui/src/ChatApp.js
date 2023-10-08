@@ -61,11 +61,9 @@ const ChatApp = () => {
 
     // fetch the history
     useEffect(() => {
-        console.log("fetching history", path)
         fetch("http://localhost:8745/messages/" + path[path.length - 1])
             .then(response => response.json())
             .then(conversation => {
-                console.log("conversation", conversation);
                 setConversation(conversation);
                 setStreamingState(prev => {
                     const { lastMessagePath } = prev;
@@ -132,7 +130,6 @@ const ChatApp = () => {
             }
             */
             if (message.type === "path") {
-                console.log({message});
                 setStreamingState(prev => {
                     const idToPath = prev.idToPath;
                     const messages = prev.messages;
@@ -171,9 +168,7 @@ const ChatApp = () => {
                         console.log("no current message", message, prev.messages);
                         return prev;
                     }
-                    console.log("before chunk", currentMessage, {chat: message.diff})
                     const newMessage = addDiffToMessage(currentMessage, {chat: message.diff});
-                    console.log("after chunk", newMessage)
                     const idToPath = {...prev.idToPath};
                     const messages = {...prev.messages};
                     messages[message.id] = newMessage;
@@ -200,28 +195,21 @@ const ChatApp = () => {
     useEffect(() => {
         const { messages } = streamingState;
         setConversation(prevConversation => {
-            console.log("updating conversation", prevConversation, messages);
             // todo only update with messages that belong to the prevConversation
             const newMessages = [...prevConversation.messages];
-            console.log("ignoring everything not in:", prevConversation.path[prevConversation.path.length - 1])
             for(let updated of Object.values(messages)) {
-                console.log("checking message in conv:", updated.path[updated.path.length - 2] );
                 if (updated.path[updated.path.length - 2] !== prevConversation.path[prevConversation.path.length - 1]) {
                     continue;
                 }
-                console.log("updating message", updated)
                 const updatedId = updated.path[updated.path.length - 1];
                 const existingMessage = newMessages.find(i => i.path[i.path.length - 1] === updatedId);
                 if (existingMessage) {
-                    console.log("updating existing message", existingMessage, updated)
                     existingMessage.chat = updated.chat;
                     existingMessage.meta = updated.meta;
                 } else {
-                    console.log("adding new message", updated)
                     newMessages.push(updated);
                 }
             }
-            console.log("new messages", newMessages);
             return {
                 ...prevConversation,
                 messages: newMessages
@@ -268,7 +256,6 @@ const ChatApp = () => {
     };
 
     const pushToPath = (id) => {
-        console.log("pushing to path", id)
         setPath(prevPath => {
             // if we are already on that path, do nothing
             if (prevPath[prevPath.length - 1] === id) {
