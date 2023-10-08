@@ -8,7 +8,7 @@ from minichain.dtypes import (Cancelled, SystemMessage, UserMessage, ExceptionFo
                               AssistantMessage, FunctionMessage, messages_types_to_history)
 from minichain.functions import Function
 from minichain.schemas import DefaultResponse, DefaultQuery
-from minichain.message_handler import MessageDB
+from minichain.message_handler import MessageDB, Conversation
 from minichain.utils.cached_openai import get_openai_response_stream
 from minichain.utils.summarize_history import get_summarized_history
 
@@ -63,12 +63,15 @@ class Agent:
         """arguments: dict with values mentioned in the prompt template
         history: list of Message objects that are already part of the conversation, for follow up conversations
         """
-        if conversation is None:
-            conversation = self.message_handler.conversation()
+        if not isinstance(conversation, Conversation):
+            if conversation is None:
+                conversation = self.message_handler.conversation()
+            else:
+                conversation = conversation.conversation()
             for message in self.init_history:
                 await conversation.send(message, is_initial=True)
         await conversation.send(
-            UserMessage(self.prompt_template(**arguments)), is_initial=True
+            UserMessage(self.prompt_template(**arguments)), is_initial=False
         )
         agent_session = Session(self, conversation)
         response = await agent_session.run_until_done()

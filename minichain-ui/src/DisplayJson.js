@@ -131,27 +131,9 @@ const DisplayJson = ({ data }) => {
     if (Array.isArray(data)) {
       return (
         <div>
-          <b style={{ cursor: 'pointer' }} onClick={() => toggleFold(parentKey)}>
-            Show/hide {data.length} elements
-          </b>
-          {!isFolded[parentKey] &&
-            <table>
-              <tbody>
-                {data.map((element, index) => {
-                  const newKey = `${parentKey}[${index}]`;
-                  return (
-                    <tr className="array-element" key={newKey}>
-                      <td>
-                        <button onClick={() => toggleFold(newKey)}>+</button>
-                      </td>
-                      <td>
-                        {!isFolded[newKey] && renderData(element, newKey)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>}
+          {data.map((item, index) => {
+            renderData(item, `${parentKey}.${index}`);
+          })}
         </div>
       );
     }

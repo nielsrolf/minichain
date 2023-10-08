@@ -92,8 +92,14 @@ class StreamToStdout(StreamCollector):
     def __init__(self):
         super().__init__(shared={'on_message': async_print})
 
+
+def datetime_or_str_to_datetime(value):
+    if isinstance(value, str):
+        return dt.datetime.fromisoformat(value)
+    return value
+
 def sort_by_timestamp(items):
-    return sorted(items, key=lambda x: x.meta['timestamp'])
+    return sorted(items, key=lambda x: datetime_or_str_to_datetime(x.meta['timestamp']))
 
 import datetime as dt
 def get_default_meta():
@@ -146,13 +152,14 @@ class Message():
     
     @classmethod
     def load(cls, filepath, **kwargs):
+        filepath = filepath + ".json"
         with open(filepath, 'r') as f:
             data = json.load(f)
         return cls(**data, **kwargs)
     
     @property
     def children(self):
-        children = self.shared['message_db'].get(self.path[-1])
+        children = self.shared['message_db'].children_of(self.path[-1])
         return children
     
     def as_json(self):
@@ -169,10 +176,11 @@ class Message():
 class Conversation():
     def __init__(self,
                  path: List[str],
+                 shared: Dict,
                  meta: Dict=None,
                  conversation_id: str=None,
                  messages: List[Message] = None,
-                 shared: Dict = None):
+                 ):
         path = path or ['Trash']
         if conversation_id is None:
             conversation_id = str(uuid4().hex[:8])
@@ -182,6 +190,7 @@ class Conversation():
         self.messages = messages or []
         self.path = path
         self.shared = shared or {'on_message': do_nothing}
+        self.shared['message_db'].register_conversation(self)
     
     def set(self, **meta):
         self.meta.update(meta)
@@ -211,12 +220,11 @@ class Conversation():
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
         filepath = os.path.join(target_dir, "conversation.json")
+        data = self.as_json()
+        data['conversation_id'] = self.path[-1]
+        data['message_ids'] = [m['path'][-1] for m in data.pop('messages')]
         with open(filepath, 'w') as f:
-            json.dump({
-                "meta": self.meta,
-                "path": self.path,
-                "conversation_id": self.path[-1],
-            }, f, default=datetime_converter)
+            json.dump(data, f, default=datetime_converter)
         for message in self.messages:
             message.save()
     
@@ -224,7 +232,12 @@ class Conversation():
     def load(cls, filepath, **kwargs):
         with open(filepath, 'r') as f:
             data = json.load(f)
-        return cls(**data, **kwargs)
+            message_ids = data.pop('message_ids', [])
+        conversation = cls(**data, **kwargs)
+        for message_id in message_ids:
+            message = Message.load(os.path.join(os.path.dirname(filepath), message_id), **kwargs)
+            conversation.messages.append(message)
+        return conversation
     
     async def send(self, chat_message, **meta):
         """Send a message without streaming - for initial messages
@@ -254,13 +267,29 @@ class MessageDB():
             'save_dir': save_dir
         }
         self.conversations = []
+        self.load()
     
     async def on_message(self, msg):
-        for consume in self.shared['consumers']:
-            await consume(msg)
+        # send the message to the original consumer and let errors bubble up
+        await  self.shared['consumers'][0](msg)
+        # send the message to all other consumers if they want to consume it
+        for consume in self.shared['consumers'][1:]:
+            try:
+                await consume(msg)
+            except Exception as e:
+                pass
     
-    def add_consumer(self, consumer):
-        self.shared['consumers'].append(consumer)
+    def register_conversation(self, conversation):
+        self.conversations.append(conversation)
+    
+    def children_of(self, message_id):
+        return [c for c in self.conversations if c.path[-2] == message_id]
+    
+    def add_consumer(self, consumer, is_main=False):
+        if is_main:
+            self.shared['consumers'].insert(0, consumer)
+        else:
+            self.shared['consumers'].append(consumer)
 
     def load(self):
         load_dir = self.shared['save_dir'] + "/root"
@@ -269,7 +298,6 @@ class MessageDB():
         # in load_dir, we have one folder for each conversation
         for conversation_id in os.listdir(load_dir):
             conversation = Conversation.load(os.path.join(load_dir, conversation_id, "conversation.json"), shared=self.shared)
-            self.conversations.append(conversation)
 
     def get(self, conversation_id) -> Conversation:
         if conversation_id == "root":
@@ -277,16 +305,24 @@ class MessageDB():
         for conversation in self.conversations:
             if conversation.path[-1] == conversation_id:
                 return conversation
+        breakpoint()
 
     def conversation(self, meta=None) -> Conversation:
         conversation = Conversation(meta=meta, shared=self.shared, path=['root'])
-        self.conversations.append(conversation)
         return conversation
     
     def as_json(self):
         # We return the same format as conversations, but we show only user messages that contain conv.meta['preview']
-        conversations = sort_by_timestamp(self.conversations)
-        conversations = [i for i in conversations if i.path]
+        conversations = self.children_of('root')
+        conversations = sort_by_timestamp(conversations)
+        messages = [([m for m in c.messages if m.meta.get('is_initial', False)==False] + [None])[0] for c in conversations]
+        messages = [m.as_json() for m in messages if m is not None]
+        return {
+            "meta": {},
+            "path": ['root'],
+            "messages": messages
+        }
+
 
 
 def nested(mode, dictionary, value):

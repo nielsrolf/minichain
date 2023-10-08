@@ -13,16 +13,16 @@ const functionsToRenderAsCode = [
 ];
 
 
-function ChatMessage({message, convTree, handleSubConversationClick }){
+function ChatMessage({message, handleSubConversationClick }){
     if (message.role === 'function' && message.name === 'return') {
         return '';
     }
     return (
-        <div className={`message-${message.role}`} key={message.id}>
-            <div className='message-header'> {message.id} {message.role } {message.name} {message.time}</div>
-            {functionsToRenderAsCode.includes(message.name) ? <CodeBlock code={message.content} /> : <DisplayJson data={message.content} />}
-            {message.function_call && <DisplayJson data={message.function_call} />}
-            {convTree.childrenOf[message.id] && convTree.childrenOf[message.id].map(subConversationId => {
+        <div className={`message-${message.chat.role}`} key={message.path[message.path.length - 1]}>
+            <div className='message-header'> {message.path[message.path.length - 1]} {message.chat.role } {message.chat.name} {message.meta.time}</div>
+            {functionsToRenderAsCode.includes(message.chat.name) ? <CodeBlock code={message.chat.content} /> : <DisplayJson data={message.chat.content} />}
+            {message.chat.function_call && <DisplayJson data={message.chat.function_call} />}
+            {message.children?.map(subConversationId => {
                 return (
                     <div onClick={() => handleSubConversationClick(subConversationId)}>View thread</div>
                 );

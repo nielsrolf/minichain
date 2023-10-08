@@ -17,6 +17,7 @@ from starlette.websockets import WebSocketDisconnect
 from minichain.dtypes import (AssistantMessage, Cancelled, FunctionMessage,
                               SystemMessage, UserMessage)
 from minichain.message_handler import MessageDB
+from minichain.utils.json_datetime import datetime_converter
 
 
 
@@ -102,18 +103,18 @@ async def websocket_endpoint(websocket: WebSocket):
         except Cancelled as e:
             raise e
         except (WebSocketDisconnect, RuntimeError) as e:
-            pass
+            return
         try:
+            message = json.loads(json.dumps(message, default=datetime_converter))
             await websocket.send_json(message)
         except Exception as e:
-            print("websocket closed, running in background")
+            breakpoint()
+            import traceback
+            traceback.print_exc()
 
     
-    message_db.add_consumer(send_message_raise_cancelled)
+    message_db.add_consumer(send_message_raise_cancelled, is_main=True)
     
-    # # connect this websocket to the streaming targets of potentially running agents
-    # for agent in agents.values():
-    #     agent.stream.on_message = add_message_to_db_and_send
 
     try:
         while True:
@@ -140,9 +141,6 @@ async def websocket_endpoint(websocket: WebSocket):
             agent = agents[agent_name]
 
             conversation = message_db.get(payload.response_to)
-            if payload.response_to == "root":
-                conversation.set(preview=payload.query)
-                
             await agent.run(query=payload.query, conversation=conversation)
 
 
@@ -162,6 +160,8 @@ async def get_agents():
 
 @app.get("/messages/{path:path}")
 async def read_messages(path: str):
+    if path == "":
+        path = "root"
     path = path.split('/')
     conversation = message_db.get(path[-1])
     return conversation.as_json()
