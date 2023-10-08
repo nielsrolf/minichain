@@ -14,10 +14,11 @@ function addDiffToMessage(message, diff) {
         return message + diff;
     }
     // add the diff recursively to message
+    let updated = {...message}
     for (const key in diff) {
-        message[key] = addDiffToMessage(message[key], diff[key]);
+        updated[key] = addDiffToMessage(message[key], diff[key]);
     }
-    return message
+    return updated;
 }
 
 
@@ -60,6 +61,7 @@ const ChatApp = () => {
 
     // fetch the history
     useEffect(() => {
+        console.log("fetching history", path)
         fetch("http://localhost:8745/messages/" + path[path.length - 1])
             .then(response => response.json())
             .then(conversation => {
@@ -169,7 +171,7 @@ const ChatApp = () => {
                         console.log("no current message", message, prev.messages);
                         return prev;
                     }
-                    console.log("before chunk", currentMessage)
+                    console.log("before chunk", currentMessage, {chat: message.diff})
                     const newMessage = addDiffToMessage(currentMessage, {chat: message.diff});
                     console.log("after chunk", newMessage)
                     const idToPath = {...prev.idToPath};
@@ -201,19 +203,25 @@ const ChatApp = () => {
             console.log("updating conversation", prevConversation, messages);
             // todo only update with messages that belong to the prevConversation
             const newMessages = [...prevConversation.messages];
+            console.log("ignoring everything not in:", prevConversation.path[prevConversation.path.length - 1])
             for(let updated of Object.values(messages)) {
-                if (!updated.path[updated.path.length - 2] !== prevConversation.path[prevConversation.path.length - 1]) {
+                console.log("checking message in conv:", updated.path[updated.path.length - 2] );
+                if (updated.path[updated.path.length - 2] !== prevConversation.path[prevConversation.path.length - 1]) {
                     continue;
                 }
+                console.log("updating message", updated)
                 const updatedId = updated.path[updated.path.length - 1];
                 const existingMessage = newMessages.find(i => i.path[i.path.length - 1] === updatedId);
                 if (existingMessage) {
+                    console.log("updating existing message", existingMessage, updated)
                     existingMessage.chat = updated.chat;
                     existingMessage.meta = updated.meta;
                 } else {
+                    console.log("adding new message", updated)
                     newMessages.push(updated);
                 }
             }
+            console.log("new messages", newMessages);
             return {
                 ...prevConversation,
                 messages: newMessages
@@ -223,16 +231,15 @@ const ChatApp = () => {
 
     // when the streaming state noticed a message not in the conversation, update the path (if we are attached)
     useEffect(() => {
-        if (isAttached) {
-            setPath(prevPath => {
-                const { lastMessagePath } = streamingState;
-                if (prevPath[prevPath.length - 1] === lastMessagePath[lastMessagePath.length - 1]) {
-                    return prevPath;
-                }
-                return [...prevPath, lastMessagePath[lastMessagePath.length - 2]];
-            });
+        const lastMessagePath = streamingState.lastMessagePath;
+        if (
+            isAttached && 
+            lastMessagePath[lastMessagePath.length - 2]  &&
+            lastMessagePath[lastMessagePath.length - 2] !== path[path.length - 1]
+        ) {
+            setPath([...path, lastMessagePath[lastMessagePath.length - 2]]);
         }
-    }, [streamingState, isAttached]);
+    }, [streamingState, isAttached, path]);
 
 
 
@@ -329,8 +336,8 @@ const ChatApp = () => {
                 <button onClick={() => {
                     // parent
                     setIsAttached(false);
-                    // TODO
-                    
+                    const parent = conversation.path[conversation.path.length - 2] || "root";
+                    pushToPath(parent);
                 }}>Parent</button>
                 {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {
                     setIsAttached(true);

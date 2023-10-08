@@ -164,7 +164,10 @@ async def read_messages(path: str):
         path = "root"
     path = path.split('/')
     conversation = message_db.get(path[-1])
-    return conversation.as_json()
+    if conversation:
+        return conversation.as_json()
+    else:
+        raise HTTPException(status_code=404, detail="Conversation not found")
 
 
 @app.get("/static/{path:path}")

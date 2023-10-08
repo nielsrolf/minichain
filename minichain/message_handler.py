@@ -192,9 +192,9 @@ class Conversation():
         self.shared = shared or {'on_message': do_nothing}
         self.shared['message_db'].register_conversation(self)
     
-    def set(self, **meta):
+    async def set(self, **meta):
         self.meta.update(meta)
-        self.shared['on_message']({
+        await self.shared['on_message']({
             "type": "path",
             "path": self.path,
             "meta": self.meta
@@ -271,7 +271,7 @@ class MessageDB():
     
     async def on_message(self, msg):
         # send the message to the original consumer and let errors bubble up
-        await  self.shared['consumers'][0](msg)
+        await self.shared['consumers'][0](msg)
         # send the message to all other consumers if they want to consume it
         for consume in self.shared['consumers'][1:]:
             try:
@@ -297,7 +297,7 @@ class MessageDB():
             return
         # in load_dir, we have one folder for each conversation
         for conversation_id in os.listdir(load_dir):
-            conversation = Conversation.load(os.path.join(load_dir, conversation_id, "conversation.json"), shared=self.shared)
+            Conversation.load(os.path.join(load_dir, conversation_id, "conversation.json"), shared=self.shared)
 
     def get(self, conversation_id) -> Conversation:
         if conversation_id == "root":
@@ -305,7 +305,6 @@ class MessageDB():
         for conversation in self.conversations:
             if conversation.path[-1] == conversation_id:
                 return conversation
-        breakpoint()
 
     def conversation(self, meta=None) -> Conversation:
         conversation = Conversation(meta=meta, shared=self.shared, path=['root'])
@@ -315,8 +314,12 @@ class MessageDB():
         # We return the same format as conversations, but we show only user messages that contain conv.meta['preview']
         conversations = self.children_of('root')
         conversations = sort_by_timestamp(conversations)
-        messages = [([m for m in c.messages if m.meta.get('is_initial', False)==False] + [None])[0] for c in conversations]
-        messages = [m.as_json() for m in messages if m is not None]
+        messages = [([
+            m
+            for m in c.messages if m.meta.get('is_initial', False)==False] + [None])[0] for c in conversations]
+        messages = [dict(**m.as_json(), fake_children=[c.path[-1]]) for m, c in zip(messages, conversations) if m is not None]
+        for m in messages:
+            m['children'] = m.pop('fake_children')
         return {
             "meta": {},
             "path": ['root'],

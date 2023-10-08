@@ -41,9 +41,9 @@ class MemoryAgent(Agent):
             **kwargs,
         )
 
-    def register_stream(self, stream):
-        self.memory.register_stream(stream)
-        super().register_stream(stream)
+    def register_message_handler(self, message_handler):
+        self.memory.register_message_handler(message_handler)
+        super().register_message_handler(message_handler)
 
 
 async def main():
