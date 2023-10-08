@@ -1,15 +1,11 @@
 import asyncio
-import json
 import os
-import uuid
-from typing import Callable, List, Optional, Union
+from typing import List, Optional
 
-import docker
 from pydantic import BaseModel, Field
 
 from minichain.agent import Function
 from minichain.schemas import BashQuery
-from minichain.streaming import Stream
 from minichain.utils.docker_sandbox import bash
 
 
@@ -29,13 +25,13 @@ def shorten_response(response: str) -> str:
 
 
 class BashSession(Function):
-    def __init__(self, stream=None, image_name="nielsrolf/minichain:latest"):
+    def __init__(self, message_handler=None, image_name="nielsrolf/minichain:latest"):
         super().__init__(
             name="bash",
             openapi=BashQuery,
             function=self,
             description="Run bash commands. Cwd is reset after each message. Run commands with the -y flag to avoid interactive prompts (e.g. npx create-app)",
-            stream=stream,
+            message_handler=message_handler,
         )
         # self.session = uuid.uuid4().hex
         self.image_name = image_name
@@ -63,13 +59,13 @@ class BashSession(Function):
         outputs = await bash(
             commands,
             session=self.session,
-            stream=self.stream,
+            stream=self.message_handler,
             timeout=timeout,
         )
         response = "".join(outputs)
         response = shorten_response(response)
         print("done:", commands, response)
-        await self.stream.set({"content": response})
+        await self.message_handler.set({"content": response})
         return response
 
     # when the session is destroyed, stop the container
@@ -101,36 +97,27 @@ def print(*args, **kwargs):
 last_lines = """import types
 print(", ".join([f"{k}: {v}" for k, v in locals().items() if k in <lastLine> ]))"""
 
+import nbformat as nbf
+from nbconvert.preprocessors import ExecutePreprocessor
 
 class CodeInterpreter(Function):
-    def __init__(self, stream=None, **kwargs):
+    def __init__(self, message_handler=None, **kwargs):
         super().__init__(
             name="python",
             openapi=CodeInterpreterQuery,
             function=self,
             description="Create and run a temporary python file (non-interactively; jupyter-style !bash commands are not supported).",
-            stream=stream,
+            message_handler=message_handler,
         )
-        self.bash = BashSession(stream=stream)
+        self.notebook = nbf.v4.new_notebook()
+        self.ep = ExecutePreprocessor(timeout=600, kernel_name='python3')
 
     async def __call__(self, code: str, timeout: int = 60) -> str:
-        last_line = json.dumps(code.strip().split("\n")[-1])
-        code = first_lines + code
-        if (
-            not "=" in last_line
-            and not "plt" in last_line
-            and not "print" in last_line
-            and not "import" in last_line
-            and not "save" in last_line
-            and not last_line.startswith("#")
-        ):
-            code = code + "\n" + last_lines.replace("<lastLine>", last_line)
-        filename = uuid.uuid4().hex[:5]
-        filepath = f"{self.bash.cwd}/.minichain/{filename}.py"
-        with open(filepath, "w") as f:
-            f.write(code)
-        self.bash.register_stream(self.stream)
-        output = await self.bash(commands=[f"python {filepath}"], timeout=timeout)
+        breakpoint()
+        new_cell = nbf.v4.new_code_cell(code)
+        self.notebook.cells.append(new_cell)
+        self.ep.preprocess(self.notebook, {'metadata': {'path': '/'}})
+        output = self.notebook.cells[-1].outputs[0].text
         return output
 
 

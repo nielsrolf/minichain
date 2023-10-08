@@ -3,7 +3,6 @@ from pprint import pprint
 import pytest
 
 from minichain.memory import SemanticParagraphMemory
-from minichain.utils.markdown_browser import markdown_browser
 
 
 def print_memories(memories):
@@ -19,23 +18,10 @@ question = "In which line is the docker container started?"
 
 @pytest.mark.asyncio
 async def test_question_embedding_memory():
-    memory = SemanticParagraphMemory(
-        use_vector_search=True, use_content_scan_search=False
-    )
+    memory = SemanticParagraphMemory()
     await memory.ingest(text, example_file)
     memories = await memory.retrieve(question)
     print_memories(memories)
-    answer = await memory.rank_or_summarize(memories, question)
+    answer = await memory.summarize(memories, question)
     print(answer)
 
-
-@pytest.mark.asyncio
-async def test_content_scan_memory():
-    memory = SemanticParagraphMemory(
-        use_vector_search=False, use_content_scan_search=True
-    )
-    await memory.ingest(text, example_file)
-    memories = await memory.retrieve(question)
-    print_memories(memories)
-    answer = await memory.rank_or_summarize(memories, question)
-    print(answer)

@@ -7,7 +7,7 @@ import openai
 from retry import retry
 
 from minichain.dtypes import AssistantMessage, FunctionCall
-from minichain.streaming import Stream
+from minichain.message_handler import StreamCollector
 from minichain.utils.debug import debug
 from minichain.utils.disk_cache import async_disk_cache, disk_cache
 
@@ -64,7 +64,7 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
     return FunctionCall(**function_call)
 
 
-def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
+def fix_common_errors(response: Dict[str, Any]) -> Dict[str, Any]:
     """Fix common errors in the formatting and turn the dict into a AssistantMessage"""
     if not response.get("function_call"):
         response["function_call"] = {
@@ -72,7 +72,7 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
             "arguments": json.dumps({"content": response.pop("content")}),
         }
         response["content"] = ""
-    response["function_call"] = parse_function_call(response["function_call"]).dict()
+    response["function_call"] = parse_function_call(response["function_call"])
     if "```" in response["content"] and response["function_call"]["name"] in ["python", "edit"]:
         # move the code to the arguments
         raw = response["content"]
@@ -85,7 +85,7 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
             if not ("\n```" in code):
                 code, content_after = code.rsplit("```", 1)[0]
             else:
-                code, content_after = code.rsplit("\n```", 1)
+                code, content_after = code.split("\n```", 1)
         except:
             breakpoint()
         response["function_call"]["arguments"]["code"] = code
@@ -95,8 +95,8 @@ def fix_common_errors(response: Dict[str, Any]) -> AssistantMessage:
 def format_history(messages: list) -> list:
     """Format the history to be compatible with the openai api - json dumps all arguments"""
     for message in messages:
-        if (function_call := message.get("function_call")) is not None:
-            try:
+        try:
+            if (function_call := message.get("function_call")) is not None:
                 if isinstance(function_call["arguments"], dict):
                     content = function_call["arguments"].pop("content", None)
                     message["content"] = content or message["content"]
@@ -104,9 +104,9 @@ def format_history(messages: list) -> list:
                     if code is not None:
                         message["content"] = message["content"] + f"\n```\n{code}\n```"
                     function_call["arguments"] = json.dumps(function_call["arguments"])
-            except Exception as e:
-                print(e)
-                breakpoint()
+        except Exception as e:
+            print(e)
+            breakpoint()
     return messages
 
 
@@ -134,7 +134,7 @@ async def get_openai_response_stream(
     chat_history, functions, model="gpt-4-0613", stream=None
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     if stream is None:
-        stream = Stream()
+        stream = StreamCollector()
     messages = format_history(chat_history)
 
     try:
@@ -163,6 +163,9 @@ async def get_openai_response_stream(
         print("We got rate limited, chilling for a minute...")
         time.sleep(60)
         raise e
+    except Exception as e:
+        print(e)
+        breakpoint()
     raw_response = {
         key: value for key, value in stream.current_message.items() if "id" not in key
     }

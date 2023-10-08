@@ -18,7 +18,6 @@ def parse_function(code, file, id_prefix=""):
         while not (lines[end_line].startswith("def ") or lines[end_line].startswith("async def ")):
             end_line += 1
     except IndexError:
-        breakpoint()
         return None, len(lines)
     line = lines[end_line]
     try:

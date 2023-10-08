@@ -5,10 +5,10 @@ from pydantic import BaseModel
 import pydantic.error_wrappers
 
 from minichain.dtypes import (Cancelled, SystemMessage, UserMessage, ExceptionForAgent,
-                              messages_types_to_history)
+                              AssistantMessage, FunctionMessage, messages_types_to_history)
 from minichain.functions import Function
 from minichain.schemas import DefaultResponse, DefaultQuery
-from minichain.streaming import Stream
+from minichain.message_handler import MessageDB
 from minichain.utils.cached_openai import get_openai_response_stream
 from minichain.utils.summarize_history import get_summarized_history
 
@@ -36,7 +36,7 @@ class Agent:
         prompt_template="{task}".format,
         response_openapi=DefaultResponse,
         init_history=[],
-        stream=None,
+        message_handler=None,
         name=None,
         llm="gpt-4-0613",
     ):
@@ -53,36 +53,29 @@ class Agent:
         self.prompt_template = prompt_template
         self.name = name or self.__class__.__name__
         self.llm = llm
-        self.stream = stream or Stream()
+        self.message_handler = message_handler or MessageDB()
 
     @property
     def functions_openai(self):
         return [i.openapi_json for i in self.functions]
 
-    async def initialize_session(self, history=[]):
-        agent_session = Session(
-            self,
-            history=self.init_history + history,
-        )
-        if len(history) == 0:
-            # we are starting a new conversation
-            agent_session.stream = await self.stream.conversation(agent=self.name)
-        else:
-            # we are following up on a conversation
-            agent_session.stream = self.stream
-        return agent_session
-
-    async def run(self, history=[], **arguments):
+    async def run(self, conversation=None, **arguments):
         """arguments: dict with values mentioned in the prompt template
         history: list of Message objects that are already part of the conversation, for follow up conversations
         """
-        agent_session = await self.initialize_session(history=history)
-        agent_session.history.append(UserMessage(self.prompt_template(**arguments)))
+        if conversation is None:
+            conversation = self.message_handler.conversation()
+            for message in self.init_history:
+                await conversation.send(message, is_initial=True)
+        await conversation.send(
+            UserMessage(self.prompt_template(**arguments)), is_initial=True
+        )
+        agent_session = Session(self, conversation)
         response = await agent_session.run_until_done()
         return response
 
-    def register_stream(self, stream):
-        self.stream = stream
+    def register_message_handler(self, message_handler):
+        self.message_handler = message_handler
 
     def as_function(self, name, description, prompt_openapi=DefaultQuery):
         async def function(**arguments):
@@ -96,79 +89,86 @@ class Agent:
             name,
             function,
             description,
-            stream=self.stream,
+            message_handler=self.message_handler,
         )
-        # Make sure both the functions register_stream and the agent's register_stream are called
+        # Make sure both the functions register_message_handler and the agent's register_message_handler are called
         function_tool.from_agent = self
         return function_tool
+    
+    async def before_return(self, output):
+        try:
+            await self.bash(
+                commands=[f"cd {self.bash.cwd}"]
+            )
+        except Exception as e:
+            pass
 
 
 class Session:
     """
-    - handle streaming
+    - handle message_handlering
     - stateful history
     """
 
-    def __init__(self, agent, history=[]):
+    def __init__(self, agent, conversation):
         self.agent = agent
-        self.history = history.copy()
+        self.conversation = conversation
 
     async def run_until_done(self):
-        with self.stream as stream:
-            await self.send_initial_messages(stream)
-            while True:
-                action = await self.get_next_action(stream)
-                if action is not None:
-                    output = await self.execute_action(action, stream)
-                    if action.name == "return" and output is not False:
-                        # output is the output of the return function
-                        # since each function returns a string, we need to parse the output
-                        return json.loads(output)
+        while True:
+            action = await self.get_next_action()
+            if action is not None:
+                output = await self.execute_action(action)
+                if action['name'] == "return" and output is not False:
+                    # output is the output of the return function
+                    # since each function returns a string, we need to parse the output
+                    await self.agent.before_return(output)
+                    return json.loads(output)
 
-    async def get_next_action(self, stream):
-        history_without_ids = messages_types_to_history(self.history)
+    async def get_next_action(self):
+        history_without_ids = messages_types_to_history(self.conversation.messages)
         # summarized_history = await get_summarized_history(
         #     history_without_ids, self.agent.functions_openai
         # )
         summarized_history = history_without_ids
         # do the openai call
-        with await stream.to(self.history, role="assistant") as stream:
-            await get_openai_response_stream(
+        async with self.conversation.to(AssistantMessage()) as message_handler:
+            llm_response = await get_openai_response_stream(
                 summarized_history,
                 self.agent.functions_openai,
                 model=self.agent.llm,
-                stream=stream,
+                stream=message_handler,
             )
-        return self.history[-1].function_call
+        return llm_response['function_call']
 
-    async def execute_action(self, action, stream):
-        with await stream.to(self.history, role="function", name=action.name) as stream:
+    async def execute_action(self, action):
+        async with self.conversation.to(FunctionMessage(name=action['name'])) as message_handler:
             try:
                 for function in self.agent.functions:
-                    if function.name == action.name:
-                        function.register_stream(stream)
-                        if not isinstance(action.arguments, dict):
-                            await stream.set(
+                    if function.name == action['name']:
+                        function.register_message_handler(message_handler)
+                        if not isinstance(action['arguments'], dict):
+                            await message_handler.set(
                                 f"Error: arguments for {function.name} are not valid JSON."
                             )
                             return False
-                        function_output = await function(**action.arguments)
+                        function_output = await function(**action['arguments'])
                         return function_output
-                await stream.set(
+                await message_handler.set(
                     f"Error: this function does not exist. Available functions: {', '.join([i.name for i in self.agent.functions])}"
                 )
             # catch pydantic validation errors
             except ExceptionForAgent as e:
-                await stream.set(self.format_error_message(e))
+                await message_handler.set(self.format_error_message(e))
             except Exception as e:
                 if "missing 1 required positional argument: 'code'" in str(e) or "validation error for edit\ncode\n  field required" in str(e):
-                    await stream.set(
+                    await message_handler.set(
                         f"Error: this function requires a code. Use the normal message content field to put  the code like here:\n```\ncode here\n```"
                     )
                 else:
                     print(self.format_error_message(e))
                     if isinstance(e, pydantic.error_wrappers.ValidationError):
-                        await stream.chunk(self.format_error_message(e))
+                        await message_handler.chunk(self.format_error_message(e))
                     else:
                         print(self.format_error_message(e))
                         # breakpoint()
@@ -190,16 +190,5 @@ class Session:
         msg = "```\n" + msg + "\n```"
         return msg
 
-    async def follow_up(self, user_message):
-        with await self.stream.to(self.history, role="user") as stream:
-            await stream.set(user_message.content)
-        return await self.run_until_done()
-
-    async def send_initial_messages(self, stream):
-        for message in self.history[:-1]:
-            await stream.send(message, is_initial=True)
-        # The last init message is the actual user message
-        await stream.send(self.history[-1], is_initial=False)
-
-    def register_stream(self, stream):
-        self.stream = stream
+    def register_message_handler(self, message_handler):
+        self.message_handler = message_handler

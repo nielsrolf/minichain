@@ -1,6 +1,6 @@
 from minichain.agent import Agent
 from minichain.schemas import MultiModalResponse
-from minichain.tools.bash import CodeInterpreter
+from minichain.tools.bash import CodeInterpreter, BashSession
 from minichain.tools.replicate_client import *
 
 models = {
@@ -37,7 +37,7 @@ class Artist(Agent):
         super().__init__(
             functions=self.replicate_models
             + [
-                interpreter.bash,
+                BashSession(),
                 interpreter,
             ],
             system_message=artist_message,

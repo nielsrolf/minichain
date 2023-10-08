@@ -80,7 +80,7 @@ class AGI(Agent):
                 code_context = "\n".join(relevant_code)
                 query += f"Here is some relevant code:\n{code_context}"
             if "programmer" in assignee.lower():
-                self.programmer.register_stream(self.stream)
+                self.programmer.register_message_handler(self.message_handler)
                 response = await self.programmer.run(
                     query=query,
                 )
@@ -114,7 +114,7 @@ class AGI(Agent):
                 content=info_to_memorize,
                 source=source,
                 watch_source=False,
-                scope=self.stream.conversation_stack[-2]
+                scope=self.message_handler.conversation_stack[-2]
             )
             return response
 

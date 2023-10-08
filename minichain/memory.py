@@ -112,8 +112,8 @@ class SemanticParagraphMemory:
         self.agent_kwargs = agents_kwargs
         self.ingested_hashed = {}
 
-    def register_stream(self, stream):
-        self.agent_kwargs["stream"] = stream
+    def register_message_handler(self, message_handler):
+        self.agent_kwargs["message_handler"] = message_handler
 
     # Ingestion
     
@@ -224,8 +224,8 @@ class SemanticParagraphMemory:
         memory_matches = [self.get_memory_from_id(i.value.id) for i in matches]
         # remove all matches that are out of scope
         matches_in_scope, scope = [], ["root"]
-        if self.agent_kwargs.get("stream"):
-            scope = self.agent_kwargs["stream"].conversation_stack
+        if self.agent_kwargs.get("message_handler"):
+            scope = self.agent_kwargs["message_handler"].path
         for match, memory in zip(matches, memory_matches):
             if memory is None:
                 # we got an id of a memory that does not exist anymore
@@ -372,11 +372,11 @@ class SemanticParagraphMemory:
                 result = "\n\n".join([self.format_as_snippet(i) for i in results])
             return result
 
-        def register_stream(stream):
-            self.register_stream(stream)
-            find_memory.stream = stream
+        def register_message_handler(message_handler):
+            self.register_message_handler(message_handler)
+            find_memory.message_handler = message_handler
 
-        find_memory.register_stream = register_stream
+        find_memory.register_message_handler = register_message_handler
 
         return find_memory
 
@@ -393,11 +393,11 @@ class SemanticParagraphMemory:
             summary = self.get_content_summary(new_memories)
             return f"Ingested {path}. New memories formed:\n{summary} "
 
-        def register_stream(stream):
-            self.register_stream(stream)
-            create_memories_from_file.stream = stream
+        def register_message_handler(message_handler):
+            self.register_message_handler(message_handler)
+            create_memories_from_file.message_handler = message_handler
 
-        create_memories_from_file.register_stream = register_stream
+        create_memories_from_file.register_message_handler = register_message_handler
 
         return create_memories_from_file
 

@@ -3,11 +3,11 @@ import json
 
 from pydantic import BaseModel, Field, create_model
 
-from minichain.streaming import Stream
+from minichain.message_handler import StreamCollector
 
 
 class Function:
-    def __init__(self, openapi, name, function, description, stream=None):
+    def __init__(self, openapi, name, function, description, message_handler=None):
         """
         Arguments:
             openapi (dict): the openapi.json describing the function
@@ -15,9 +15,7 @@ class Function:
             function (any -> FunctionMessage): the function to call. Must return a FunctionMessage
             description (str): the description of the function
         """
-        if stream is None:
-            stream = Stream()
-        self.stream = stream
+        self.message_handler = message_handler or StreamCollector()
         self.pydantic_model = None
         try:
             if isinstance(openapi, dict):
@@ -54,7 +52,7 @@ class Function:
 
     async def __call__(self, **arguments):
         """Call the function with the given arguments.
-        _stream: a function that is expected to be called with new parts of the output of the function string
+        _message_handler: a function that is expected to be called with new parts of the output of the function string
                 (e.g. new lines of a bash command)
         """
         if "code" in arguments and not self.has_code_argument:
@@ -64,16 +62,16 @@ class Function:
         response = await self.function(**arguments)
         if not isinstance(response, str):
             response = json.dumps(response)
-        await self.stream.set(response)
+        await self.message_handler.set(response)
         print("response", response)
         return response
         # return self.parse(response)
 
-    def register_stream(self, stream):
-        self.stream = stream
+    def register_message_handler(self, message_handler):
+        self.message_handler = message_handler
         for maybe_agent in self.__dict__.values():
             try:
-                maybe_agent.register_stream(stream)
+                maybe_agent.register_message_handler(message_handler)
             except:
                 pass
 

@@ -16,125 +16,8 @@ from starlette.websockets import WebSocketDisconnect
 
 from minichain.dtypes import (AssistantMessage, Cancelled, FunctionMessage,
                               SystemMessage, UserMessage)
-from minichain.streaming import Stream
+from minichain.message_handler import MessageDB
 
-
-class MessageDB:
-    def __init__(self, path=".minichain"):
-        self.path = path
-        os.makedirs(f"{path}/messages", exist_ok=True)
-        self.saved_ids = {}
-        self.childrenOf = defaultdict(list)
-        self.conversationAgents = {}
-        self.messages = []
-        self.init_message_ids = []
-        self.load()
-
-    def load(self):
-        path = f"{self.path}/messages"
-        messages = []
-        paths = os.listdir(path)
-        paths_sorted = sorted(paths, key=lambda x: int(x.split(".")[0]))
-        for filename in paths_sorted:
-            try:
-                with open(os.path.join(path, filename), "r") as f:
-                    message = json.load(f)
-                    if message.get("stack", None):
-                        self.update_childrenOf(message)
-                    else:
-                        messages.append(message)
-                        self.saved_ids[message["id"]] = filename
-            except Exception as e:
-                print(f"Error loading message from {filename}", e)
-        self.messages = messages
-
-    def update_childrenOf(self, message):
-        if message.get('is_initial', False):
-            self.init_message_ids += [message["stack"][-1]]
-        parent = message["stack"][0]
-        for child in message["stack"][1:]:
-            if child not in self.childrenOf[parent]:
-                self.childrenOf[parent].append(child)
-                if message.get("agent", None) is not None:
-                    self.conversationAgents[child] = message["agent"]
-            parent = child
-    
-    def get_path(self, id):
-        # return the conversation stack to the conversation of the message id
-        path = []
-        while id != "root":
-            path = [id] + path
-            id = [i for i in self.childrenOf if id in self.childrenOf[i]][0]
-        return ["root"] + path
-
-    def dicts_to_classes(self, dicts):
-        classes = {
-            "user": UserMessage,
-            "system": SystemMessage,
-            "function": FunctionMessage,
-            "assistant": AssistantMessage,
-            None: dict,
-        }
-        messages = []
-        for message in dicts:
-            message = classes[message.get("role", None)](**message)
-            messages.append(message)
-        return messages
-
-    def save_msg(self, message, dirname):
-        if not message.get("id") in self.saved_ids:
-            path = f"{self.path}/{dirname}"
-            filename = f"{len(os.listdir(path))}.json"
-            filepath = os.path.join(path, filename)
-            if (
-                message.get("id", None) is not None
-            ):  # could also be a stack message, which has no id
-                self.saved_ids[message["id"]] = filepath
-        else:
-            filepath = self.saved_ids[message["id"]]
-        with open(filepath, "w") as f:
-            json.dump(message, f)
-
-    def add_message(self, message):
-        if not isinstance(message, dict):
-            message = message.dict()
-        if message.get("stack", None):
-            self.update_childrenOf(message)
-        else:
-            # if the message is new, append it
-            if message.get("id") not in self.saved_ids:
-                self.messages.append(message)
-            else:
-                # if the message is already saved, update it
-                for i, m in enumerate(self.messages):
-                    if m["id"] == message["id"]:
-                        self.messages[i] = message
-        self.save_msg(message, "messages")
-
-    def get_history(self, conversation_id):
-        dicts = self.get_conversation(conversation_id)
-        return self.dicts_to_classes(dicts)
-
-    def get_message(self, message_id):
-        for message in self.messages:
-            if message["id"] == message_id:
-                return message
-        return None
-
-    def get_conversation(self, conversation_id):
-        conversation = []
-        for message in self.messages:
-            if message["conversation_id"] == conversation_id:
-                conversation.append(message)
-        return conversation
-
-    def messages_as_dicts(self):
-        dicts = []
-        for message in self.messages:
-            if not isinstance(message, dict):
-                message = message.dict()
-            dicts.append(message)
-        return dicts
 
 
 app = FastAPI()
@@ -206,20 +89,6 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("websocket accepted")
 
-    async def add_message_to_db_and_send(message: dict):
-        """message: {id: 1, content: 'yo'} / {stack: [123, 1]}"""
-        print("add_message_to_db_and_send", message)
-        message_db.add_message(message)
-        if not isinstance(message, dict):
-            message = message.dict()
-        if message.get("stack", None):
-            await send_message_raise_cancelled({"type": "stack", **message})
-        else:
-            await send_message_raise_cancelled({"type": "message", "data": message})
-
-    async def add_chunk(chunk, message_id):
-        message = {"diff": chunk, "id": message_id, "type": "chunk"}
-        await send_message_raise_cancelled(message)
 
     async def send_message_raise_cancelled(message):
         # check the websocket: has a cancel message been sent? if no message has
@@ -238,6 +107,13 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(message)
         except Exception as e:
             print("websocket closed, running in background")
+
+    
+    message_db.add_consumer(send_message_raise_cancelled)
+    
+    # # connect this websocket to the streaming targets of potentially running agents
+    # for agent in agents.values():
+    #     agent.stream.on_message = add_message_to_db_and_send
 
     try:
         while True:
@@ -263,38 +139,12 @@ async def websocket_endpoint(websocket: WebSocket):
             print("agent_name", agent_name)
             agent = agents[agent_name]
 
-            stream = Stream(on_message=add_message_to_db_and_send, on_chunk=add_chunk)
-
+            conversation = message_db.get(payload.response_to)
             if payload.response_to == "root":
-                history = []
-                # We make a new conversation with only the user message (such that it appears in root)
-                # and then we do the actual conversation as sub conversation
-                with await stream.conversation("root", agent=agent.name) as stream:
-                    with await stream.to([], role="user") as stream:
-                        await stream.set(payload.query)
-                        conversation_stack = stream.conversation_stack
-            else:
-                history = message_db.get_history(payload.response_to)
-                conversation_stack = message_db.get_path(payload.response_to)
+                conversation.set(preview=payload.query)
+                
+            await agent.run(query=payload.query, conversation=conversation)
 
-
-            # Now conversation stack is either the stack pulled from the reply_to message, or the stack of the new conversation   
-            stream.conversation_stack = conversation_stack
-            agent.register_stream(stream)
-            await agent.run(query=payload.query, history=history)
-
-            # go to cwd if the agent has a bash
-            try:
-                await agent.interpreter.bash(
-                    commands=[f"cd {agent.interpreter.bash.cwd}"]
-                )
-            except Exception as e:
-                try:
-                    await agent.programmer.interpreter.bash(
-                        commands=[f"cd {os.getcwd()}"]
-                    )
-                except Exception as e:
-                    pass
 
     except Exception as e:
         traceback.print_exc()
@@ -310,14 +160,11 @@ async def get_agents():
     return list(agents.keys())
 
 
-@app.get("/history")
-async def get_history():
-    return {
-        "messages": message_db.messages_as_dicts(),
-        "childrenOf": message_db.childrenOf,
-        "conversationAgents": message_db.conversationAgents,
-        "init_message_ids": message_db.init_message_ids,
-    }
+@app.get("/messages/{path:path}")
+async def read_messages(path: str):
+    path = path.split('/')
+    conversation = message_db.get(path[-1])
+    return conversation.as_json()
 
 
 @app.get("/static/{path:path}")

@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from minichain.agent import Agent
 from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage
 from minichain.tools import codebase
-from minichain.tools.bash import CodeInterpreter
+from minichain.tools.bash import CodeInterpreter, BashSession
 from minichain.agents.hippocampus import Hippocampus
 
 
@@ -19,6 +19,7 @@ class Programmer(Agent):
     def __init__(self, load_memory_from=None, **kwargs):
         self.hippocampus = Hippocampus(load_memory_from=load_memory_from, **kwargs)
         interpreter = CodeInterpreter()
+        bash = BashSession()
         self.interpreter = interpreter
         print("Init history for programmer:", kwargs.get("init_history", []))
         init_history = kwargs.pop("init_history", [])
@@ -26,7 +27,7 @@ class Programmer(Agent):
             init_history = self.get_init_history()
 
         functions = [
-            interpreter.bash,
+            bash,
             interpreter,
             codebase.get_file_summary,
             codebase.view,
