@@ -249,7 +249,7 @@ const ChatApp = () => {
             response_to = currentConversationId;
         }
 
-        const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to, agent: conversation.agent || defaultAgentName });
+        const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to, agent: conversation.meta.agent || defaultAgentName });
         client.send(messagePayload);
         setInputValue("");
         setIsAttached(true);
@@ -363,7 +363,7 @@ const ChatApp = () => {
                         color: "white",
                         padding: "5px",
                     }}>
-                        {conversation.agent || defaultAgentName}
+                        {conversation.meta.agent || defaultAgentName}
                     </div>
                 )}
 
@@ -372,6 +372,9 @@ const ChatApp = () => {
 
             <div className="chat">
                 {conversation.messages.filter(message => !message.meta?.is_initial || showInitMessages).map(message => {
+                    if (path[path.length - 1] === "root" && message.agent !== defaultAgentName ) {
+                        return '';
+                    }
                     return (
                         <ChatMessage
                             message={message}

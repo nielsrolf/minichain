@@ -65,9 +65,9 @@ class Agent:
         """
         if not isinstance(conversation, Conversation):
             if conversation is None:
-                conversation = self.message_handler.conversation()
+                conversation = self.message_handler.conversation(meta=dict(agent=self.name))
             else:
-                conversation = conversation.conversation()
+                conversation = conversation.conversation(meta=dict(agent=self.name))
             for message in self.init_history:
                 await conversation.send(message, is_initial=True)
         await conversation.send(

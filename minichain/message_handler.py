@@ -322,7 +322,7 @@ class MessageDB():
         messages = [([
             m
             for m in c.messages if m.meta.get('is_initial', False)==False] + [None])[0] for c in conversations]
-        messages = [dict(**m.as_json(), fake_children=[c.path[-1]]) for m, c in zip(messages, conversations) if m is not None]
+        messages = [dict(**m.as_json(), fake_children=[c.path[-1]], agent=c.meta.get('agent')) for m, c in zip(messages, conversations) if m is not None]
         for m in messages:
             m['children'] = m.pop('fake_children')
         return {

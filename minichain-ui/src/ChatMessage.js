@@ -32,6 +32,9 @@ function ChatMessage({message, handleSubConversationClick }){
     if (!message.chat) {
         return '';
     }
+    if (message.chat.name === 'return') {
+        return '';
+    }
     return (
         <div className={`message-${message.chat.role || 'assistant'}`} key={message.path[message.path.length - 1]}>
             <div className='message-header'> {message.path[message.path.length - 1]} {message.chat.role } {message.chat.name} {message.meta.timestamp} {message.meta.cost} {message.meta.duration}</div>
