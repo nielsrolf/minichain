@@ -15,8 +15,6 @@ from minichain.utils.summarize_history import get_summarized_history
 
 def make_return_function(openapi_json: BaseModel, check=None):
     async def return_function(**arguments):
-        print("return function called", arguments)
-        breakpoint()
         if check is not None:
             check(**arguments)
         return arguments

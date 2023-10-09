@@ -42,21 +42,25 @@ class TitleScore(BaseModel):
 
 class VectorDB:
     def __init__(self, embedding_function=get_embedding):
-        self.values = []
-        self.keys = []
+        self.values = {}
+        self.keys = {}
         self.embedding_function = embedding_function
 
     def encode(self, texts):
         return np.array([self.embedding_function(text) for text in texts])
+    
+    def _dict_to_list(self, dict):
+        return [dict[key] for key in sorted(self.keys.keys())]
 
     def search(self, query_embeddings, num_results=3) -> List[VectorSearchScore]:
-        scores = np.dot(query_embeddings, np.array(self.keys).T)
+        K, V = self._dict_to_list(self.keys), self._dict_to_list(self.values)
+        scores = np.dot(query_embeddings, np.array(K).T)
         selection = []
         num_results = max(num_results // len(query_embeddings), 1)
         for i in range(len(scores)):
             indices = np.argsort(scores[i])[::-1][:num_results]
             selection += [
-                VectorSearchScore(scores[i][j], self.values[j]) for j in indices
+                VectorSearchScore(scores[i][j], V[j]) for j in indices
             ]
         # remove duplicates
         selection = sorted(selection, key=lambda x: x.score, reverse=True)
@@ -70,9 +74,24 @@ class VectorDB:
 
     def add(self, key, value):
         key_embedding = self.encode([key])[0]
-        self.keys.append(key_embedding)
-        self.values.append(value)
-
+        key_hash = hash_string(key)
+        self.keys[key_hash] = key_embedding
+        self.values[key_hash] = value
+    
+    def remove_key(self, key):
+        key_hash = hash_string(key)
+        del self.keys[key_hash]
+        del self.values[key_hash]
+    
+    def remove_value(self, value):
+        delete = []
+        for k, v in self.values.items():
+            if v.id == value.id:
+                delete += [k]
+        for k in delete:
+            del self.keys[k]
+            del self.values[k]
+    
 
 class IngestQuery(BaseModel):
     url: str = Field(..., description="The url of the website to read and tag.")
@@ -112,6 +131,12 @@ class SemanticParagraphMemory:
         self.agent_kwargs["message_handler"] = message_handler
 
     # Ingestion
+    def forget(self, memory):
+        try:
+            self.vector_db.remove_value(memory)
+            self.memories.remove(memory)
+        except ValueError:
+            pass
     
     def check_if_still_valid(self, memory, content=None):
         # Checks if the remembered raw text still appears in the source file and potentially 
@@ -126,13 +151,13 @@ class SemanticParagraphMemory:
                 content = ""
         if memory.meta.content not in content:
             try:
-                self.memories.remove(memory)
+                self.forget(memory)
             except ValueError:
                 pass
             return False
                 
         placeholder = uuid.uuid4().hex
-        content = content.replace(memory.meta.content, placeholder)
+        content = content.replace(memory.meta.content, "\n" + placeholder + "\n")
         lines = content.split("\n")
         try:
             if lines[max(0, memory.memory.start_line - 1)] == placeholder:
@@ -140,8 +165,7 @@ class SemanticParagraphMemory:
         except IndexError:
             # file is potentially shorter than before
             pass
-        
-        start_line = lines.index(placeholder) + 1
+        start_line = lines.index(placeholder)
         end_line = start_line + len(memory.meta.content.split("\n")) - 1
         memory.memory.start_line = start_line
         memory.memory.end_line = end_line
@@ -178,6 +202,8 @@ class SemanticParagraphMemory:
         return memories
 
     async def ingest_rec(self, path):
+        if not os.path.exists(path):
+            return []
         new_memories = []
         if os.path.isdir(path):
             files = get_visible_files(path)
@@ -216,16 +242,12 @@ class SemanticParagraphMemory:
         matches = self.vector_db.search(query_embeddings, num_results=num_results * 2)
         # remove all matches that are out of scope
         matches = [i for i in matches if i.value.memory.type == "content"]
-        memory_matches = [self.get_memory_from_id(i.value.id) for i in matches]
         # remove all matches that are out of scope
         matches_in_scope, scope = [], ["root"]
         if self.agent_kwargs.get("message_handler"):
             scope = self.agent_kwargs["message_handler"].path
-        for match, memory in zip(matches, memory_matches):
-            if memory is None:
-                # we got an id of a memory that does not exist anymore
-                continue
-            if memory.meta.scope in scope:
+        for match in matches:
+            if match.value.meta.scope in scope:
                 matches_in_scope.append(match)
         matches = matches_in_scope
         # Get the highest score for each memory-id (memories can occur multiple times)
@@ -244,12 +266,13 @@ class SemanticParagraphMemory:
 
     async def retrieve(self, question: str, num_results=8) -> List[MemoryWithMeta]:
         results = await self.search_by_vector(question, num_results)
-        update_needed = False
+        sources_to_update = []
         for i in results:
             if not self.check_if_still_valid(i):
-                update_needed = True
-                await self.ingest_rec(i.meta.source)
-        if update_needed:
+                sources_to_update.append(i.meta.source)
+        if len(sources_to_update) > 0:
+            for source in list(set(sources_to_update)):
+                await self.ingest_rec(source)
             results = await self.retrieve(question, num_results)
         return results
 
@@ -313,6 +336,7 @@ class SemanticParagraphMemory:
             self.vector_db.values = pickle.load(f)
         with open(os.path.join(memory_dir, "memories.json"), "r") as f:
             memories = json.load(f, object_hook=datetime_parser)
+        # /temp
         try:
             with open(os.path.join(memory_dir, "ingested_hashed.json"), "r") as f:
                 ingested_hashed = json.load(f)
@@ -375,3 +399,22 @@ class SemanticParagraphMemory:
 
         return create_memories_from_file
 
+async def main():
+    memory = SemanticParagraphMemory()
+    memory.load(".minichain/memory")
+    print(memory.get_content_summary())
+    print(memory.get_content_summary())
+    while (query := input("Query: ")) not in ["q", "quit", "exit", "stop" ]:
+        results = await memory.retrieve(query)
+        print("\n\n".join([memory.format_as_snippet(i) for i in results]))
+        print([i.memory.title for i in results])
+    
+    breakpoint()
+    memory.save(".minichain/memory")
+
+
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

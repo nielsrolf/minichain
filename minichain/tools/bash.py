@@ -94,9 +94,6 @@ class Jupyter(Function):
                         await self.message_handler.set() # Flush the message handler - send the meta data
                         break  # Execution is finished
 
-                    else:
-                        breakpoint()
-
             except KeyboardInterrupt:
                 # Cleanup in case of interruption
                 self.kernel_client.stop_channels()
