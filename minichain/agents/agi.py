@@ -113,7 +113,7 @@ class AGI(Agent):
                 content=info_to_memorize,
                 source=source,
                 watch_source=False,
-                scope=self.message_handler.conversation_stack[-2]
+                scope=self.message_handler.path[-2]
             )
             return response
 
