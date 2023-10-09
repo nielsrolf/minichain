@@ -24,62 +24,10 @@ def shorten_response(response: str) -> str:
     return response
 
 
-# class BashSession(Function):
-#     def __init__(self, message_handler=None, image_name="nielsrolf/minichain:latest"):
-#         super().__init__(
-#             name="bash",
-#             openapi=BashQuery,
-#             function=self,
-#             description="Run bash commands. Cwd is reset after each message. Run commands with the -y flag to avoid interactive prompts (e.g. npx create-app)",
-#             message_handler=message_handler,
-#         )
-#         # self.session = uuid.uuid4().hex
-#         self.image_name = image_name
-#         self.cwd = os.getcwd()
-#         self.session = (
-#             self.cwd.replace("/", "")
-#             .replace(".", "")
-#             .replace("-", "")
-#             .replace("_", "")
-#             .replace(" ", "")
-#         )
-#         # start a hello world echo command because this will trigger the preinstalling of the packages
-#         # if we do asyncio.run, we get: RuntimeError: asyncio.run() cannot be called from a running event loop
-#         # so we just create a background task
-#         print("Starting bash session:", self.session)
-#         try:
-#             asyncio.create_task(self.__call__(commands=["echo hello world"]))
-#         except Exception as e:
-#             print(e)
-
-#     async def __call__(self, commands: List[str], timeout: int = 60, **ignored_kwargs) -> str:
-#         await bash([f"cd {self.cwd}"], session=self.session)
-#         if any(["npx" in i for i in commands]):
-#             timeout = max(timeout, 180)
-#         outputs = await bash(
-#             commands,
-#             session=self.session,
-#             stream=self.message_handler,
-#             timeout=timeout,
-#         )
-#         response = "".join(outputs)
-#         response = shorten_response(response)
-#         print("done:", commands, response)
-#         await self.message_handler.set({"content": response})
-#         return response
-
-#     # when the session is destroyed, stop the container
-#     # def __del__(self):
-#     #     # stop the container with name self.session
-#     #     client = docker.from_env()
-#     #     try:
-#     #         container = client.containers.get(self.session)
-#     #         container.stop()
-#     #     except docker.errors.NotFound:
-#     #         pass
 
 
-class CodeInterpreterQuery(BaseModel):
+
+class JupyterQuery(BaseModel):
     code: str = Field(
         ...,
         description="Python code to run",
@@ -91,13 +39,13 @@ class CodeInterpreterQuery(BaseModel):
 
 import jupyter_client
 
-class CodeInterpreter(Function):
+class Jupyter(Function):
     def __init__(self, message_handler=None, **kwargs):
         super().__init__(
-            name="python",
-            openapi=CodeInterpreterQuery,
+            name="jupyter",
+            openapi=JupyterQuery,
             function=self,
-            description="Run Python code and stream outputs in real-time.",
+            description="Run python code and or `!bash_commands` in a jupyter kernel. ",
             message_handler=message_handler,
         )
 
@@ -108,13 +56,9 @@ class CodeInterpreter(Function):
         self.kernel_client.start_channels()
 
     async def __call__(self, code: str, timeout: int = 60) -> str:
-        # This will store all the outputs
-        outputs = []
-
         # Execute the code
         msg_id = self.kernel_client.execute(code)
-
-        breakpoint()
+        await self.message_handler.chunk(f"Out: \n")
 
         while True:
             try:
@@ -138,11 +82,13 @@ class CodeInterpreter(Function):
                         )
 
                     elif msg_type == 'execute_result':
-                        await self.message_handler.set(
-                            content['data']['text/plain'] + "\n",
+                        await self.message_handler.chunk(
+                            "",
                             meta={"display_data": [content['data']]}
                         )
-                        outputs.append(content['data'])
+                        await self.message_handler.set(
+                            content['data']['text/plain'] + "\n"
+                        )
 
                     elif msg_type == 'status' and content['execution_state'] == 'idle':
                         await self.message_handler.set() # Flush the message handler - send the meta data
@@ -156,31 +102,13 @@ class CodeInterpreter(Function):
                 self.kernel_client.stop_channels()
                 self.kernel_manager.shutdown_kernel()
                 break
-        breakpoint()
         # Return all the captured outputs as a single string
-        return "\n".join(str(output) for output in outputs)
+        output = self.message_handler.current_message['content']
+        short = shorten_response(output)
+        await self.message_handler.set(short)
+        return short
 
     def __del__(self):
         # Ensure cleanup when the class instance is deleted
         self.kernel_client.stop_channels()
         self.kernel_manager.shutdown_kernel()
-
-
-
-# async def test_bash_session():
-#     bash = BashSession()
-#     # response = bash(commands=["echo hello world", "pip install librosa"])
-#     response = await bash(
-#         commands=["mkdir bla123", "cd bla123", "touch testfile", "echo hello world"]
-#     )
-#     response = await bash(commands=["ls"])
-#     assert "testfile" in response.split("\n")
-#     response = await bash(commands=["pwd"])
-#     assert "bla123" in response
-#     response = await bash(commands=["cd ..", "rm -rf bla123"])
-
-
-# if __name__ == "__main__":
-#     import asyncio
-
-#     asyncio.run(test_bash_session())

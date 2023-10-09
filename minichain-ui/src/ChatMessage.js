@@ -4,8 +4,7 @@ import './ChatApp.css';
 
 
 const functionsToRenderAsCode = [
-    "bash",
-    "python",
+    "jupyter",
     "view",
     "edit",
     "view_symbol",

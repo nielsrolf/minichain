@@ -1,8 +1,6 @@
 import json
-import math
 import os
 import pickle
-import re
 from dataclasses import dataclass
 from typing import Any, List, Optional
 import uuid
@@ -11,10 +9,9 @@ import hashlib
 import numpy as np
 from pydantic import BaseModel, Field
 
-from minichain.agent import Agent
-from minichain.functions import Function, tool
-from minichain.tools.codebase import default_ignore_files, get_visible_files
-from minichain.tools.recursive_summarizer import long_document_qa, text_scan
+from minichain.functions import tool
+from minichain.tools.codebase import get_visible_files
+from minichain.tools.recursive_summarizer import long_document_qa
 from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory, text_to_single_memory
 from minichain.utils.cached_openai import get_embedding
 from minichain.utils.json_datetime import datetime_parser, datetime_converter
@@ -182,6 +179,8 @@ class SemanticParagraphMemory:
         return memories
 
     async def ingest_rec(self, path):
+        if not os.path.exists(path):
+            return []
         print("Ingesting: ", path)
         new_memories = []
         if os.path.isdir(path):

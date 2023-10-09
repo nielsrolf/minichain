@@ -1,6 +1,6 @@
 from minichain.agent import Agent
 from minichain.schemas import MultiModalResponse
-from minichain.tools.bash import CodeInterpreter, BashSession
+from minichain.tools.bash import Jupyter
 from minichain.tools.replicate_client import *
 
 models = {
@@ -13,7 +13,7 @@ models = {
 }
 
 
-artist_message = """You are a multimodal artist. You use the functions available to you to interact with media files. You also use the python interpreter and ffmpeg when needed.
+artist_message = """You are a multimodal artist. You use the functions available to you to interact with media files. You also use the jupyter and ffmpeg when needed.
 
 Instructions:
 - when you generate images, be very verbose in the prompt and describe the image in detail. Mention styles (e.g. photo-realistic, cartoon, oil painting etc.), colors, shapes, objects, etc. Describe what something looks like, not what is happening. Example of a bad prompt: "John is driving to the kindergarden". Example of a good prompt: "A 40-year old black man wearing a cap is driving in his red VW-passat. Photorealistic, high quality". Reason it's better: the image creator does not know what John looks like, and the first prompt is generally not informative about the image. The second prompt describes the image in enough detail for the image creator to generate exactly what we want.
@@ -25,8 +25,6 @@ Instructions:
 
 class Artist(Agent):
     def __init__(self, **kwargs):
-        interpreter = CodeInterpreter()
-        self.interpreter = interpreter
         os.makedirs(".minichain/downloads", exist_ok=True)
         download_dir = f".minichain/downloads/{len(os.listdir('.minichain/downloads'))}"
         print("Artist", download_dir)
@@ -36,10 +34,7 @@ class Artist(Agent):
         ]
         super().__init__(
             functions=self.replicate_models
-            + [
-                BashSession(),
-                interpreter,
-            ],
+            + [Jupyter()],
             system_message=artist_message,
             prompt_template="{query}".format,
             response_openapi=MultiModalResponse,

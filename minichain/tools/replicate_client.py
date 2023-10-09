@@ -22,9 +22,12 @@ def get_model_details(model_id):
 
 def use_model(model_id, input):
     version = get_model(model_id)
-    prediction = replicate.predictions.create(version=version, input=input)
-    prediction.wait()
-    return prediction.output
+    try:
+        prediction = replicate.predictions.create(version=version, input=input)
+        prediction.wait()
+        return prediction.output
+    except Exception as e:
+        return "Error: " + str(e)
 
 
 def replace_files_by_data_recursive(data):

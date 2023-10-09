@@ -3,10 +3,10 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from minichain.agent import Agent
-from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage
+from minichain.dtypes import UserMessage
 from minichain.memory import SemanticParagraphMemory
 from minichain.tools import codebase
-from minichain.tools.bash import CodeInterpreter #, BashSession
+from minichain.tools.bash import Jupyter
 
 
 system_message = """You are the memory assistant.
@@ -35,13 +35,11 @@ class Hippocampus(Agent):
             self.memory.load(load_memory_from)
         except FileNotFoundError:
             print(f"Memory file {load_memory_from} not found.")
-        interpreter = CodeInterpreter()
-        # bash = BashSession()
 
         functions = [
             self.memory.find_memory_tool(),
             # bash,
-            interpreter,
+            Jupyter(),
             codebase.get_file_summary,
             codebase.view,
             codebase.edit,
