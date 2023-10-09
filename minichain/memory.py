@@ -30,16 +30,6 @@ class VectorSearchScore:
     value: Any
 
 
-class TitleScore(BaseModel):
-    title: str = Field(
-        ..., description="Title of the document as written in the input text."
-    )
-    score: int = Field(
-        ...,
-        description="The score of how relevant this document seems to be. A score of 80 means there is an 80% chance that this document contains the answer to the question.",
-    )
-
-
 class VectorDB:
     def __init__(self, embedding_function=get_embedding):
         self.values = {}
@@ -52,7 +42,8 @@ class VectorDB:
     def _dict_to_list(self, dict):
         return [dict[key] for key in sorted(self.keys.keys())]
 
-    def search(self, query_embeddings, num_results=3) -> List[VectorSearchScore]:
+    def search(self, query_questions, num_results=3) -> List[VectorSearchScore]:
+        query_embeddings = self.encode(query_questions)
         K, V = self._dict_to_list(self.keys), self._dict_to_list(self.values)
         scores = np.dot(query_embeddings, np.array(K).T)
         selection = []
@@ -62,8 +53,10 @@ class VectorDB:
             selection += [
                 VectorSearchScore(scores[i][j], V[j]) for j in indices
             ]
+            # print what contributes to the score
+            for j in indices:
+                print(f"{query_questions[i]} -> {V[j].memory.title} ({scores[i][j]})")
         # remove duplicates
-        selection = sorted(selection, key=lambda x: x.score, reverse=True)
         deduplicated = []
         deduplicated_keys = []
         for i in selection:
@@ -229,17 +222,10 @@ class SemanticParagraphMemory:
             self.save(self.auto_save_dir)
         return memory
     
-    def get_memory_from_id(self, id):
-        try:
-            return [i for i in self.memories if i.id == id][0]
-        except IndexError:
-            return None
-    
     async def search_by_vector(self, question, num_results) -> List[MemoryWithMeta]:
         # query_questions = await self.generate_questions(question)
         query_questions = [question]
-        query_embeddings = self.vector_db.encode(query_questions)
-        matches = self.vector_db.search(query_embeddings, num_results=num_results * 2)
+        matches = self.vector_db.search(query_questions, num_results=num_results * 2)
         # remove all matches that are out of scope
         matches = [i for i in matches if i.value.memory.type == "content"]
         # remove all matches that are out of scope
@@ -249,20 +235,7 @@ class SemanticParagraphMemory:
         for match in matches:
             if match.value.meta.scope in scope:
                 matches_in_scope.append(match)
-        matches = matches_in_scope
-        # Get the highest score for each memory-id (memories can occur multiple times)
-        scores = {
-            i.value.id: max([j.score for j in matches if j.value.id == i.value.id])
-            for i in matches
-        }
-        # Sort by score
-        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        # Get the top results
-        top_results = sorted_scores[:num_results]
-        # Get the memories
-        memory_ids = [i[0] for i in top_results]
-        results = [i for i in self.memories if i.id in memory_ids]
-        return results[:num_results]
+        return [i.value for i in matches_in_scope[:num_results]]
 
     async def retrieve(self, question: str, num_results=8) -> List[MemoryWithMeta]:
         results = await self.search_by_vector(question, num_results)
@@ -410,7 +383,6 @@ async def main():
         print([i.memory.title for i in results])
     
     breakpoint()
-    memory.save(".minichain/memory")
 
 
 
