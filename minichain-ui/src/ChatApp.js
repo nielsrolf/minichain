@@ -323,7 +323,8 @@ const ChatApp = () => {
                 <button onClick={() => {
                     // parent
                     setIsAttached(false);
-                    const parent = conversation.path[conversation.path.length - 2] || "root";
+                    const parent = conversation.path[conversation.path.length - 3] || "root";
+                    console.log("parent", conversation.path, parent);
                     pushToPath(parent);
                 }}>Parent</button>
                 {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {

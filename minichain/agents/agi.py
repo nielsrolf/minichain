@@ -84,6 +84,7 @@ class AGI(Agent):
                     query=query,
                 )
             elif "webgpt" in assignee.lower():
+                self.webgpt.register_message_handler(self.message_handler)
                 response = await self.webgpt.run(
                     query=f"Please research on the following ticket:\n{task.description}\n{additional_info}",
                 )
@@ -92,6 +93,7 @@ class AGI(Agent):
                     query=query,
                 )
             elif "artist" in assignee.lower():
+                self.artist.register_message_handler(self.message_handler)
                 response = await self.artist.run(
                     query=f"Please research on the following ticket:\n{task.description}\n{additional_info}",
                 )
