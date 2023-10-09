@@ -3,10 +3,10 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from minichain.agent import Agent
-from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage
+from minichain.dtypes import UserMessage
 from minichain.memory import SemanticParagraphMemory
 from minichain.tools import codebase
-from minichain.tools.bash import CodeInterpreter
+from minichain.tools.bash import Jupyter
 
 
 system_message = """You are the memory assistant.
@@ -24,8 +24,8 @@ class CodeSection(BaseModel):
 
 
 class RelevantInfos(BaseModel):
-    code_sections: List[CodeSection] = Field([], description="Code sections that are relevant to the query.")
-    answer: Optional[str] = Field(None, description="The answer to the query.")
+    code_sections: List[CodeSection] = Field(..., description="Code sections that are relevant to the query.")
+    answer: str = Field(..., description="The answer to the query.")
 
 
 class Hippocampus(Agent):
@@ -35,12 +35,10 @@ class Hippocampus(Agent):
             self.memory.load(load_memory_from)
         except FileNotFoundError:
             print(f"Memory file {load_memory_from} not found.")
-        interpreter = CodeInterpreter()
 
         functions = [
             self.memory.find_memory_tool(),
-            interpreter.bash,
-            interpreter,
+            Jupyter(),
             codebase.get_file_summary,
             codebase.view,
             codebase.edit,
@@ -53,13 +51,16 @@ class Hippocampus(Agent):
         super().__init__(
             functions=functions,
             system_message=system_message,
-            prompt_template="{query}".format,
+            prompt_template="Find memories related to: {query}".format,
             init_history=init_history,
             response_openapi=RelevantInfos,
             **kwargs,
         )
+    
+    async def before_run(self, *args, **kwargs):
+        self.memory.reload()
 
-    def register_stream(self, stream):
-        self.memory.register_stream(stream)
-        return super().register_stream(stream)
+    def register_message_handler(self, message_handler):
+        self.memory.register_message_handler(message_handler)
+        return super().register_message_handler(message_handler)
 

@@ -14,10 +14,11 @@ function addDiffToMessage(message, diff) {
         return message + diff;
     }
     // add the diff recursively to message
+    let updated = {...message}
     for (const key in diff) {
-        message[key] = addDiffToMessage(message[key], diff[key]);
+        updated[key] = addDiffToMessage(message[key], diff[key]);
     }
-    return message
+    return updated;
 }
 
 
@@ -26,39 +27,25 @@ const ChatApp = () => {
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
     const [checkConnectionStatus, setCheckConnectionStatus] = useState(false);
     const [inputValue, setInputValue] = useState("");
-    const [path, setPath] = useState(["root"]);
-    const [agentName, setAgentName] = useState("Programmer");
-    const [defaultAgentName, setDefaultAgentName] = useState("Programmer");
+    const [defaultAgentName, setDefaultAgentName] = useState("ChatGPT");
     const [isAttached, setIsAttached] = useState(true);
     const [availableAgents, setAvailableAgents] = useState([]);
     const [showInitMessages, setShowInitMessages] = useState(false);
-    const [convTree, setConvTree] = useState({
-        "messages": [],
-        "childrenOf": {},
-        "conversationAgents": {},
-        "init_message_ids": [],
+    const [streamingState, setStreamingState] = useState({
+        idToPath: {},
+        messages: {},
+        lastMessagePath: ['root']
+    });
+    
+
+
+    const [path, setPath] = useState(["root"]);
+    const [conversation, setConversation] = useState({
+        path: ["root"],
+        messages: []
     });
 
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
-    const visibleMessages = useMemo(() => {
-        let visible = convTree.messages.filter(message => convTree.childrenOf[currentConversationId]?.includes(message.id));
-        if (currentConversationId === "root") {
-            visible = visible.filter(message => convTree.conversationAgents[message.id] === defaultAgentName);
-        }
-        if (!showInitMessages) {
-            visible = visible.filter(message => !convTree.init_message_ids.includes(message.id));
-        }
-        return visible;
-    }, [convTree, currentConversationId, defaultAgentName, showInitMessages]);
-
-    // when the path changes, we update the agent name
-    useEffect(() => {
-        if (path[path.length - 1] === "root") {
-            setAgentName(defaultAgentName);
-        } else {
-            setAgentName(convTree.conversationAgents[path[path.length - 1]]);
-        }
-    }, [path, convTree, defaultAgentName]);
 
     // fetch the available agents
     useEffect(() => {
@@ -74,15 +61,31 @@ const ChatApp = () => {
 
     // fetch the history
     useEffect(() => {
-        fetch("http://localhost:8745/history")
+        fetch("http://localhost:8745/messages/" + path[path.length - 1])
             .then(response => response.json())
-            .then(data => {
-                setConvTree(data);
+            .then(conversation => {
+                setConversation(conversation);
+                setStreamingState(prev => {
+                    const { lastMessagePath } = prev;
+                    // for each message in the conversation, add it to the dicts
+                    const idToPath = {};
+                    const messages = {};
+                    conversation.messages.forEach(message => {
+                        idToPath[message.path[message.path.length - 1]] = message.path
+                        messages[message.path[message.path.length - 1]] = message;
+                    });
+                    return {
+                        idToPath: idToPath,
+                        messages: messages,
+                        lastMessagePath: lastMessagePath
+                    };
+                });
             })
             .catch(e => {
                 console.error(e);
             });
-    }, []);
+    }, [path]);
+
 
 
     useEffect(() => {
@@ -106,57 +109,78 @@ const ChatApp = () => {
 
         client.onmessage = (messageRaw) => {
             const message = JSON.parse(messageRaw.data);
-            setConvTree(prevConvTree => {
-                let updatedMessages = [...prevConvTree.messages];
-                let updatedChildrenOf = { ...prevConvTree.childrenOf };
-                let updatedConversationAgents = { ...prevConvTree.conversationAgents };
-                let updatedInitMessageIds = [...prevConvTree.init_message_ids];
+            /**
+             * message = {
+                "type": "path",
+                "path": self.path,
+                "meta": self.meta
+            }
 
-                if (message.type === "stack") {
-                    const { stack } = message;
-                    if (message.is_initial) {
-                        updatedInitMessageIds = [...updatedInitMessageIds, stack[stack.length - 1]];
+            {
+                "id": self.path[-1],
+                "type": "set",
+                "chat": self.current_message,
+                "meta": self.meta
+            }
+
+            {
+                "id": self.path[-1],
+                "type": "chunk",
+                "diff": diff
+            }
+            */
+            if (message.type === "path") {
+                setStreamingState(prev => {
+                    const idToPath = prev.idToPath;
+                    const messages = prev.messages;
+                    idToPath[message.path[message.path.length - 1]] = message.path;
+                    messages[message.path[message.path.length - 1]] = {meta: message.meta, path: message.path};
+                    return {
+                        idToPath: idToPath,
+                        messages: messages,
+                        lastMessagePath: message.path
+                    };
+                });
+                
+            } else if (message.type === "set") {
+                // update or create the message if it is in the current conversation
+                // otherwise, do nothing
+                setStreamingState(prev => {
+                    const path = prev.idToPath[message.id];
+                    if (!path) {
+                        return prev;
                     }
-                    let parent = stack[0];
-                    for (let i = 1; i < stack.length; i++) {
-                        const child = stack[i];
-                        if (updatedChildrenOf[parent]) {
-                            if (!updatedChildrenOf[parent].includes(child)) {
-                                updatedChildrenOf[parent].push(child);
-                            }
-                        } else {
-                            updatedChildrenOf[parent] = [child];
-                        }
-                        parent = child;
+                    const idToPath = {...prev.idToPath};
+                    const messages = {...prev.messages};
+                    messages[message.id] = {meta: message.meta, path: idToPath[message.id], chat: message.chat};
+                    return {
+                        idToPath: idToPath,
+                        messages: messages,
+                        lastMessagePath: path
+                    };
+                });
+
+            } else if (message.type === "chunk") {
+                setStreamingState(prev => {
+                    const path = prev.idToPath[message.id];
+                    const currentMessage = prev.messages[message.id];
+                    if (!currentMessage) {
+                        console.log("no current message", message, prev.messages);
+                        return prev;
                     }
-                    if (message.agent) {
-                        updatedConversationAgents[stack[stack.length - 1]] = message.agent;
-                    }
-                } else if (message.type === "message") {
-                    const existingMessageIndex = updatedMessages.findIndex(i => i.id === message.data.id);
-                    if (existingMessageIndex !== -1) {
-                        updatedMessages[existingMessageIndex] = message.data;
-                    } else {
-                        updatedMessages.push(message.data);
-                    }
-                } else if (message.type === "chunk") {
-                    const existingMessageIndex = updatedMessages.findIndex(i => i.id === message.id);
-                    if (existingMessageIndex !== -1) {
-                        updatedMessages[existingMessageIndex] = addDiffToMessage(updatedMessages[existingMessageIndex], message.diff);
-                    } else {
-                        updatedMessages.push({ "id": message.id, ...message.diff });
-                    }
-                } else {
-                    console.error("Unknown message type", message);
-                }
-                console.log({ updatedMessages, updatedChildrenOf })
-                return {
-                    "messages": updatedMessages,
-                    "childrenOf": updatedChildrenOf,
-                    "conversationAgents": updatedConversationAgents,
-                    "init_message_ids": updatedInitMessageIds,
-                };
-            });
+                    const newMessage = addDiffToMessage(currentMessage, {chat: message.diff});
+                    const idToPath = {...prev.idToPath};
+                    const messages = {...prev.messages};
+                    messages[message.id] = newMessage;
+                    return {
+                        idToPath: idToPath,
+                        messages: messages,
+                        lastMessagePath: path
+                    };
+                });
+            } else {
+                console.error("Unknown message type", message);
+            }
         };
 
         setClient(client);
@@ -166,8 +190,50 @@ const ChatApp = () => {
         };
     }, []);
 
+
+    // when the streaming state updates: update the conversation
+    useEffect(() => {
+        const { messages } = streamingState;
+        setConversation(prevConversation => {
+            // todo only update with messages that belong to the prevConversation
+            const newMessages = [...prevConversation.messages];
+            for(let updated of Object.values(messages)) {
+                if (updated.path[updated.path.length - 2] !== prevConversation.path[prevConversation.path.length - 1]) {
+                    continue;
+                }
+                const updatedId = updated.path[updated.path.length - 1];
+                const existingMessage = newMessages.find(i => i.path[i.path.length - 1] === updatedId);
+                if (existingMessage) {
+                    existingMessage.chat = updated.chat;
+                    existingMessage.meta = updated.meta;
+                } else {
+                    newMessages.push(updated);
+                }
+            }
+            return {
+                ...prevConversation,
+                messages: newMessages
+            };
+        });
+    }, [streamingState]);
+
+    // when the streaming state noticed a message not in the conversation, update the path (if we are attached)
+    useEffect(() => {
+        const lastMessagePath = streamingState.lastMessagePath;
+        if (
+            isAttached && 
+            lastMessagePath[lastMessagePath.length - 2]  &&
+            lastMessagePath[lastMessagePath.length - 2] !== path[path.length - 1]
+        ) {
+            setPath([...path, lastMessagePath[lastMessagePath.length - 2]]);
+        }
+    }, [streamingState, isAttached, path]);
+
+
+
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
+        setIsAttached(false);
         if (subConversationId) {
             pushToPath(subConversationId);
         }
@@ -184,14 +250,13 @@ const ChatApp = () => {
             response_to = currentConversationId;
         }
 
-        const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to, agent: agentName });
+        const messagePayload = JSON.stringify({ query: inputValue, response_to: response_to, agent: conversation.meta.agent || defaultAgentName });
         client.send(messagePayload);
         setInputValue("");
         setIsAttached(true);
     };
 
     const pushToPath = (id) => {
-        console.log("pushing to path", id)
         setPath(prevPath => {
             // if we are already on that path, do nothing
             if (prevPath[prevPath.length - 1] === id) {
@@ -202,40 +267,21 @@ const ChatApp = () => {
         });
     };
 
+    // if the conversation changes, scroll to the bottom
     useEffect(() => {
         if (!isAttached) {
             return;
         }
-        // Scroll to the bottom of the page
         const bottom = document.getElementById("bottom");
         // if bottom is not in view, scroll to it
         if (!bottom || bottom.getBoundingClientRect().top > window.innerHeight) {
             bottom?.scrollIntoView({ behavior: "smooth" })
             setIsAttached(true);
         }
-    }, [visibleMessages, isAttached]);
-
-
-    // if we are attached 
-    useEffect(() => {
-        if (!isAttached || convTree.messages.length === 0) {
-            return;
-        }
-        // if we are attached and a new message has been send, push its conversation to the path
-        const lastMessage = convTree.messages[convTree.messages.length - 1];
-        if (!convTree.childrenOf[currentConversationId]?.includes(lastMessage.id)) {
-            // find the conversation id
-            const conversationId = Object.keys(convTree.childrenOf).find(key => convTree.childrenOf[key].includes(lastMessage.id));
-            if (conversationId) {
-                pushToPath(conversationId);
-            }
-        }
-    }, [convTree, isAttached, currentConversationId]);
-
+    }, [conversation, isAttached]);
 
 
     const selectAgent = (agentName) => {
-        setAgentName(agentName);
         setDefaultAgentName(agentName);
     }
 
@@ -278,13 +324,8 @@ const ChatApp = () => {
                 <button onClick={() => {
                     // parent
                     setIsAttached(false);
-                    const currentConversationId = path[path.length - 1];
-                    if (currentConversationId !== "root") {
-                        const parent = Object.keys(convTree.childrenOf).find(key => convTree.childrenOf[key].includes(currentConversationId));
-                        const grandParent = Object.keys(convTree.childrenOf).find(key => convTree.childrenOf[key].includes(parent));
-                        pushToPath(grandParent);
-                    }
-                    
+                    const parent = conversation.path[conversation.path.length - 3] || "root";
+                    pushToPath(parent);
                 }}>Parent</button>
                 {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {
                     setIsAttached(true);
@@ -323,7 +364,7 @@ const ChatApp = () => {
                         color: "white",
                         padding: "5px",
                     }}>
-                        {agentName}
+                        {conversation.meta.agent || defaultAgentName}
                     </div>
                 )}
 
@@ -331,11 +372,13 @@ const ChatApp = () => {
             <div style={{ height: "50px" }}></div>
 
             <div className="chat">
-                {visibleMessages.map(message => {
+                {conversation.messages.filter(message => !message.meta?.is_initial || showInitMessages).map(message => {
+                    if (path[path.length - 1] === "root" && message.agent !== defaultAgentName ) {
+                        return '';
+                    }
                     return (
                         <ChatMessage
                             message={message}
-                            convTree={convTree}
                             handleSubConversationClick={handleSubConversationClick}
                         />
                     );

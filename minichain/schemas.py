@@ -43,5 +43,6 @@ class BashQuery(BaseModel):
 class MultiModalResponse(BaseModel):
     content: str = Field(..., description="The final response to the user.")
     generated_files: List[str] = Field(
-        ..., description="Media files that have been generated."
+        description="Media files that have been generated.",
+        default_factory=list,
     )

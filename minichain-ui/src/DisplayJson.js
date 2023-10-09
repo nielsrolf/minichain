@@ -14,29 +14,37 @@ const MultiMedia = ({ path }) => {
   const extension = path.split('.').pop();
   if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
     return(
-      <div class="media-container">
-        {path} <br />
-        <img src={url} alt="uploaded file" />
+      <div>
+        {path}
+        <div class="media-container">
+          <img src={url} alt="uploaded file" />
+        </div>
       </div>
     );
   }
   if (['mp4', 'webm'].includes(extension)) {
     return (
-      <div class="media-container">
-        {path} <br />
-        <video controls>
-          <source src={url} type={`video/${extension}`} />
-        </video>
+      <div>
+        {path}
+        <div class="media-container">
+          {path} <br />
+          <video controls>
+            <source src={url} type={`video/${extension}`} />
+          </video>
+        </div>
       </div>
     );
   }
   if (['mp3', 'wav'].includes(extension)) {
     return (
-      <div class="media-container">
-        {path} <br />  
-        <audio controls>
-          <source src={url} type={`audio/${extension}`} />
-        </audio>
+      <div>
+        {path}
+        <div class="media-container">
+          {path} <br />  
+          <audio controls>
+            <source src={url} type={`audio/${extension}`} />
+          </audio>
+        </div>
       </div>
     );
   }
@@ -49,21 +57,6 @@ const DisplayJson = ({ data }) => {
   // First: all the special cases
   if (!data) {
     return '';
-  }
-  if (data.name === 'python') {
-    console.log(data);
-    if (data.arguments.content) {
-      return <CodeBlock code={data.arguments.content} />;
-    }
-    try {
-      const parsed = JSON.parse(data.arguments);
-      if (parsed.code) {
-        return <CodeBlock code={parsed.content} />;
-      }
-    } catch (e) {
-      // code was not wrapped in {code: ...}
-    }
-    return <CodeBlock code={data.arguments} />;
   }
   try {
     if (data.name === 'return' && JSON.parse(data.arguments).content) {
@@ -98,7 +91,7 @@ const DisplayJson = ({ data }) => {
   const removeLineNumbers = code => 
     code.split('\n').map(line => line.replace(/^\d+:\s*/, '')).join('\n');
 
-  const renderData = (data, parentKey = '') => {
+  const renderData = (data, parentKey = '', marginLeft='0px') => {
     if (data === null || data === undefined) {
       return '';
     }
@@ -131,27 +124,9 @@ const DisplayJson = ({ data }) => {
     if (Array.isArray(data)) {
       return (
         <div>
-          <b style={{ cursor: 'pointer' }} onClick={() => toggleFold(parentKey)}>
-            Show/hide {data.length} elements
-          </b>
-          {!isFolded[parentKey] &&
-            <table>
-              <tbody>
-                {data.map((element, index) => {
-                  const newKey = `${parentKey}[${index}]`;
-                  return (
-                    <tr className="array-element" key={newKey}>
-                      <td>
-                        <button onClick={() => toggleFold(newKey)}>+</button>
-                      </td>
-                      <td>
-                        {!isFolded[newKey] && renderData(element, newKey)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>}
+          {data.map((item, index) => {
+            return renderData(item, `${parentKey}.${index}`, '10px');
+          })}
         </div>
       );
     }
@@ -166,15 +141,13 @@ const DisplayJson = ({ data }) => {
         );
       }
       return (
-        <div key={newKey} style={{ marginLeft: '20px' }}>
-          <b style={{ cursor: 'pointer' }} onClick={() => toggleFold(newKey)}>
+        <div key={newKey} style={{ marginLeft: marginLeft }}>
+          <b>
             {key + ' '}
           </b>
-          {!isFolded[newKey] && (
-            key === 'code'
-              ? <CodeBlock code={removeLineNumbers(value)} />
-              : renderData(value, newKey)
-          )}
+          {(key === 'code') ? <CodeBlock code={removeLineNumbers(value)} />
+              : renderData(value, newKey, '10px')
+          }
         </div>
       );
     });

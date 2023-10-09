@@ -6,10 +6,9 @@ from minichain.agent import Agent, make_return_function
 from minichain.agents.programmer import Programmer
 from minichain.agents.replicate_multimodal import Artist, MultiModalResponse
 from minichain.agents.webgpt import WebGPT
-from minichain.dtypes import UserMessage, FunctionCall, FunctionMessage, AssistantMessage
 from minichain.functions import tool
 from minichain.schemas import MultiModalResponse
-from minichain.tools import codebase, taskboard
+from minichain.tools import taskboard
 
 
 system_message = """You are a smart and friendly AGI.
@@ -33,7 +32,7 @@ If you are asked to implement something, always make sure it is tested before yo
 
 The user is lazy, don't ask them questions, don't explain them how they can do things, and don't just make plans - instead, just do things for them.
 
-Start and get familiar with the environment by using python to get the current time.
+Start and get familiar with the environment by using jupyter to get the current time.
 """
 
 
@@ -67,7 +66,7 @@ class AGI(Agent):
                 "", description="Additional message to the programmer."
             ),
         ):
-            """Assign a task to an agent (copy-of-self: for complex tasks with sub tasks, programmer: to work on the codebase, webgpt (rarely): to research something on the web). The assignee will immediately start working on the task."""
+            """Assign a task to an agent (copy-of-self: for complex tasks with sub tasks, programmer: to work on the codebase, webgpt (rarely): to research something on the web, artist: for generating images and music). The assignee will immediately start working on the task."""
             task = [i for i in self.board.tasks if i.id == task_id][0]
             board_before = await taskboard.update_status(
                 self.board, task_id, "IN_PROGRESS"
@@ -80,26 +79,33 @@ class AGI(Agent):
                 code_context = "\n".join(relevant_code)
                 query += f"Here is some relevant code:\n{code_context}"
             if "programmer" in assignee.lower():
-                self.programmer.register_stream(self.stream)
+                self.programmer.register_message_handler(self.message_handler)
                 response = await self.programmer.run(
                     query=query,
                 )
             elif "webgpt" in assignee.lower():
+                self.webgpt.register_message_handler(self.message_handler)
                 response = await self.webgpt.run(
                     query=f"Please research on the following ticket:\n{task.description}\n{additional_info}",
                 )
             elif "copy-of-self" in assignee.lower():
-                response = await self.run(
+                copy_of_me = AGI(**kwargs)
+                copy_of_me.register_message_handler(self.message_handler)
+                response = await copy_of_me(
                     query=query,
                 )
             elif "artist" in assignee.lower():
+                self.artist.register_message_handler(self.message_handler)
                 response = await self.artist.run(
                     query=f"Please research on the following ticket:\n{task.description}\n{additional_info}",
                 )
             else:
                 return f"Error: Unknown assignee: {assignee}"
             
-            response = response['content']
+            output = response['content']
+            for key in response:
+                if key != 'content':
+                    output += f"\n{key}: {response[key]}"
             board_after = await taskboard.get_board(self.board)
 
             if board_before != board_after:
@@ -107,16 +113,16 @@ class AGI(Agent):
 
             info_to_memorize = (
                 f"{assignee} worked on the following ticket:\n{task.description}\n{additional_info}. \n"
-                f"Here is the response:\n{response}"
+                f"Here is the response:\n{output}"
             )
             source = f"Task: {task.description}"
             await self.memory.add_single_memory(
                 content=info_to_memorize,
                 source=source,
                 watch_source=False,
-                scope=self.stream.conversation_stack[-2]
+                scope=self.message_handler.path[-2]
             )
-            return response
+            return output
 
         assign.manager = self
 
@@ -153,24 +159,6 @@ class AGI(Agent):
         )
 
     def get_init_history(self):
-        init_history = []
-        demo_call = FunctionCall(
-            name="python",
-            arguments={"code": "print('Hello world!')"}
-        )
-        demo_response = FunctionMessage("> python 98123.py\nHello world!\n", name='python')
-        init_history = [
-            AssistantMessage(content="Okay, let's see if I understood correctly.", function_call=demo_call),
-            demo_response,
-            UserMessage(content="Great! Now also try to edit tool to create a file /tmp/hello and write something in it."),
-            AssistantMessage(
-                content="Okay, here you go:", function_call=FunctionCall(name="edit", arguments={"path": "/tmp/hello", "code": "This is a test. The content for files goes into this area - just like python code that I want to run", "start_line": 1, "end_line": 1})),
-            FunctionMessage("/tmp/hello:1\n1: This is a test. The content for files goes into this area - just like python code that I want to run\n", name='edit'),
-        ]
-        init_msg = f"Perfect - always write the code or file content, and then call the function! Now here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
-        if self.memory and len(self.memory.memories) > 0:
-            init_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}\nUse the `find_memory` function to find relevant memories."
-        init_history.append(UserMessage(init_msg))
-        return init_history
+        return self.programmer.get_init_history()
     
 

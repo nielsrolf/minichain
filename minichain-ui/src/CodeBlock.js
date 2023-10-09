@@ -66,7 +66,7 @@ const CodeBlock = ({ code }) => {
     };
 
     return (
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', backgroundColor: "rgba(0, 0, 0, 0.2)", padding: "5px", borderRadius: "5px" }}>
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', backgroundColor: "rgba(0, 0, 0, 0.2)", width: "100%" }}>
             <button
                 onClick={copyToClipboard}
                 style={{ position: 'absolute', top: 0, right: 0 }}

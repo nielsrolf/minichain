@@ -1,16 +1,12 @@
 import asyncio
-import json
 import os
-import uuid
-from typing import Callable, List, Optional, Union
+from typing import List, Optional
 
-import docker
 from pydantic import BaseModel, Field
 
 from minichain.agent import Function
 from minichain.schemas import BashQuery
-from minichain.streaming import Stream
-from minichain.utils.docker_sandbox import bash
+# from minichain.utils.docker_sandbox import bash
 
 
 def shorten_response(response: str) -> str:
@@ -28,62 +24,10 @@ def shorten_response(response: str) -> str:
     return response
 
 
-class BashSession(Function):
-    def __init__(self, stream=None, image_name="nielsrolf/minichain:latest"):
-        super().__init__(
-            name="bash",
-            openapi=BashQuery,
-            function=self,
-            description="Run bash commands. Cwd is reset after each message. Run commands with the -y flag to avoid interactive prompts (e.g. npx create-app)",
-            stream=stream,
-        )
-        # self.session = uuid.uuid4().hex
-        self.image_name = image_name
-        self.cwd = os.getcwd()
-        self.session = (
-            self.cwd.replace("/", "")
-            .replace(".", "")
-            .replace("-", "")
-            .replace("_", "")
-            .replace(" ", "")
-        )
-        # start a hello world echo command because this will trigger the preinstalling of the packages
-        # if we do asyncio.run, we get: RuntimeError: asyncio.run() cannot be called from a running event loop
-        # so we just create a background task
-        print("Starting bash session:", self.session)
-        try:
-            asyncio.create_task(self.__call__(commands=["echo hello world"]))
-        except Exception as e:
-            print(e)
-
-    async def __call__(self, commands: List[str], timeout: int = 60, **ignored_kwargs) -> str:
-        await bash([f"cd {self.cwd}"], session=self.session)
-        if any(["npx" in i for i in commands]):
-            timeout = max(timeout, 180)
-        outputs = await bash(
-            commands,
-            session=self.session,
-            stream=self.stream,
-            timeout=timeout,
-        )
-        response = "".join(outputs)
-        response = shorten_response(response)
-        print("done:", commands, response)
-        await self.stream.set({"content": response})
-        return response
-
-    # when the session is destroyed, stop the container
-    # def __del__(self):
-    #     # stop the container with name self.session
-    #     client = docker.from_env()
-    #     try:
-    #         container = client.containers.get(self.session)
-    #         container.stop()
-    #     except docker.errors.NotFound:
-    #         pass
 
 
-class CodeInterpreterQuery(BaseModel):
+
+class JupyterQuery(BaseModel):
     code: str = Field(
         ...,
         description="Python code to run",
@@ -91,63 +35,77 @@ class CodeInterpreterQuery(BaseModel):
     timeout: Optional[int] = Field(60, description="The timeout in seconds.")
 
 
-first_lines = """import sys
-import builtins
-def print(*args, **kwargs):
-    builtins.print(*args, **kwargs)
-    sys.stdout.flush()
-"""
-
-last_lines = """import types
-print(", ".join([f"{k}: {v}" for k, v in locals().items() if k in <lastLine> ]))"""
 
 
-class CodeInterpreter(Function):
-    def __init__(self, stream=None, **kwargs):
+import jupyter_client
+
+class Jupyter(Function):
+    def __init__(self, message_handler=None, **kwargs):
         super().__init__(
-            name="python",
-            openapi=CodeInterpreterQuery,
+            name="jupyter",
+            openapi=JupyterQuery,
             function=self,
-            description="Create and run a temporary python file (non-interactively; jupyter-style !bash commands are not supported).",
-            stream=stream,
+            description="Run python code and or `!bash_commands` in a jupyter kernel. ",
+            message_handler=message_handler,
         )
-        self.bash = BashSession(stream=stream)
+
+        # Start a Jupyter kernel
+        self.kernel_manager = jupyter_client.KernelManager(kernel_name='python3')
+        self.kernel_manager.start_kernel()
+        self.kernel_client = self.kernel_manager.client()
+        self.kernel_client.start_channels()
 
     async def __call__(self, code: str, timeout: int = 60) -> str:
-        last_line = json.dumps(code.strip().split("\n")[-1])
-        code = first_lines + code
-        if (
-            not "=" in last_line
-            and not "plt" in last_line
-            and not "print" in last_line
-            and not "import" in last_line
-            and not "save" in last_line
-            and not last_line.startswith("#")
-        ):
-            code = code + "\n" + last_lines.replace("<lastLine>", last_line)
-        filename = uuid.uuid4().hex[:5]
-        filepath = f"{self.bash.cwd}/.minichain/{filename}.py"
-        with open(filepath, "w") as f:
-            f.write(code)
-        self.bash.register_stream(self.stream)
-        output = await self.bash(commands=[f"python {filepath}"], timeout=timeout)
-        return output
+        # Execute the code
+        msg_id = self.kernel_client.execute(code)
+        await self.message_handler.chunk(f"Out: \n")
 
+        while True:
+            try:
+                # Get messages from the kernel
+                msg = self.kernel_client.get_iopub_msg(timeout=timeout)
 
-async def test_bash_session():
-    bash = BashSession()
-    # response = bash(commands=["echo hello world", "pip install librosa"])
-    response = await bash(
-        commands=["mkdir bla123", "cd bla123", "touch testfile", "echo hello world"]
-    )
-    response = await bash(commands=["ls"])
-    assert "testfile" in response.split("\n")
-    response = await bash(commands=["pwd"])
-    assert "bla123" in response
-    response = await bash(commands=["cd ..", "rm -rf bla123"])
+                # await self.message_handler.chunk(str(msg) + "\n")
 
+                # Check for output messages
+                if msg['parent_header'].get('msg_id') == msg_id:
+                    msg_type = msg['header']['msg_type']
+                    content = msg['content']
 
-if __name__ == "__main__":
-    import asyncio
+                    if msg_type == 'stream':
+                        await self.message_handler.chunk(content['text'])
+                    
+                    elif msg_type == 'display_data':
+                        await self.message_handler.chunk(
+                            content['data']['text/plain'] + "\n",
+                            meta={"display_data": [content['data']]}
+                        )
 
-    asyncio.run(test_bash_session())
+                    elif msg_type == 'execute_result':
+                        await self.message_handler.chunk(
+                            "",
+                            meta={"display_data": [content['data']]}
+                        )
+                        await self.message_handler.set(
+                            content['data']['text/plain'] + "\n"
+                        )
+
+                    elif msg_type == 'status' and content['execution_state'] == 'idle':
+                        await self.message_handler.set() # Flush the message handler - send the meta data
+                        break  # Execution is finished
+
+            except KeyboardInterrupt:
+                # Cleanup in case of interruption
+                self.kernel_client.stop_channels()
+                self.kernel_manager.shutdown_kernel()
+                break
+        # Return all the captured outputs as a single string
+        output = self.message_handler.current_message['content']
+        short = shorten_response(output)
+        await self.message_handler.set(short)
+        return short
+
+    def __del__(self):
+        # Ensure cleanup when the class instance is deleted
+        self.kernel_client.stop_channels()
+        self.kernel_manager.shutdown_kernel()

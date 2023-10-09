@@ -2,6 +2,7 @@ import datetime as dt
 import hashlib
 import uuid
 from typing import Any, Dict, List, Optional, Union
+import os
 
 from pydantic import BaseModel, Field
 
@@ -60,6 +61,12 @@ class MemoryMeta(BaseModel):
     timestamp: dt.datetime = Field(default_factory=dt.datetime.now, description="The timestamp when the document was created.")
     scope: str = "root" # if scope is a conversation id, this memory will only appear for (sub)conversations with the same id
 
+    # after loading: normalize source file paths
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if os.path.exists(self.source) and self.source.startswith("./"):
+            self.source = self.source[2:]
+
 
 class MemoryWithMeta(BaseModel):
     memory: Memory
@@ -79,7 +86,7 @@ def add_line_numbers(text):
 class EndThisMemorySession(Exception):
     pass
 
-async def text_to_memory(text=None, source=None, max_num_memories=None, agent_kwargs={}, existing_memories=[]) -> List[MemoryWithMeta]:
+async def text_to_memory(text, source=None, agent_kwargs={}, existing_memories=[]) -> List[MemoryWithMeta]:
     """
     Turn a text into a list of semantic paragraphs.
     - add line numbers to the text
@@ -93,11 +100,9 @@ async def text_to_memory(text=None, source=None, max_num_memories=None, agent_kw
       20: line 20
       ```
     """
-    assert text is not None or text_with_line_numbers is not None
     existing_memories = list(existing_memories)
     memories = []
-    
-    text_with_line_numbers = add_line_numbers(text)
+
     lines = text.split("\n")
 
     async def add_memory(**memory):

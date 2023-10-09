@@ -127,15 +127,6 @@ async def get_long_summary(
     # Remove irrelevant files
     summary = file_summaries.pop("README.md", "") + "\n".join(file_summaries.values())
     if len(summary.split(" ")) > 400:
-        # sections = text_scan(
-        #     summary,
-        #     RelevantSection,
-        #     "The following is a summary a project's codebase. Your task is to find all sections that seem important to know for a programmer tasked to implement new features or answer questions about the project. The programmer can read specific section in detail, so this summary should mainly give an overview about where to find what. When you are done, call the return function - without an additional summary.",
-        # )
-        # summary = "\n".join(
-        #     "\n".join(summary.split("\n")[section["start"] : section["end"]])
-        #     for section in sections
-        # )
         summary = await long_document_qa(
             text=summary,
             question="Summarize the following codebase in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important code.",
@@ -149,6 +140,8 @@ async def get_file_summary(path: str = Field(..., description="The path to the f
     text, error = open_or_search_file(path)
     if error is not None:
         return error
+    if os.isdir(path):
+        return text
     if path.endswith(".py"):
         summary = summarize_python_file(path)
     else:
@@ -178,12 +171,17 @@ async def scan_file_for_info(
 
 
 def open_or_search_file(path):
+    # check if the path is a directory
+    if os.path.isdir(path):
+        files = get_visible_files(path)
+        return None, f"Path is a directory. Did you mean one of: {files}"
     if not os.path.exists(path):
+        search_name = path.split("/")[-1]
         # find it in subfolders
         matches = []
         for root, dirs, filenames in os.walk("."):
             for filename in filenames:
-                if filename == path:
+                if filename == search_name:
                     matches.append(os.path.join(root, filename))
         if len(matches) == 0:
             return None, f"File not found: {path}"
@@ -312,7 +310,7 @@ async def edit(
         # diff = "\n".join(list(diff))
         if diff == "":
             return 'Edit done successfully.'
-        return 'Edit done. Here is the diff of pylint before and after the edit:\n' + diff
+        return f'Edit done. {path} now has {len(lines)} number of lines. Here is the diff of pylint before and after the edit:\n' + diff + "\nYou don't have to fix every linting issue, but check for important ones."
     return truncate_updated(updated_in_context)
 
 
@@ -332,56 +330,6 @@ def remove_line_numbers(code):
     # remove line numbers if present using regex
     code = re.sub(r"^\d+ ", "", code, flags=re.MULTILINE)
     return code
-
-
-@tool()
-async def replace_symbol(
-    path: str = Field(..., description="The path to the file"),
-    symbol: str = Field(
-        ...,
-        description="Either {function_name}, {class_name} or {class_name}.{method_name}. Works for python only.",
-    ),
-    code: str = Field(
-        ...,
-        description="The new code to replace the symbol with. Can be escaped with `ticks` to avoid formatting code as JSON.",
-    ),
-    is_new: bool = Field(False, description="Whether a new symbol should be created."),
-):
-    """Replace a symbol (function/class/method) in a file."""
-    symbol_id = symbol
-    code = remove_line_numbers(code)
-    all_symbols = get_symbols(path)
-    for symbol in all_symbols:
-        if symbol["id"] == symbol_id:
-            with open(symbol["path"], "r") as f:
-                lines = f.readlines()
-                lines[symbol["start"] : symbol["end"]] = code.split("\n")
-            with open(symbol["path"], "w") as f:
-                f.write("\n".join(lines))
-            updated_in_context = await view(
-                path=symbol["path"],
-                start=symbol["start"] - 4,
-                end=symbol["start"] + len(code.split("\n")) + 4,
-                with_line_numbers=True,
-            )
-            return truncate_updated(updated_in_context)
-    if is_new:
-        # Find the last line of the file or class and insert the new symbol there
-        # Check if it's a class method
-        if "." in symbol_id:
-            class_name, method_name = symbol_id.split(".")
-            for symbol in all_symbols:
-                if symbol["id"] == class_name:
-                    start = symbol["end"]
-                    break
-        else:
-            with open(symbol["path"], "r") as f:
-                lines = f.readlines()
-            start = len(lines)
-        end = start + len(code.split("\n"))
-        return edit(path=symbol["path"], start=start, end=end, code=code)
-    return "Symbol not found. Did you mean to create a new symbol?"
-
 
 @tool()
 async def view_symbol(
@@ -422,7 +370,6 @@ async def view_symbol(
     return "Symbol not found. Available symbols:\n" + "\n".join(
         [symbol["id"] for symbol in all_symbols]
     )
-
 
 async def test_codebase():
     print(get_initial_summary())
