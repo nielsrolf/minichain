@@ -19,7 +19,15 @@ Chat models are agents without structured output and end their turn by respondin
 To install the python library, run:
 ```
 pip install git+https://github.com/nielsrolf/minichain
+```
+It is recommended to run agents inside of docker environments where they have no permission to destroy important things or have access to all secrets.
+If you just want to use the VSCode extension, you can do it via
+```
 docker pull nielsrolf/minichain:latest
+docker run -v $(pwd):$(pwd) \
+     -w $(pwd) -p 8745:8745 \
+     --env-file .env.example \
+     -e your_image_name # optionally:  --gpus all 
 ```
 
 ## Defining a tool

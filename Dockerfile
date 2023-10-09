@@ -41,3 +41,11 @@ RUN pip install librosa pydub yt-dlp soundfile
 RUN apt-get install -y screen
 
 RUN pip install moviepy
+
+# install jupyter
+RUN pip install jupyterlab
+
+RUN pip install pip install git+https://github.com/nielsrolf/minichain
+
+# Start minichain api
+CMD ["python", "-m", "minichain.api"]
