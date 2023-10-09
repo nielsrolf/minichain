@@ -164,10 +164,14 @@ class Message():
     
     @classmethod
     def load(cls, filepath, **kwargs):
-        filepath = filepath + ".json"
-        with open(filepath, 'r') as f:
+        with open(filepath + ".json", 'r') as f:
             data = json.load(f)
-        return cls(**data, **kwargs)
+        message = cls(**data, **kwargs)
+        # load all sub conversations
+        if os.path.exists(filepath) and os.path.isdir(filepath):
+            for sub_conversation_id in os.listdir(filepath):
+                Conversation.load(os.path.join(filepath, sub_conversation_id, "conversation.json"), **kwargs)
+        return message
     
     @property
     def children(self):
