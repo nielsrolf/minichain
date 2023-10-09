@@ -233,6 +233,7 @@ const ChatApp = () => {
 
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
+        setIsAttached(false);
         if (subConversationId) {
             pushToPath(subConversationId);
         }
@@ -324,7 +325,6 @@ const ChatApp = () => {
                     // parent
                     setIsAttached(false);
                     const parent = conversation.path[conversation.path.length - 3] || "root";
-                    console.log("parent", conversation.path, parent);
                     pushToPath(parent);
                 }}>Parent</button>
                 {isAttached ? <button id="attachDetach" onClick={() => setIsAttached(false)}>Detach</button> : <button onClick={() => {

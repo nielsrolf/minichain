@@ -50,10 +50,6 @@ const DisplayJson = ({ data }) => {
   if (!data) {
     return '';
   }
-  // if (data.name === 'python') {
-  //   console.log(data);
-  //   return <CodeBlock code={data.arguments} />;
-  // }
   try {
     if (data.name === 'return' && JSON.parse(data.arguments).content) {
       return;
@@ -87,7 +83,7 @@ const DisplayJson = ({ data }) => {
   const removeLineNumbers = code => 
     code.split('\n').map(line => line.replace(/^\d+:\s*/, '')).join('\n');
 
-  const renderData = (data, parentKey = '') => {
+  const renderData = (data, parentKey = '', marginLeft='0px') => {
     if (data === null || data === undefined) {
       return '';
     }
@@ -121,7 +117,7 @@ const DisplayJson = ({ data }) => {
       return (
         <div>
           {data.map((item, index) => {
-            renderData(item, `${parentKey}.${index}`);
+            return renderData(item, `${parentKey}.${index}`, '10px');
           })}
         </div>
       );
@@ -137,15 +133,13 @@ const DisplayJson = ({ data }) => {
         );
       }
       return (
-        <div key={newKey} style={{ marginLeft: '20px' }}>
-          <b style={{ cursor: 'pointer' }} onClick={() => toggleFold(newKey)}>
+        <div key={newKey} style={{ marginLeft: marginLeft }}>
+          <b>
             {key + ' '}
           </b>
-          {!isFolded[newKey] && (
-            key === 'code'
-              ? <CodeBlock code={removeLineNumbers(value)} />
-              : renderData(value, newKey)
-          )}
+          {(key === 'code') ? <CodeBlock code={removeLineNumbers(value)} />
+              : renderData(value, newKey, '10px')
+          }
         </div>
       );
     });

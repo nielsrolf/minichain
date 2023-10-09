@@ -24,8 +24,8 @@ class CodeSection(BaseModel):
 
 
 class RelevantInfos(BaseModel):
-    code_sections: List[CodeSection] = Field([], description="Code sections that are relevant to the query.")
-    answer: Optional[str] = Field(None, description="The answer to the query.")
+    code_sections: List[CodeSection] = Field(..., description="Code sections that are relevant to the query.")
+    answer: str = Field(..., description="The answer to the query.")
 
 
 class Hippocampus(Agent):
@@ -38,7 +38,6 @@ class Hippocampus(Agent):
 
         functions = [
             self.memory.find_memory_tool(),
-            # bash,
             Jupyter(),
             codebase.get_file_summary,
             codebase.view,
@@ -52,11 +51,14 @@ class Hippocampus(Agent):
         super().__init__(
             functions=functions,
             system_message=system_message,
-            prompt_template="{query}".format,
+            prompt_template="Find memories related to: {query}".format,
             init_history=init_history,
             response_openapi=RelevantInfos,
             **kwargs,
         )
+    
+    async def before_run(self, *args, **kwargs):
+        self.memory.reload()
 
     def register_message_handler(self, message_handler):
         self.memory.register_message_handler(message_handler)

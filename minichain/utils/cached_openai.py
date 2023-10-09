@@ -22,36 +22,28 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
         pass
     if '"code": ```' in function_call["arguments"]:
         # replace first occurrence of ``` with " and last
+        before, after = function_call["arguments"].split('"code": ```', 1)
         try:
-            before, after = function_call["arguments"].split('"code": ```', 1)
-            try:
-                code, after = after.rsplit("```,", 1)[0]
-            except:
-                code, after = after.rsplit("```", 1)[0]
-            arguments_no_code = json.loads(before + after)
-            arguments = {"code": code, **arguments_no_code}
-            function_call["arguments"] = arguments
-            return FunctionCall(**function_call)
-        except Exception as e:
-            print(e)
-            breakpoint()
+            code, after = after.rsplit("```,", 1)[0]
+        except:
+            code, after = after.rsplit("```", 1)[0]
+        arguments_no_code = json.loads(before + after)
+        arguments = {"code": code, **arguments_no_code}
+        function_call["arguments"] = arguments
+        return FunctionCall(**function_call)
 
     if '"code": `' in function_call["arguments"]:
-        try:
-            # replace first occurrence of ``` with " and last
-            before, after = function_call["arguments"].split('"code": `', 1)
-            if "`, " in after:
-                try:
-                    code, after = after.rsplit("`,", 1)[0]
-                except:
-                    code, after = after.rsplit("`", 1)[0]
-            arguments_no_code = json.loads(before + after)
-            arguments = {"code": code, **arguments_no_code}
-            function_call["arguments"] = arguments
-            return FunctionCall(**function_call)
-        except Exception as e:
-            print(e)
-            breakpoint()
+        # replace first occurrence of ``` with " and last
+        before, after = function_call["arguments"].split('"code": `', 1)
+        if "`, " in after:
+            try:
+                code, after = after.rsplit("`,", 1)[0]
+            except:
+                code, after = after.rsplit("`", 1)[0]
+        arguments_no_code = json.loads(before + after)
+        arguments = {"code": code, **arguments_no_code}
+        function_call["arguments"] = arguments
+        return FunctionCall(**function_call)
 
     return FunctionCall(**function_call)
 
@@ -87,37 +79,29 @@ def fix_common_errors(response: Dict[str, Any]) -> Dict[str, Any]:
 def format_history(messages: list) -> list:
     """Format the history to be compatible with the openai api - json dumps all arguments"""
     for message in messages:
-        try:
-            if (function_call := message.get("function_call")) is not None:
-                if isinstance(function_call["arguments"], dict):
-                    content = function_call["arguments"].pop("content", None)
-                    message["content"] = content or message["content"]
-                    code = function_call["arguments"].pop("code", None)
-                    if code is not None:
-                        message["content"] = message["content"] + f"\n```\n{code}\n```"
-                    function_call["arguments"] = json.dumps(function_call["arguments"])
-        except Exception as e:
-            print(e)
-            breakpoint()
+        if (function_call := message.get("function_call")) is not None:
+            if isinstance(function_call["arguments"], dict):
+                content = function_call["arguments"].pop("content", None)
+                message["content"] = content or message["content"]
+                code = function_call["arguments"].pop("code", None)
+                if code is not None:
+                    message["content"] = message["content"] + f"\n```\n{code}\n```"
+                function_call["arguments"] = json.dumps(function_call["arguments"])
     return messages
 
 
 def save_llm_call_for_debugging(messages, functions, parsed_response, raw_response):
-    try:
-        os.makedirs(".minichain/debug", exist_ok=True)
-        with open(".minichain/debug/last_openai_request.json", "w") as f:
-            json.dump(
-                {
-                    "messages": messages,
-                    "functions": functions,
-                    "parsed_response": parsed_response,
-                    "raw_response": raw_response,
-                },
-                f,
-            )
-    except Exception as e:
-        print(e)
-        breakpoint()
+    os.makedirs(".minichain/debug", exist_ok=True)
+    with open(".minichain/debug/last_openai_request.json", "w") as f:
+        json.dump(
+            {
+                "messages": messages,
+                "functions": functions,
+                "parsed_response": parsed_response,
+                "raw_response": raw_response,
+            },
+            f,
+        )
 
 
 @async_disk_cache
@@ -155,9 +139,6 @@ async def get_openai_response_stream(
         print("We got rate limited, chilling for a minute...")
         time.sleep(60)
         raise e
-    except Exception as e:
-        print(e)
-        breakpoint()
     raw_response = {
         key: value for key, value in stream.current_message.items() if "id" not in key
     }

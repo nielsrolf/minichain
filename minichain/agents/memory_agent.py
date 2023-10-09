@@ -41,6 +41,9 @@ class MemoryAgent(Agent):
             **kwargs,
         )
 
+    async def before_run(self, *args, **kwargs):
+        self.memory.reload()
+
     def register_message_handler(self, message_handler):
         self.memory.register_message_handler(message_handler)
         super().register_message_handler(message_handler)

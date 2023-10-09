@@ -20,6 +20,7 @@ Instructions:
 - when you are asked to generate a story or a video using multiple images, describe each object and person in detail, and use the same descriptions for the persons in every image. Otherwise, two people will look different in the first and second image, and the story will not make sense.
 - use python and moviepy to generate videos if appropriate
 - when you call a function, you call a different AI model. This model knows nothing about the current conversation, so include all relevant info in the prompts
+- when you get unclear requests from the user, get creative! Don't ask for specifications, see it as a challenge to create something that will surprise the user
 """
 
 

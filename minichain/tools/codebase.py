@@ -179,11 +179,12 @@ async def scan_file_for_info(
 
 def open_or_search_file(path):
     if not os.path.exists(path):
+        search_name = path.split("/")[-1]
         # find it in subfolders
         matches = []
         for root, dirs, filenames in os.walk("."):
             for filename in filenames:
-                if filename == path:
+                if filename == search_name:
                     matches.append(os.path.join(root, filename))
         if len(matches) == 0:
             return None, f"File not found: {path}"

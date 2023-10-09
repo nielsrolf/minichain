@@ -15,6 +15,8 @@ from minichain.utils.summarize_history import get_summarized_history
 
 def make_return_function(openapi_json: BaseModel, check=None):
     async def return_function(**arguments):
+        print("return function called", arguments)
+        breakpoint()
         if check is not None:
             check(**arguments)
         return arguments
@@ -58,11 +60,16 @@ class Agent:
     @property
     def functions_openai(self):
         return [i.openapi_json for i in self.functions]
+    
+    async def before_run(self, conversation=None, **arguments):
+        """Hook for subclasses to run code before the run method is called."""
+        pass
 
     async def run(self, conversation=None, **arguments):
         """arguments: dict with values mentioned in the prompt template
         history: list of Message objects that are already part of the conversation, for follow up conversations
         """
+        await self.before_run()
         if not isinstance(conversation, Conversation):
             if conversation is None:
                 conversation = self.message_handler.conversation(meta=dict(agent=self.name))
@@ -99,12 +106,8 @@ class Agent:
         return function_tool
     
     async def before_return(self, output):
-        try:
-            await self.bash(
-                commands=[f"cd {self.bash.cwd}"]
-            )
-        except Exception as e:
-            pass
+        """Hook for subclasses to run code before the return method is called."""
+        pass
 
 
 class Session:
@@ -126,6 +129,7 @@ class Session:
                     # output is the output of the return function
                     # since each function returns a string, we need to parse the output
                     await self.agent.before_return(output)
+                    print("output", output)
                     return json.loads(output)
 
     async def get_next_action(self):
@@ -162,36 +166,20 @@ class Session:
                 )
             # catch pydantic validation errors
             except ExceptionForAgent as e:
-                await message_handler.set(self.format_error_message(e))
+                error_msg = str(e)
+                await message_handler.set(error_msg)
             except Exception as e:
                 if "missing 1 required positional argument: 'code'" in str(e) or "validation error for edit\ncode\n  field required" in str(e):
                     await message_handler.set(
                         f"Error: this function requires a code. Use the normal message content field to put  the code like here:\n```\ncode here\n```"
                     )
                 else:
-                    print(self.format_error_message(e))
-                    if isinstance(e, pydantic.error_wrappers.ValidationError):
-                        await message_handler.chunk(self.format_error_message(e))
-                    else:
-                        print(self.format_error_message(e))
-                        # breakpoint()
-                        raise e
+                    print("yooo")
+                    traceback.print_stack()
+                    traceback.print_exc()
+                    # breakpoint()
+                    raise e
         return False
-
-    def format_error_message(self, e):
-        if isinstance(e, Cancelled):
-            raise e
-        traceback.print_exc()
-        try:
-            msg = f"{type(e)}: {e} - {e.msg}"
-        except AttributeError:
-            msg = f"{type(e)}: {e}"
-        msg = msg.replace(
-            "<class 'pydantic.error_wrappers.ValidationError'>",
-            "Response could not be parsed, did you mean to call return?\nError:",
-        )
-        msg = "```\n" + msg + "\n```"
-        return msg
 
     def register_message_handler(self, message_handler):
         self.message_handler = message_handler

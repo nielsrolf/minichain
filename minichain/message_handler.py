@@ -137,6 +137,13 @@ class Message():
     
     async def __aexit__(self, exc_type, exc_value, traceback):
         """saves the message to the message handler and avoids updating the message"""
+        if self._stream_target is None:
+            return
+        start_time = self._stream_target.meta['timestamp']
+        duration = dt.datetime.now() - start_time
+        await self._stream_target.set(meta={
+            'duration': duration
+        })
         self.chat = self._stream_target.current_message
         self.meta.update(self._stream_target.meta)
         self._stream_target.off()
@@ -279,10 +286,12 @@ class MessageDB():
         await self.shared['consumers'][0](msg)
         # send the message to all other consumers if they want to consume it
         for consume in self.shared['consumers'][1:]:
-            try:
-                await consume(msg)
-            except Exception as e:
-                pass
+            await consume(msg)
+
+            # try:
+            #     await consume(msg)
+            # except Exception as e:
+            #     pass
     
     def register_conversation(self, conversation):
         self.conversations.append(conversation)

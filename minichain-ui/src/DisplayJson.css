@@ -8,4 +8,9 @@ tr {
   flex-wrap: wrap; */
   /* justify-content: space-around; */
   padding-bottom: 20px;
+
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }

@@ -89,7 +89,9 @@ class AGI(Agent):
                     query=f"Please research on the following ticket:\n{task.description}\n{additional_info}",
                 )
             elif "copy-of-self" in assignee.lower():
-                response = await self.run(
+                copy_of_me = AGI(**kwargs)
+                copy_of_me.register_message_handler(self.message_handler)
+                response = await copy_of_me(
                     query=query,
                 )
             elif "artist" in assignee.lower():

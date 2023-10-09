@@ -17,15 +17,15 @@
   background-color: #181818;
   color: #CCCCCC;
   border: 0px;
-  border-radius: 10px;
+  border-radius: 5px;
 }
 
 .send-button {
   /* position: float; */
   /* right: 0px;
-  bottom: 10px; */
+  bottom: 5px; */
   width: 80px;
-  padding: 10px;
+  padding: 5px;
   border: none;
   background-color: rgb(10, 10, 10);
   /* background: url('path_to_icon') no-repeat center; */
@@ -37,14 +37,18 @@
 .message-assistant,
 .message-function {
   border: 1px solid black;
-  padding: 10px;
-  margin-bottom: 10px;
-  border-radius: 10px;
-  border: 0px;
+  /* border: 1px solid grey; */
+  padding: 5px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  border-radius: 5px;
+  /* border: 0px; */
 }
 
 .message-system {
-  background-color: black;
+  /* background-color: black; */
+  background-color: rgba(41, 86, 91, 0.2);
+
   /* background-color: rgba(69, 93, 69) */
 }
 
@@ -53,11 +57,13 @@
 }
 
 .message-assistant {
-  background-color: rgba(72, 72, 72, 0.2);
+  background-color: rgba(10, 10, 10, 0.2);
+
 }
 
 .message-function {
-  background-color: rgba(41, 86, 91, 0.2);
+  background-color: rgba(72, 72, 72, 0.2);
+
 }
 
 .message-header {
@@ -83,7 +89,7 @@
 }
 
 .header {
-    padding: 10px;
+    padding: 5px;
     position: fixed;
     top: 0;
     background-color: #1F1F1F;
@@ -104,7 +110,8 @@
 }
 
 /* Images in .chat should not be wider than the chat */
+
 .chat img {
-    max-width: 100%;
-    border-radius: 10px;
+  max-width: 100%;
+  border-radius: 5px;
 }

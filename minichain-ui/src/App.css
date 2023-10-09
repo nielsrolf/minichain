@@ -11,10 +11,11 @@ a {
 
 
 button {
-    background-color: rgb(68, 68, 108);
+    background-color: rgb(18, 29, 33);
+    border: 1px solid grey;
     color: white;
-    border: none;
-    border-radius: 5px;
+    /* border: none; */
+    /* border-radius: 5px; */
     padding: 5px;
     margin: 5px;
     cursor: pointer;

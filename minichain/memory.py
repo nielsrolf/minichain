@@ -10,8 +10,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 from minichain.functions import tool
-from minichain.tools.codebase import get_visible_files
-from minichain.tools.recursive_summarizer import long_document_qa
+from minichain.tools.codebase import get_visible_files, open_or_search_file
 from minichain.tools.text_to_memory import MemoryWithMeta, text_to_memory, text_to_single_memory
 from minichain.utils.cached_openai import get_embedding
 from minichain.utils.json_datetime import datetime_parser, datetime_converter
@@ -179,9 +178,6 @@ class SemanticParagraphMemory:
         return memories
 
     async def ingest_rec(self, path):
-        if not os.path.exists(path):
-            return []
-        print("Ingesting: ", path)
         new_memories = []
         if os.path.isdir(path):
             files = get_visible_files(path)
@@ -257,30 +253,6 @@ class SemanticParagraphMemory:
             results = await self.retrieve(question, num_results)
         return results
 
-    async def answer_from_memory(self, question: str):
-        results = await self.retrieve(question)
-        result = await self.summarize(results, question)
-        return result
-
-    async def summarize(self, results, question) -> str:
-        if len(results) == 0:
-            return "No relevant memories found."
-        snippets = [
-            self.format_as_snippet(memory)
-            for memory in results
-            if memory.memory.type == "content"
-        ]
-        document = f"Here are the memories that I found that might be relevant to the question: {question}"
-        document += "\n\n".join(snippets)
-        document += f"\nIf these memories are insufficient to answer the question, they may contain some information that will help decide where to look for the answer (such as `I couldn't find the relevant info but it seems like the answer could be in this file: ...`)"
-        # TODO give long document qa agent_kwargs
-        summary = await long_document_qa(
-            text=document,
-            question=question,
-            
-        )
-        return summary
-
     def format_as_snippet(self, memory) -> str:
         return self.snippet_template.format(
             source=memory.meta.source,
@@ -300,9 +272,10 @@ class SemanticParagraphMemory:
         # group by source
         memories_by_source = {}
         for memory in memories:
-            memories_by_source[memory.meta.source] = memories_by_source.get(
-                memory.meta.source, []
-            ) + [memory]
+            if memory.meta.scope == "root":
+                memories_by_source[memory.meta.source] = memories_by_source.get(
+                    memory.meta.source, []
+                ) + [memory]
         if len(memories) > 15:
             if len(memories_by_source.keys()) > 15:
                 summary += f"You have {len(memories)} memories from {len(memories_by_source.keys())} sources.\n"
@@ -349,6 +322,10 @@ class SemanticParagraphMemory:
         except:
             pass
         self.memories = [MemoryWithMeta(**i) for i in memories]
+        self.auto_save_dir = memory_dir
+    
+    def reload(self):
+        self.load(self.auto_save_dir)
 
     def find_memory_tool(self):
         @tool()
@@ -357,18 +334,13 @@ class SemanticParagraphMemory:
             num_results: int = Field(
                 5,
                 description="The number of raw memories to return or consider before answering. The results are ranked by relevance.",
-            ),
-            output: str = Field(
-                "answer",
-                description="The output format. Allowed values are: ['answer', 'raw']. Select 'raw' in order to retrieve the content of the original memory, e.g. in order to retrieve code.",
             )
         ):
             """Search memories related to a question."""
             results = await self.retrieve(question, num_results=num_results)
-            if output == "answer":
-                result = await self.summarize(results, question)
-            elif output == "raw":
-                result = "\n\n".join([self.format_as_snippet(i) for i in results])
+            if len(results) == 0:
+                return f"No memories found for question: {question}"
+            result = "\n\n".join([self.format_as_snippet(i) for i in results])
             return result
 
         def register_message_handler(message_handler):
@@ -388,6 +360,9 @@ class SemanticParagraphMemory:
             )
         ):
             """Read a file and create memories from it."""
+            if not os.path.exists(path):
+                _, error = open_or_search_file(path)
+                return f"Error: {error}"
             new_memories = await self.ingest_rec(path)
             summary = self.get_content_summary(new_memories)
             return f"Ingested {path}. New memories formed:\n{summary} "
