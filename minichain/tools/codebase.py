@@ -310,7 +310,7 @@ async def edit(
         # diff = "\n".join(list(diff))
         if diff == "":
             return 'Edit done successfully.'
-        return 'Edit done. Here is the diff of pylint before and after the edit:\n' + diff
+        return f'Edit done. {path} now has {len(lines)} number of lines. Here is the diff of pylint before and after the edit:\n' + diff + "\nYou don't have to fix every linting issue, but check for important ones."
     return truncate_updated(updated_in_context)
 
 

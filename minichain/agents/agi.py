@@ -102,7 +102,10 @@ class AGI(Agent):
             else:
                 return f"Error: Unknown assignee: {assignee}"
             
-            response = response['content']
+            output = response['content']
+            for key in response:
+                if key != 'content':
+                    output += f"\n{key}: {response[key]}"
             board_after = await taskboard.get_board(self.board)
 
             if board_before != board_after:
@@ -110,7 +113,7 @@ class AGI(Agent):
 
             info_to_memorize = (
                 f"{assignee} worked on the following ticket:\n{task.description}\n{additional_info}. \n"
-                f"Here is the response:\n{response}"
+                f"Here is the response:\n{output}"
             )
             source = f"Task: {task.description}"
             await self.memory.add_single_memory(
@@ -119,7 +122,7 @@ class AGI(Agent):
                 watch_source=False,
                 scope=self.message_handler.path[-2]
             )
-            return response
+            return output
 
         assign.manager = self
 

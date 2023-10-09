@@ -14,29 +14,37 @@ const MultiMedia = ({ path }) => {
   const extension = path.split('.').pop();
   if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
     return(
-      <div class="media-container">
-        {path} <br />
-        <img src={url} alt="uploaded file" />
+      <div>
+        {path}
+        <div class="media-container">
+          <img src={url} alt="uploaded file" />
+        </div>
       </div>
     );
   }
   if (['mp4', 'webm'].includes(extension)) {
     return (
-      <div class="media-container">
-        {path} <br />
-        <video controls>
-          <source src={url} type={`video/${extension}`} />
-        </video>
+      <div>
+        {path}
+        <div class="media-container">
+          {path} <br />
+          <video controls>
+            <source src={url} type={`video/${extension}`} />
+          </video>
+        </div>
       </div>
     );
   }
   if (['mp3', 'wav'].includes(extension)) {
     return (
-      <div class="media-container">
-        {path} <br />  
-        <audio controls>
-          <source src={url} type={`audio/${extension}`} />
-        </audio>
+      <div>
+        {path}
+        <div class="media-container">
+          {path} <br />  
+          <audio controls>
+            <source src={url} type={`audio/${extension}`} />
+          </audio>
+        </div>
       </div>
     );
   }

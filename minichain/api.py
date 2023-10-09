@@ -5,6 +5,7 @@ import traceback
 import uuid
 from collections import defaultdict
 from typing import Any, Dict, Optional
+import shutil
 
 import yaml
 from fastapi import FastAPI, HTTPException, WebSocket
@@ -62,6 +63,7 @@ async def upload_file_to_chat(
         downloads_path = "./minichain/downloads"
         os.makedirs(downloads_path, exist_ok=True)
         new_path = f"{downloads_path}/{len(os.listdir(downloads_path))}_{filename}"
+        shutil.copyfile(file, new_path)
         file = new_path
     return f"displaying file: {file}"
 
