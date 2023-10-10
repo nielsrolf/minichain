@@ -52,6 +52,10 @@ function getWebviewContent(context, panel) {
 		/href="\/static\/css\/main\..*\.css"/g,
 		`href="${panel.webview.asWebviewUri(vscode.Uri.file(path.join(buildPath, 'static', 'css', cssFile)))}"`
 	);
+	html = html.replace(
+        /src="\.(\/plotly-latest\.min\.js)"/g,
+        `src="${panel.webview.asWebviewUri(vscode.Uri.file(path.join(buildPath, '$1')))}"`
+    );
 
 	// Inject the vscode API
 	const vscodeScript = `

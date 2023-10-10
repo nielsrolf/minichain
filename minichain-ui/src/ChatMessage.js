@@ -1,7 +1,7 @@
 import DisplayJson from './DisplayJson';
 import CodeBlock from "./CodeBlock";
 import './ChatApp.css';
-import { func } from 'prop-types';
+import { useEffect } from 'react';
 
 
 const functionsToRenderAsCode = [
@@ -15,15 +15,55 @@ const functionsToRenderAsCode = [
 function DisplayData({data}){
     // this renders a single entry of a message that comes from jupyter
     console.log("displaying data:", data);
+    
+    // create a new script element and append it to the DOM
+    // useEffect(() => {
+    //     if (data['text/html']) {
+    //         const script = document.createElement("script");
+    //         console.log("script created", script);
+    //         // extract the script from the html <script type="text/javascript"> 
+    //         const regex = /<script type="text\/javascript">([\s\S]*)<\/script>/;
+    //         const match = data['text/html'].match(regex);
+    //         if (!match) {
+    //             console.log("no script found in html");
+    //             console.log(data['text/html']);
+    //             return;
+    //         }
+    //         console.log("script found in html", match[1]);
+    //         script.innerHTML = match[1];
+    //         document.body.appendChild(script);
+    //     }
+    // }, [data]);
+
+    useEffect(() => {
+        if (data['text/html']) {
+            const script = document.createElement("script");
+            // extract the script from the html <script type="text/javascript"> 
+            const regex = /<script type="text\/javascript">([\s\S]*)<\/script>/;
+            const match = data['text/html'].match(regex);
+            if (!match) {
+                return;
+            }
+            
+            // This is where you remove the require call and use the contents directly
+            const modifiedScriptContent = match[1].replace(
+                /require\(\["plotly"\], function\(Plotly\) {([\s\S]*)}\);/,
+                "$1"
+            );
+    
+            script.innerHTML = modifiedScriptContent;
+            document.body.appendChild(script);
+        }
+    }, [data]);
+
     if (data['image/png']) {
-        return <div class='media-container'><img src={`data:image/png;base64,${data['image/png']}`} alt={`${data['text/plain']}`} /></div>;
+        return <div className='media-container'><img src={`data:image/png;base64,${data['image/png']}`} alt={`${data['text/plain']}`} /></div>;
     }
     if (data['text/html']) {
-        return <div dangerouslySetInnerHTML={{ __html: data['text/html'] }} />;
+        return <div dangerouslySetInnerHTML={{__html: data['text/html']}} />;
     }
     console.log("cannot display data:");
     console.log(data);
-    
 }
 
 

@@ -70,7 +70,7 @@ class Jupyter(Function):
                     
                     elif msg_type == 'display_data':
                         await self.message_handler.chunk(
-                            content['data']['text/plain'] + "\n",
+                            content['data'].get('text/plain', "") + "\n",
                             meta={"display_data": [content['data']]}
                         )
 

@@ -16,7 +16,7 @@ const MultiMedia = ({ path }) => {
     return(
       <div>
         {path}
-        <div class="media-container">
+        <div className="media-container">
           <img src={url} alt="uploaded file" />
         </div>
       </div>
@@ -26,7 +26,7 @@ const MultiMedia = ({ path }) => {
     return (
       <div>
         {path}
-        <div class="media-container">
+        <div className="media-container">
           {path} <br />
           <video controls>
             <source src={url} type={`video/${extension}`} />
@@ -39,7 +39,7 @@ const MultiMedia = ({ path }) => {
     return (
       <div>
         {path}
-        <div class="media-container">
+        <div className="media-container">
           {path} <br />  
           <audio controls>
             <source src={url} type={`audio/${extension}`} />
