@@ -1,12 +1,12 @@
 import asyncio
 import os
 from typing import List, Optional
+import jupyter_client
 
 from pydantic import BaseModel, Field
 
 from minichain.agent import Function
 from minichain.schemas import BashQuery
-# from minichain.utils.docker_sandbox import bash
 
 
 def shorten_response(response: str) -> str:
@@ -24,9 +24,6 @@ def shorten_response(response: str) -> str:
     return response
 
 
-
-
-
 class JupyterQuery(BaseModel):
     code: str = Field(
         ...,
@@ -34,10 +31,6 @@ class JupyterQuery(BaseModel):
     )
     timeout: Optional[int] = Field(60, description="The timeout in seconds.")
 
-
-
-
-import jupyter_client
 
 class Jupyter(Function):
     def __init__(self, message_handler=None, **kwargs):
@@ -88,6 +81,11 @@ class Jupyter(Function):
                         )
                         await self.message_handler.set(
                             content['data']['text/plain'] + "\n"
+                        )
+                    
+                    elif msg_type == 'error':
+                        await self.message_handler.chunk(
+                            content['evalue'] + "\n",
                         )
 
                     elif msg_type == 'status' and content['execution_state'] == 'idle':
