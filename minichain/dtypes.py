@@ -36,6 +36,8 @@ message_types = {
 class Cancelled(Exception):
     pass
 
+class ConsumerClosed(Exception):
+    pass
 
 class ExceptionForAgent(Exception):
     """Base class for all exceptions that may occur inside a function that should be passed

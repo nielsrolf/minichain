@@ -15,8 +15,7 @@ from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 from starlette.websockets import WebSocketDisconnect
 
-from minichain.dtypes import (AssistantMessage, Cancelled, FunctionMessage,
-                              SystemMessage, UserMessage)
+from minichain.dtypes import Cancelled, ConsumerClosed
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
 
@@ -78,21 +77,22 @@ async def websocket_endpoint(websocket: WebSocket):
         # been sent, avoid blocking by using asyncio.wait_for
         try:
             data = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
-            if data == "cancel":
-                raise Cancelled("cancel")
+            if data.startswith("cancel:"):
+                raise Cancelled(data)
         except asyncio.TimeoutError:
             pass
         except Cancelled as e:
             raise e
         except (WebSocketDisconnect, RuntimeError) as e:
-            return
+            # Maybe another coroutine is already awaiting a message
+            pass
+        print("websocket is open")
         try:
             message = json.loads(json.dumps(message, default=datetime_converter))
             await websocket.send_json(message)
         except Exception as e:
-            breakpoint()
-            import traceback
-            traceback.print_exc()
+            print("websocket error", e)
+            raise ConsumerClosed()
 
     
     message_db.add_consumer(send_message_raise_cancelled, is_main=True)
@@ -150,6 +150,15 @@ async def read_messages(path: str):
         return conversation.as_json()
     else:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@app.put("/meta/{path:path}")
+async def put_meta(path: str, meta: Dict[str, Any]):
+    if path == "":
+        path = "root"
+    path = path.split('/')
+    message_or_conversation = await message_db.update_meta(path[-1], meta)
+    return message_or_conversation.as_json()
 
 
 @app.get("/static/{path:path}")
