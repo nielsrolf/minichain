@@ -4,6 +4,7 @@ import os
 from uuid import uuid4
 
 from minichain.utils.json_datetime import datetime_converter
+from minichain.dtypes import Cancelled, ConsumerClosed
 
 async def do_nothing(*args, **kwargs):
     pass
@@ -128,6 +129,7 @@ class Message():
             self.path = self.path + [message_id]
         self._stream_target = None
         self.shared = shared
+        self.shared['message_db'].register_message(self)
 
     async def __aenter__(self):
         """Returns a stream target that can be used to update the message"""
@@ -139,11 +141,13 @@ class Message():
         """saves the message to the message handler and avoids updating the message"""
         if self._stream_target is None:
             return
-        start_time = self._stream_target.meta['timestamp']
-        duration = dt.datetime.now() - start_time
-        await self._stream_target.set(meta={
-            'duration': duration
-        })
+        # If this is the first time we exit from a stream to this message, set the duration field
+        if 'duration' not in self._stream_target.meta:
+            start_time = self._stream_target.meta['timestamp']
+            duration = (dt.datetime.now() - start_time).total_seconds()
+            await self._stream_target.set(meta={
+                'duration': duration
+            })
         self.chat = self._stream_target.current_message
         self.meta.update(self._stream_target.meta)
         self._stream_target.off()
@@ -154,6 +158,7 @@ class Message():
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
         filepath = os.path.join(target_dir, f"{self.path[-1]}.json")
+        print("saving to", filepath, self.meta)
         with open(filepath, 'w') as f:
             json.dump({
                 "chat": self.chat,
@@ -203,10 +208,14 @@ class Conversation():
             path = path + [conversation_id]
         self.meta = get_default_meta()
         self.meta.update(meta or {})
-        self.messages = messages or []
+        self._messages = messages or []
         self.path = path
         self.shared = shared or {'on_message': do_nothing}
         self.shared['message_db'].register_conversation(self)
+    
+    @property
+    def messages(self):
+        return [i for i in self._messages if i.meta.get('deleted', False)==False]
     
     async def set(self, **meta):
         self.meta.update(meta)
@@ -220,7 +229,7 @@ class Conversation():
         """returns a new Message object"""
         self.save()
         message = Message(chat=chat, path=self.path, shared=self.shared, meta=meta)
-        self.messages.append(message)
+        self._messages.append(message)
         return message
     
     async def __aenter__(self):
@@ -252,7 +261,7 @@ class Conversation():
         conversation = cls(**data, **kwargs)
         for message_id in message_ids:
             message = Message.load(os.path.join(os.path.dirname(filepath), message_id), **kwargs)
-            conversation.messages.append(message)
+            conversation._messages.append(message)
         return conversation
     
     async def send(self, chat_message, **meta):
@@ -283,25 +292,78 @@ class MessageDB():
             'save_dir': save_dir
         }
         self.conversations = []
+        self.messages = []
         self.load()
     
     async def on_message(self, msg):
-        # send the message to the original consumer and let errors bubble up
-        await self.shared['consumers'][0](msg)
         # send the message to all other consumers if they want to consume it
-        for consume in self.shared['consumers'][1:]:
-            await consume(msg)
-
-            # try:
-            #     await consume(msg)
-            # except Exception as e:
-            #     pass
+        print("message", msg)
+        alive = []
+        for consume in self.shared['consumers']:
+            print("sending to", consume)
+            try:
+                await consume(msg)
+                alive += [consume]
+            except ConsumerClosed:
+                print("Consumer closed")
+            except Cancelled as e:
+                # get the path of the Cancelled message and raise it again if the current message is this one or a sub message
+                # e was created with raise Cancel("cancel:{conversation_id}")
+                conversation_id = e.args[0].split(":")[1]
+                if conversation_id in msg['path']:
+                    raise e
+        self.shared['consumers'] = alive
     
     def register_conversation(self, conversation):
         self.conversations.append(conversation)
     
+    def register_message(self, message):
+        self.messages.append(message)
+    
+    def get_message(self, message_id):
+        for message in self.messages:
+            if message.path[-1] == message_id:
+                return message
+    
+    async def update_message_meta(self, message_id, meta):
+        message = self.get_message(message_id)
+        if message is None:
+            return
+        message.meta.update(meta)
+        message.save()
+        breakpoint()
+        print("yoooo", message.meta)
+        print("consumers", self.shared['consumers'])
+        await self.shared['on_message']({
+            "type": "set",
+            "id": message_id,
+            "meta": message.meta,
+            "chat": message.chat
+        })
+        return message
+    
+    async def update_conversation_meta(self, conversation_id, meta):
+        conversation = self.get(conversation_id)
+        if conversation is None:
+            return
+        conversation.meta.update(meta)
+        conversation.save()
+        await self.shared['on_message']({
+            "type": "set",
+            "id": conversation_id,
+            "meta": conversation.meta,
+            "chat": conversation.messages[-1].chat
+        })
+        return conversation
+    
+    async def update_meta(self, any_id, meta):
+        updated = await self.update_message_meta(any_id, meta)
+        if updated is None:
+            updated = await self.update_conversation_meta(any_id, meta)
+        return updated
+
     def children_of(self, message_id):
-        return [c for c in self.conversations if c.path[-2] == message_id]
+        return [c for c in self.conversations if c.path[-2] == message_id and c.meta.get('deleted', False)==False]
     
     def add_consumer(self, consumer, is_main=False):
         if is_main:

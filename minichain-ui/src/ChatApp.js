@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import './ChatApp.css';
 import ChatMessage from "./ChatMessage";
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 
 
@@ -14,7 +15,7 @@ function addDiffToMessage(message, diff) {
         return message + diff;
     }
     // add the diff recursively to message
-    let updated = {...message}
+    let updated = { ...message }
     for (const key in diff) {
         updated[key] = addDiffToMessage(message[key], diff[key]);
     }
@@ -36,8 +37,6 @@ const ChatApp = () => {
         messages: {},
         lastMessagePath: ['root']
     });
-    
-
 
     const [path, setPath] = useState(["root"]);
     const [conversation, setConversation] = useState({
@@ -64,7 +63,7 @@ const ChatApp = () => {
         fetch("http://localhost:8745/messages/" + path[path.length - 1])
             .then(response => response.json())
             .then(conversation => {
-                setConversation(conversation);
+                // setConversation(conversation);
                 setStreamingState(prev => {
                     const { lastMessagePath } = prev;
                     // for each message in the conversation, add it to the dicts
@@ -80,6 +79,7 @@ const ChatApp = () => {
                         lastMessagePath: lastMessagePath
                     };
                 });
+                setConversation(conversation);
             })
             .catch(e => {
                 console.error(e);
@@ -134,14 +134,14 @@ const ChatApp = () => {
                     const idToPath = prev.idToPath;
                     const messages = prev.messages;
                     idToPath[message.path[message.path.length - 1]] = message.path;
-                    messages[message.path[message.path.length - 1]] = {meta: message.meta, path: message.path};
+                    messages[message.path[message.path.length - 1]] = { meta: message.meta, path: message.path };
                     return {
                         idToPath: idToPath,
                         messages: messages,
                         lastMessagePath: message.path
                     };
                 });
-                
+
             } else if (message.type === "set") {
                 // update or create the message if it is in the current conversation
                 // otherwise, do nothing
@@ -150,9 +150,9 @@ const ChatApp = () => {
                     if (!path) {
                         return prev;
                     }
-                    const idToPath = {...prev.idToPath};
-                    const messages = {...prev.messages};
-                    messages[message.id] = {meta: message.meta, path: idToPath[message.id], chat: message.chat};
+                    const idToPath = { ...prev.idToPath };
+                    const messages = { ...prev.messages };
+                    messages[message.id] = { meta: message.meta, path: idToPath[message.id], chat: message.chat };
                     return {
                         idToPath: idToPath,
                         messages: messages,
@@ -168,9 +168,9 @@ const ChatApp = () => {
                         console.log("no current message", message, prev.messages);
                         return prev;
                     }
-                    const newMessage = addDiffToMessage(currentMessage, {chat: message.diff});
-                    const idToPath = {...prev.idToPath};
-                    const messages = {...prev.messages};
+                    const newMessage = addDiffToMessage(currentMessage, { chat: message.diff });
+                    const idToPath = { ...prev.idToPath };
+                    const messages = { ...prev.messages };
                     messages[message.id] = newMessage;
                     return {
                         idToPath: idToPath,
@@ -197,7 +197,7 @@ const ChatApp = () => {
         setConversation(prevConversation => {
             // todo only update with messages that belong to the prevConversation
             const newMessages = [...prevConversation.messages];
-            for(let updated of Object.values(messages)) {
+            for (let updated of Object.values(messages)) {
                 if (updated.path[updated.path.length - 2] !== prevConversation.path[prevConversation.path.length - 1]) {
                     continue;
                 }
@@ -221,10 +221,11 @@ const ChatApp = () => {
     useEffect(() => {
         const lastMessagePath = streamingState.lastMessagePath;
         if (
-            isAttached && 
-            lastMessagePath[lastMessagePath.length - 2]  &&
+            isAttached &&
+            lastMessagePath[lastMessagePath.length - 2] &&
             lastMessagePath[lastMessagePath.length - 2] !== path[path.length - 1]
         ) {
+            console.log("calling setPath because new message and we are attached")
             setPath([...path, lastMessagePath[lastMessagePath.length - 2]]);
         }
     }, [streamingState, isAttached, path]);
@@ -234,6 +235,10 @@ const ChatApp = () => {
     // Function to handle when a message with a sub conversation is clicked
     const handleSubConversationClick = (subConversationId) => {
         setIsAttached(false);
+        if (!subConversationId) {
+            // just refresh this conversation
+            setPath([...path]);
+        }
         if (subConversationId) {
             pushToPath(subConversationId);
         }
@@ -257,6 +262,7 @@ const ChatApp = () => {
     };
 
     const pushToPath = (id) => {
+        console.log("pushing to path", id);
         setPath(prevPath => {
             // if we are already on that path, do nothing
             if (prevPath[prevPath.length - 1] === id) {
@@ -266,19 +272,6 @@ const ChatApp = () => {
             return [...prevPath, id]
         });
     };
-
-    // if the conversation changes, scroll to the bottom
-    useEffect(() => {
-        if (!isAttached) {
-            return;
-        }
-        const bottom = document.getElementById("bottom");
-        // if bottom is not in view, scroll to it
-        if (!bottom || bottom.getBoundingClientRect().top > window.innerHeight) {
-            bottom?.scrollIntoView({ behavior: "smooth" })
-            setIsAttached(true);
-        }
-    }, [conversation, isAttached]);
 
 
     const selectAgent = (agentName) => {
@@ -294,7 +287,7 @@ const ChatApp = () => {
             window.location.reload();
         }
     }, [checkConnectionStatus, connectionStatus]);
-        
+
 
     if (connectionStatus !== "CONNECTED") {
         return (
@@ -305,7 +298,7 @@ const ChatApp = () => {
                 <div style={{ height: "100px" }}></div>
                 <div className="chat">
                     You need to manually start the backend via `python -m minichain.api` and have Docker running. Then refresh the page.
-                </div> 
+                </div>
             </div>
         );
     }
@@ -313,14 +306,17 @@ const ChatApp = () => {
     return (
         <div className="main">
             <div className="header">
+                <ArrowBackIcon onClick={() => {
+                    setIsAttached(false);
+                    if (path.length === 1) {
+                        return;
+                    }
+                    setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
+                }} />
                 <button onClick={() => {
                     setIsAttached(false);
                     pushToPath("root")
                 }}>Main</button>
-                <button onClick={() => {
-                    setIsAttached(false);
-                    setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
-                }}>Back </button>
                 <button onClick={() => {
                     // parent
                     setIsAttached(false);
@@ -334,10 +330,10 @@ const ChatApp = () => {
                     // Scroll to the last message using scrollIntoView
                     const bottom = document.getElementById("bottom");
                     bottom?.scrollIntoView({ behavior: "smooth" });
-                }}>Scroll to Last Message</button>
+                }}>Down</button>
                 <button onClick={() => {
                     // Send a cancel message to the websocket
-                    client.send('cancel');
+                    client.send(`cancel:${currentConversationId}}`);
                 }}>Interrupt</button>
                 {/* <button onClick={() => setGraphToggle(prev => !prev)}>Toggle Graph</button> */}
                 <button onClick={() => setShowInitMessages(prev => !prev)}>Toggle Init Messages</button>
@@ -373,7 +369,11 @@ const ChatApp = () => {
 
             <div className="chat">
                 {conversation.messages.filter(message => !message.meta?.is_initial || showInitMessages).map(message => {
-                    if (path[path.length - 1] === "root" && message.agent !== defaultAgentName ) {
+                    if (message.agent && message.agent !== defaultAgentName) {
+                        // message.agent is only set in the root conversation
+                        return '';
+                    }
+                    if (message.meta.deleted) {
                         return '';
                     }
                     return (

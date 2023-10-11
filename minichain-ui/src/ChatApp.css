@@ -68,8 +68,26 @@
 
 .message-header {
   /* small italic in the top right */
-  margin-top: -5px;
+  font-size: 10px;
+  color: #CCCCCC;
+  font-style: italic;
+  /* make the left and right children be on the same line with space between */
+  display: flex;
+  justify-content: space-between;
+}
+
+.messsage-header-left {
+
+}
+
+.message-header-right {
+  
+}
+
+.message-footer {
+  /* small italic in the top right */
   float: right;
+  margin-top: -5px;
   font-size: 10px;
   color: #CCCCCC;
   font-style: italic;

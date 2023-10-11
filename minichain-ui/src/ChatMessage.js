@@ -1,8 +1,12 @@
 import DisplayJson from './DisplayJson';
 import CodeBlock from "./CodeBlock";
 import './ChatApp.css';
-import { func } from 'prop-types';
-
+import { useEffect } from 'react';
+import CloseIcon from '@mui/icons-material/Close';
+import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 
 const functionsToRenderAsCode = [
     "jupyter",
@@ -15,15 +19,36 @@ const functionsToRenderAsCode = [
 function DisplayData({data}){
     // this renders a single entry of a message that comes from jupyter
     console.log("displaying data:", data);
+
+    useEffect(() => {
+        if (data['text/html']) {
+            const script = document.createElement("script");
+            // extract the script from the html <script type="text/javascript"> 
+            const regex = /<script type="text\/javascript">([\s\S]*)<\/script>/;
+            const match = data['text/html'].match(regex);
+            if (!match) {
+                return;
+            }
+            
+            // This is where you remove the require call and use the contents directly
+            const modifiedScriptContent = match[1].replace(
+                /require\(\["plotly"\], function\(Plotly\) {([\s\S]*)}\);/,
+                "$1"
+            );
+    
+            script.innerHTML = modifiedScriptContent;
+            document.body.appendChild(script);
+        }
+    }, [data]);
+
     if (data['image/png']) {
-        return <div class='media-container'><img src={`data:image/png;base64,${data['image/png']}`} alt={`${data['text/plain']}`} /></div>;
+        return <div className='media-container'><img src={`data:image/png;base64,${data['image/png']}`} alt={`${data['text/plain']}`} /></div>;
     }
     if (data['text/html']) {
-        return <div dangerouslySetInnerHTML={{ __html: data['text/html'] }} />;
+        return <div dangerouslySetInnerHTML={{__html: data['text/html']}} />;
     }
     console.log("cannot display data:");
     console.log(data);
-    
 }
 
 
@@ -68,6 +93,8 @@ function formatDuration(duration) {
         formatted += `${minutes}min `;
     }
     if (seconds) {
+        // round to 1 decimal
+        seconds = Math.round(seconds * 10) / 10;
         formatted += `${seconds}s`;
     }
     return formatted;
@@ -88,6 +115,26 @@ function formatCost(cost) {
     return 'Cost: ' + cost;
 }
 
+
+function sendMessageMeta(path, meta, children) {
+    // Send PUT request to /messages/{path} with meta data
+    console.log("sending meta:", meta, "to path:", path, "with children:", children);
+    fetch(`http://localhost:8745/meta/${path[path.length - 1]}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(meta),
+    });
+    if (!children) {
+        return;
+    }
+    for (let subConversationId of children) {
+        sendMessageMeta([...path, subConversationId], meta);
+    }
+}
+
+
 function ChatMessage({message, handleSubConversationClick }){
     // if the message has not streamed enough, return
     if (!message.chat) {
@@ -96,13 +143,30 @@ function ChatMessage({message, handleSubConversationClick }){
     if (message.chat.name === 'return') {
         return '';
     }
+    if (message.meta.deleted) {
+        return '';
+    }
     return (
         <div className={`message-${message.chat.role || 'assistant'}`} key={message.path[message.path.length - 1]}>
             <div className='message-header'>
-                {message.chat.role } {message.chat.name} 
-                {' ' + formatTimestamp(message.meta.timestamp) + ' '} 
-                {formatCost(message.meta.cost) + ' '} 
-                {formatMaybeDuration(message.meta.duration) + ' '}
+                <div className='message-header-left'>
+                    {message.chat.role } {message.chat.name} 
+                    {' ' + formatTimestamp(message.meta.timestamp) + ' '} 
+                    {formatMaybeDuration(message.meta.duration) + ' '}
+                </div>
+                <div className='message-header-right'>
+                    {message.meta.rating === 1 ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOutlinedIcon fontSize="small" onClick={() => {
+                        sendMessageMeta(message.path, {"rating": 1}, message.children);
+                    }} />}
+                    {message.meta.rating === -1 ? <ThumbDownIcon fontSize="small" /> : <ThumbDownOutlinedIcon fontSize="small" onClick={() => {
+                        sendMessageMeta(message.path, {"rating": -1}, message.children);
+                    }} />}
+                    <CloseIcon onClick={() => {
+                            sendMessageMeta(message.path, {"deleted": true}, message.children)
+                            handleSubConversationClick();
+                        }}
+                        fontSize="small" />
+                </div>
             </div>
             {functionsToRenderAsCode.includes(message.chat.name) ? <CodeBlock code={message.chat.content} /> : <DisplayJson data={message.chat.content} />}
             {message.meta.display_data && message.meta.display_data.map((data, index) => {
@@ -114,6 +178,10 @@ function ChatMessage({message, handleSubConversationClick }){
                     <div onClick={() => handleSubConversationClick(subConversationId)}><i>View thread</i></div>
                 );
             })}
+            <div className="message-footer">
+                {formatCost(message.meta.cost) + ' '} 
+                {formatMaybeDuration(message.meta.duration) + ' '}
+            </div>
         </div>
     );
 }
