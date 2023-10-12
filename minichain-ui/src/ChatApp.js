@@ -3,7 +3,7 @@ import { w3cwebsocket as W3CWebSocket } from "websocket";
 import './ChatApp.css';
 import ChatMessage from "./ChatMessage";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-
+import NewCell from "./NewCell";
 
 
 function addDiffToMessage(message, diff) {
@@ -28,7 +28,7 @@ const ChatApp = () => {
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
     const [checkConnectionStatus, setCheckConnectionStatus] = useState(false);
     const [inputValue, setInputValue] = useState("");
-    const [defaultAgentName, setDefaultAgentName] = useState("ChatGPT");
+    const [defaultAgentName, setDefaultAgentName] = useState("Programmer");
     const [isAttached, setIsAttached] = useState(true);
     const [availableAgents, setAvailableAgents] = useState([]);
     const [showInitMessages, setShowInitMessages] = useState(false);
@@ -306,12 +306,18 @@ const ChatApp = () => {
     return (
         <div className="main">
             <div className="header">
-                <ArrowBackIcon onClick={() => {
-                    setIsAttached(false);
-                    if (path.length === 1) {
-                        return;
-                    }
-                    setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
+                <ArrowBackIcon 
+                    style={{
+                        position: "absolute",
+                        left: "-30px",
+                        top: "10px",
+                    }}
+                    onClick={() => {
+                        setIsAttached(false);
+                        if (path.length === 1) {
+                            return;
+                        }
+                        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
                 }} />
                 <button onClick={() => {
                     setIsAttached(false);
@@ -384,6 +390,17 @@ const ChatApp = () => {
                     );
                 })
                 }
+                {conversation.meta.agent === 'Programmer' && (
+                    <NewCell onRun={(code) => {
+                        // send the code to the websocket
+                        const function_call = {
+                            'name': 'jupyter',
+                            'arguments': {'code': code},
+                        }
+                        const messagePayload = JSON.stringify({ function_call, response_to: currentConversationId, agent: conversation.meta.agent || defaultAgentName });
+                        client.send(messagePayload);
+                    }}/>
+                )}
                 <div id="bottom"></div> {/* this is used to scroll to the bottom when a new message is added */}
             </div>
             <div className="spacer"></div>

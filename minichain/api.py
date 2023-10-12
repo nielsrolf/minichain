@@ -33,9 +33,10 @@ app.add_middleware(
 
 
 class Payload(BaseModel):
-    query: str
+    query: Optional[str] = None
     response_to: Optional[str] = "root"
     agent: str
+    function_call: Optional[Dict[str, Any]] = None
 
 
 message_db = MessageDB()
@@ -86,18 +87,15 @@ async def websocket_endpoint(websocket: WebSocket):
         except (WebSocketDisconnect, RuntimeError) as e:
             # Maybe another coroutine is already awaiting a message
             pass
-        print("websocket is open")
+        message = json.loads(json.dumps(message, default=datetime_converter))
         try:
-            message = json.loads(json.dumps(message, default=datetime_converter))
             await websocket.send_json(message)
         except Exception as e:
             print("websocket error", e)
             raise ConsumerClosed()
-
-    
+        
     message_db.add_consumer(send_message_raise_cancelled, is_main=True)
     
-
     try:
         while True:
             try:
@@ -109,9 +107,11 @@ async def websocket_endpoint(websocket: WebSocket):
             print("received data", data)
             try:
                 payload = Payload(**json.loads(data))
+                print("payload", payload)
                 if not payload.response_to:
                     payload.response_to = "root"
             except ValidationError as e:
+                print(e)
                 # probably a heart beat
                 continue
 
@@ -123,7 +123,12 @@ async def websocket_endpoint(websocket: WebSocket):
             agent = agents[agent_name]
 
             conversation = message_db.get(payload.response_to)
-            await agent.run(query=payload.query, conversation=conversation)
+            print("Running", payload)
+            await agent.run(
+                query=payload.query,
+                function_call=payload.function_call,
+                conversation=conversation
+            )
 
 
     except Exception as e:

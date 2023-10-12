@@ -80,13 +80,18 @@ def format_history(messages: list) -> list:
     """Format the history to be compatible with the openai api - json dumps all arguments"""
     for message in messages:
         if (function_call := message.get("function_call")) is not None:
-            if isinstance(function_call["arguments"], dict):
+            if function_call.get("arguments", None) and isinstance(function_call["arguments"], dict):
                 content = function_call["arguments"].pop("content", None)
                 message["content"] = content or message["content"]
                 code = function_call["arguments"].pop("code", None)
                 if code is not None:
                     message["content"] = message["content"] + f"\n```\n{code}\n```"
                 function_call["arguments"] = json.dumps(function_call["arguments"])
+            if message['role'] == 'user':
+                function_call = message.pop("function_call")
+                message['content'] += f"\n**Calling function: {function_call['name']}** with arguments: \n{function_call['arguments']}\n"
+        if message['role'] == 'user':
+            message.pop("function_call", None)
     return messages
 
 
@@ -112,6 +117,10 @@ async def get_openai_response_stream(
     if stream is None:
         stream = StreamCollector()
     messages = format_history(chat_history)
+
+    save_llm_call_for_debugging(
+        messages, functions, None, None
+    )
 
     try:
         if len(functions) > 0:

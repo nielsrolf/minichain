@@ -250,8 +250,8 @@ class Conversation():
         data['message_ids'] = [m['path'][-1] for m in data.pop('messages')]
         with open(filepath, 'w') as f:
             json.dump(data, f, default=datetime_converter)
-        for message in self.messages:
-            message.save()
+        # for message in self.messages:
+        #     message.save()
     
     @classmethod
     def load(cls, filepath, **kwargs):
@@ -271,6 +271,7 @@ class Conversation():
             chat_message {dict} -- e.g. {"role": "assistant", "content": "Hello"}
         """
         # if the message is not
+        print("sending", chat_message)
         async with self.to(chat_message, meta) as stream:
             await stream.set(chat_message)
     
@@ -297,10 +298,8 @@ class MessageDB():
     
     async def on_message(self, msg):
         # send the message to all other consumers if they want to consume it
-        print("message", msg)
         alive = []
         for consume in self.shared['consumers']:
-            print("sending to", consume)
             try:
                 await consume(msg)
                 alive += [consume]

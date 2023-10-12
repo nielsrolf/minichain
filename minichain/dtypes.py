@@ -5,8 +5,10 @@ def SystemMessage(content: str="", role: str = "system"):
     return {"content": content, "role": role}
 
 
-def UserMessage(content: str="", role: str = "user"):
-    return {"content": content, "role": role}
+def UserMessage(content: str="", role: str = "user", function_call: Optional[Dict[str, Any]] = None):
+    if content is None:
+        content = ""
+    return {"content": content, "role": role, "function_call": function_call}
 
 
 def FunctionCall(name: str, arguments: Optional[Dict[str, Any]] = None):
