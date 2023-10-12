@@ -9,6 +9,13 @@
   font-size: 12px;
 }
 
+
+.new-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .user-input {
   width: 100%;
   height: auto;
@@ -36,6 +43,7 @@
 .message-user,
 .message-assistant,
 .message-function {
+  width: 100%;
   border: 1px solid black;
   /* border: 1px solid grey; */
   padding: 5px;
@@ -103,7 +111,7 @@
 
 .spacer {
     /* push the input area to the bottom of the page */
-    height: 50vh;
+    height: 20vh;
 }
 
 .header {

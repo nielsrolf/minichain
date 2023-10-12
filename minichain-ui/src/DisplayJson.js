@@ -52,7 +52,7 @@ const MultiMedia = ({ path }) => {
 };
 
 
-const DisplayJson = ({ data }) => {
+const DisplayJson = ({ data, run, save, editable=false }) => {
   const [isFolded, setIsFolded] = useState({});
   // First: all the special cases
   if (!data) {
@@ -112,7 +112,7 @@ const DisplayJson = ({ data }) => {
             </a>
           );
         } else {
-          return <TextWithCode text={data} />;
+          return <TextWithCode text={data} run={run} />;
         }
       }
     }
@@ -137,7 +137,7 @@ const DisplayJson = ({ data }) => {
       const newKey = `${parentKey}.${key}`;
       if (key === 'code') {
         return (
-            <CodeBlock key={newKey} code={removeLineNumbers(value)} />
+            <CodeBlock key={newKey} code={removeLineNumbers(value)} editable={true} run={run} save={save} />
         );
       }
       return (
@@ -145,9 +145,7 @@ const DisplayJson = ({ data }) => {
           <b>
             {key + ' '}
           </b>
-          {(key === 'code') ? <CodeBlock code={removeLineNumbers(value)} />
-              : renderData(value, newKey, '10px')
-          }
+          {renderData(value, newKey, '10px')}
         </div>
       );
     });

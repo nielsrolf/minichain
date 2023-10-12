@@ -1,4 +1,5 @@
 import asyncio
+from typing import List
 import json
 import os
 import traceback
@@ -15,7 +16,7 @@ from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 from starlette.websockets import WebSocketDisconnect
 
-from minichain.dtypes import Cancelled, ConsumerClosed
+from minichain.dtypes import Cancelled, ConsumerClosed, FunctionCall
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
 
@@ -33,9 +34,22 @@ app.add_middleware(
 
 
 class Payload(BaseModel):
-    query: str
+    query: Optional[str] = None
     response_to: Optional[str] = "root"
     agent: str
+    function_call: Optional[Dict[str, Any]] = None
+
+
+class Execute(BaseModel):
+    code: str
+    insert_after: List[str]
+
+
+class MessagePayload(BaseModel):
+    role: Optional[str] = None
+    content: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None
+    function_call: Optional[Dict[str, Any]] = None
 
 
 message_db = MessageDB()
@@ -47,6 +61,29 @@ agents = {}
 from pydantic import BaseModel, Field
 
 from minichain.functions import tool
+
+
+@app.post("/run/")
+async def run_cell(cell: Execute):
+    """Run a cell and insert the function call output after the specified cell."""
+    print("running cell", cell)
+    # get the conversation
+    conversation = message_db.get(cell.insert_after[-2])
+    conversation = conversation.at(cell.insert_after[-1])
+    # get the agent
+    print(conversation.meta)
+    agent = agents[conversation.meta['agent']]
+    # run the cell
+    await agent.run(
+        query="",
+        conversation=conversation,
+        function_call=FunctionCall(
+            name="jupyter",
+            arguments={"code": cell.code},
+        ),
+        message_meta={"deleted": True}
+    )
+    return {"message": "success"}
 
 
 @tool()
@@ -86,18 +123,15 @@ async def websocket_endpoint(websocket: WebSocket):
         except (WebSocketDisconnect, RuntimeError) as e:
             # Maybe another coroutine is already awaiting a message
             pass
-        print("websocket is open")
+        message = json.loads(json.dumps(message, default=datetime_converter))
         try:
-            message = json.loads(json.dumps(message, default=datetime_converter))
             await websocket.send_json(message)
         except Exception as e:
             print("websocket error", e)
             raise ConsumerClosed()
-
-    
+        
     message_db.add_consumer(send_message_raise_cancelled, is_main=True)
     
-
     try:
         while True:
             try:
@@ -109,9 +143,11 @@ async def websocket_endpoint(websocket: WebSocket):
             print("received data", data)
             try:
                 payload = Payload(**json.loads(data))
+                print("payload", payload)
                 if not payload.response_to:
                     payload.response_to = "root"
             except ValidationError as e:
+                print(e)
                 # probably a heart beat
                 continue
 
@@ -123,7 +159,12 @@ async def websocket_endpoint(websocket: WebSocket):
             agent = agents[agent_name]
 
             conversation = message_db.get(payload.response_to)
-            await agent.run(query=payload.query, conversation=conversation)
+            print("Running", payload)
+            await agent.run(
+                query=payload.query,
+                function_call=payload.function_call,
+                conversation=conversation
+            )
 
 
     except Exception as e:
@@ -159,6 +200,15 @@ async def put_meta(path: str, meta: Dict[str, Any]):
     path = path.split('/')
     message_or_conversation = await message_db.update_meta(path[-1], meta)
     return message_or_conversation.as_json()
+
+@app.put("/chat/{path:path}")
+async def put_meta(path: str, update: MessagePayload):
+    if path == "":
+        path = "root"
+    path = path.split('/')
+    update = update.dict()
+    message = await message_db.update_message(path[-1], update)
+    return message.as_json()
 
 
 @app.get("/static/{path:path}")

@@ -135,7 +135,7 @@ function sendMessageMeta(path, meta, children) {
 }
 
 
-function ChatMessage({message, handleSubConversationClick }){
+function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage }){
     // if the message has not streamed enough, return
     if (!message.chat) {
         return '';
@@ -168,11 +168,19 @@ function ChatMessage({message, handleSubConversationClick }){
                         fontSize="small" />
                 </div>
             </div>
-            {functionsToRenderAsCode.includes(message.chat.name) ? <CodeBlock code={message.chat.content} /> : <DisplayJson data={message.chat.content} />}
+            {functionsToRenderAsCode.includes(message.chat.name) ? (
+                <CodeBlock
+                    code={message.chat.content}
+                    runnable={false}
+                    editable={false}
+                /> ) : (
+                <DisplayJson data={message.chat.content} run={runCodeAfterMessage(message)}/>
+            )}
+
             {message.meta.display_data && message.meta.display_data.map((data, index) => {
                 return <DisplayData key={index} data={data} />;
             })}
-            {message.chat.function_call && <DisplayJson data={message.chat.function_call} />}
+            {message.chat.function_call && <DisplayJson data={message.chat.function_call} editable={true}  run={runCodeAfterMessage(message)} save={saveCodeInMessage(message)}/>}
             {message.children?.map(subConversationId => {
                 return (
                     <div onClick={() => handleSubConversationClick(subConversationId)}><i>View thread</i></div>

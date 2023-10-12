@@ -3,7 +3,7 @@ import { w3cwebsocket as W3CWebSocket } from "websocket";
 import './ChatApp.css';
 import ChatMessage from "./ChatMessage";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-
+import NewCell from "./NewCell";
 
 
 function addDiffToMessage(message, diff) {
@@ -28,7 +28,7 @@ const ChatApp = () => {
     const [connectionStatus, setConnectionStatus] = useState("DISCONNECTED");
     const [checkConnectionStatus, setCheckConnectionStatus] = useState(false);
     const [inputValue, setInputValue] = useState("");
-    const [defaultAgentName, setDefaultAgentName] = useState("ChatGPT");
+    const [defaultAgentName, setDefaultAgentName] = useState("Programmer");
     const [isAttached, setIsAttached] = useState(true);
     const [availableAgents, setAvailableAgents] = useState([]);
     const [showInitMessages, setShowInitMessages] = useState(false);
@@ -278,6 +278,43 @@ const ChatApp = () => {
         setDefaultAgentName(agentName);
     }
 
+
+    const runCodeAfterMessage = (message) => async (code) => {
+        // send the code as a POST request to /run/
+        const response = await fetch(`http://localhost:8745/run/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                code: code,
+                insert_after: message.path
+            }),
+        });
+        // update path to refresh the conversation
+        setPath([...path]);
+    }
+
+
+    const saveCodeInMessage = (message) => async (code) => {
+        // send the code as a PUT request to /chat/
+        console.log("saving code in message", message);
+        const response = await fetch(`http://localhost:8745/chat/${message.path[message.path.length - 1]}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                function_call: {
+                    name: message.chat.function_call.name,
+                    arguments: { ...message.chat.function_call.arguments, code: code },
+                },
+            }),
+        });
+        // update path to refresh the conversation
+        setPath([...path]);
+    }
+
     // if the connection is not connected after 1 second, try to reload the page
     setTimeout(() => {
         setCheckConnectionStatus(true);
@@ -306,13 +343,19 @@ const ChatApp = () => {
     return (
         <div className="main">
             <div className="header">
-                <ArrowBackIcon onClick={() => {
-                    setIsAttached(false);
-                    if (path.length === 1) {
-                        return;
-                    }
-                    setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
-                }} />
+                <ArrowBackIcon
+                    style={{
+                        position: "absolute",
+                        left: "-30px",
+                        top: "10px",
+                    }}
+                    onClick={() => {
+                        setIsAttached(false);
+                        if (path.length === 1) {
+                            return;
+                        }
+                        setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
+                    }} />
                 <button onClick={() => {
                     setIsAttached(false);
                     pushToPath("root")
@@ -380,10 +423,23 @@ const ChatApp = () => {
                         <ChatMessage
                             message={message}
                             handleSubConversationClick={handleSubConversationClick}
+                            runCodeAfterMessage={runCodeAfterMessage}
+                            saveCodeInMessage={saveCodeInMessage}
                         />
                     );
                 })
                 }
+                {conversation.meta?.agent === 'Programmer' && (
+                    <NewCell onRun={(code) => {
+                        // send the code to the websocket
+                        const function_call = {
+                            'name': 'jupyter',
+                            'arguments': { 'code': code },
+                        }
+                        const messagePayload = JSON.stringify({ function_call, response_to: currentConversationId, agent: conversation.meta.agent || defaultAgentName });
+                        client.send(messagePayload);
+                    }} />
+                )}
                 <div id="bottom"></div> {/* this is used to scroll to the bottom when a new message is added */}
             </div>
             <div className="spacer"></div>
