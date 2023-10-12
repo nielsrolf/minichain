@@ -41,7 +41,7 @@ const languages = [
     'ts'
 ]
 
-const CodeBlock = ({ code, onChange }) => {
+const CodeBlock = ({ code, save, run, editable=false, runnable=true }) => {
     const [hasCopied, setHasCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editorValue, setEditorValue] = useState('');
@@ -83,6 +83,15 @@ const CodeBlock = ({ code, onChange }) => {
                 >
                     Cancel
                 </button>
+
+                <button 
+                    style={{ position: 'absolute', top: 0, right: 50, zIndex: 1 }}
+                    onClick={async () => {
+                        setIsEditing(false);
+                        await save(editorValue);
+                    } }>
+                        Save
+                </button>
                 <Editor
                     height={editorHeight}
                     width="100%"
@@ -91,36 +100,50 @@ const CodeBlock = ({ code, onChange }) => {
                     theme="vs-dark"
                     onChange={(value) => setEditorValue(value)}
                 />
-                <button onClick={() => {
-                    setIsEditing(false);
-                    onChange(editorValue);
-                } }>Run</button>
+                <button
+                    onClick={async () => {
+                        await run(code)
+                    }}
+                >
+                    Run
+                </button>
             </div>
         </div>
         );
     }
 
     return (
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', backgroundColor: "rgba(0, 0, 0, 0.2)", width: "100%" }}>
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: "rgba(0, 0, 0, 0.2)", width: "100%" }}>
             <button
                 onClick={copyToClipboard}
                 style={{ position: 'absolute', top: 0, right: 0 }}
             >
                 {hasCopied ? 'Copied!' : 'Copy'}
             </button>
-            <button
-                onClick={() => {
-                    setIsEditing(true);
-                }}
-                style={{ position: 'absolute', top: 0, right: 50 }}
-            >
-                Edit
-            </button>
+            {editable && (
+                <button
+                    onClick={() => {
+                        setIsEditing(true);
+                    }}
+                    style={{ position: 'absolute', top: 0, right: 50 }}
+                >
+                    Edit
+                </button>
+            )}
             <div style={{ width: '100%', overflowX: 'auto' }}>
                 <SyntaxHighlighter language={language} style={codeStyle}>
                     {code}
                 </SyntaxHighlighter>
             </div>
+            {runnable && (
+                <button
+                    onClick={async () => {
+                        await run(code)
+                    }}
+                >
+                    Run
+                </button>
+            )}
         </div>
     );
 };

@@ -201,6 +201,8 @@ class Conversation():
                  meta: Dict=None,
                  conversation_id: str=None,
                  messages: List[Message] = None,
+                 insert_after: str=None,
+                 forked_from: str=None
                  ):
         path = path or ['Trash']
         if conversation_id is None:
@@ -212,10 +214,22 @@ class Conversation():
         self.path = path
         self.shared = shared or {'on_message': do_nothing}
         self.shared['message_db'].register_conversation(self)
+        self.forked_from = forked_from
+        self.insert_after = insert_after
     
     @property
     def messages(self):
-        return [i for i in self._messages if i.meta.get('deleted', False)==False]
+        result = []
+        if self.forked_from is not None:
+            result += self.shared['message_db'].get(self.forked_from).messages
+        result += [i for i in self._messages if i.meta.get('deleted', False)==False]
+        return result
+    
+    def fork(self, message_id, new_path=None):
+        """Returns a new conversation that is forked from the given message_id"""
+        if new_path is None:
+            new_path = self.path + [message_id, str(uuid4().hex[:8])]
+        return Conversation(path=new_path, conversation_id=new_path[-1], shared=self.shared, meta=self.meta, forked_from=message_id)
     
     async def set(self, **meta):
         self.meta.update(meta)
@@ -227,10 +241,35 @@ class Conversation():
     
     def to(self, chat, meta=None):
         """returns a new Message object"""
-        self.save()
         message = Message(chat=chat, path=self.path, shared=self.shared, meta=meta)
-        self._messages.append(message)
+        print("insert after", self.insert_after)
+        if self.insert_after is None:
+            self._messages.append(message)
+        else:
+            success=False
+            print([i.path[-1] for i in self._messages])
+            for i, m in enumerate(self._messages):
+                if m.path[-1] == self.insert_after:
+                    print("inserting after", m.path[-1], "at pos", i)
+                    self._messages.insert(i+1, message)
+                    success=True
+                    break
+            if not success:
+                print("Could not insert message after", self.insert_after, "because it was not found in", [m.path[-1] for m in self._messages])
+        self.save()
         return message
+
+    def at(self, message_id, meta=None):
+        """returns a new conversation that inserts messages not at the end, but after the given message_id"""
+        meta = dict(**self.meta, **(meta or {}))
+        return Conversation(
+            path=self.path,
+            messages=self._messages,
+            conversation_id=[self.path[-1]],
+            shared=self.shared,
+            meta=meta,
+            insert_after=message_id
+        )
     
     async def __aenter__(self):
         # Send the path message to the client
@@ -248,6 +287,8 @@ class Conversation():
         data = self.as_json()
         data['conversation_id'] = self.path[-1]
         data['message_ids'] = [m['path'][-1] for m in data.pop('messages')]
+        print("--> saving conversation to", filepath)
+        print(data)
         with open(filepath, 'w') as f:
             json.dump(data, f, default=datetime_converter)
         # for message in self.messages:
@@ -279,7 +320,7 @@ class Conversation():
         return {
             "meta": self.meta,
             "path": self.path,
-            "messages": [m.as_json() for m in sort_by_timestamp(self.messages)]
+            "messages": [m.as_json() for m in self.messages]
         }
 
 

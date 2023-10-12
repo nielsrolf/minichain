@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CodeBlock from './CodeBlock';
 import ReactMarkdown from 'react-markdown';
 
-const TextWithCode = ({ text }) => {
+const TextWithCode = ({ text, run }) => {
   const [textParts, setTextParts] = useState([]);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ const TextWithCode = ({ text }) => {
   return (
     <div>
       {textParts.map((part, index) => part.isCode
-        ? <CodeBlock key={index} code={part.text} />
+        ? <CodeBlock key={index} code={part.text} run={run}/>
         : <ReactMarkdown key={index}>{part.text.replace(/\n/g, '  \n')}</ReactMarkdown>)}
         {/* // : <ReactMarkdown key={index}>{handleNewlines(part.text)}</ReactMarkdown>)} */}
 

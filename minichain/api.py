@@ -1,4 +1,5 @@
 import asyncio
+from typing import List
 import json
 import os
 import traceback
@@ -15,7 +16,7 @@ from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
 from starlette.websockets import WebSocketDisconnect
 
-from minichain.dtypes import Cancelled, ConsumerClosed
+from minichain.dtypes import Cancelled, ConsumerClosed, FunctionCall
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
 
@@ -39,6 +40,11 @@ class Payload(BaseModel):
     function_call: Optional[Dict[str, Any]] = None
 
 
+class Execute(BaseModel):
+    code: str
+    insert_after: List[str]
+
+
 message_db = MessageDB()
 
 
@@ -48,6 +54,29 @@ agents = {}
 from pydantic import BaseModel, Field
 
 from minichain.functions import tool
+
+
+@app.post("/run/")
+async def run_cell(cell: Execute):
+    """Run a cell and insert the function call output after the specified cell."""
+    print("running cell", cell)
+    # get the conversation
+    conversation = message_db.get(cell.insert_after[-2])
+    conversation = conversation.at(cell.insert_after[-1])
+    # get the agent
+    print(conversation.meta)
+    agent = agents[conversation.meta['agent']]
+    # run the cell
+    await agent.run(
+        query="",
+        conversation=conversation,
+        function_call=FunctionCall(
+            name="jupyter",
+            arguments={"code": cell.code},
+        ),
+        message_meta={"deleted": True}
+    )
+    return {"message": "success"}
 
 
 @tool()

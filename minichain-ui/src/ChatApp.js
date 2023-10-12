@@ -278,6 +278,23 @@ const ChatApp = () => {
         setDefaultAgentName(agentName);
     }
 
+
+    const runCodeAfterMessage = (message) => async (code) => {
+        // send the code as a POST request to /run/
+        const response = await fetch(`http://localhost:8745/run/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                code: code,
+                insert_after: message.path
+            }),
+        });
+        // update path to refresh the conversation
+        setPath([...path]);
+    }
+
     // if the connection is not connected after 1 second, try to reload the page
     setTimeout(() => {
         setCheckConnectionStatus(true);
@@ -386,6 +403,7 @@ const ChatApp = () => {
                         <ChatMessage
                             message={message}
                             handleSubConversationClick={handleSubConversationClick}
+                            runCodeAfterMessage={runCodeAfterMessage}
                         />
                     );
                 })

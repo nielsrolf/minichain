@@ -63,7 +63,7 @@ class Agent:
         """Hook for subclasses to run code before the run method is called."""
         pass
 
-    async def run(self, conversation=None, function_call=None, **arguments):
+    async def run(self, conversation=None, function_call=None, message_meta=None, **arguments):
         """arguments: dict with values mentioned in the prompt template
         history: list of Message objects that are already part of the conversation, for follow up conversations
         """
@@ -75,8 +75,9 @@ class Agent:
                 conversation = conversation.conversation(meta=dict(agent=self.name))
             for message in self.init_history:
                 await conversation.send(message, is_initial=True)
+        message_meta = message_meta or {}
         await conversation.send(
-            UserMessage(self.prompt_template(**arguments), function_call=function_call), is_initial=False
+            UserMessage(self.prompt_template(**arguments), function_call=function_call), is_initial=False, **message_meta
         )
         agent_session = Session(self, conversation)
         if function_call is not None:
