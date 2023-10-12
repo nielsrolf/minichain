@@ -169,6 +169,8 @@ class Message():
     
     @classmethod
     def load(cls, filepath, **kwargs):
+        if not os.path.exists(filepath + ".json"):
+            return None
         with open(filepath + ".json", 'r') as f:
             data = json.load(f)
         message = cls(**data, **kwargs)
@@ -222,7 +224,7 @@ class Conversation():
         result = []
         if self.forked_from is not None:
             result += self.shared['message_db'].get(self.forked_from).messages
-        result += [i for i in self._messages if i.meta.get('deleted', False)==False]
+        result += [i for i in self._messages if i is not None and i.meta.get('deleted', False)==False]
         return result
     
     def fork(self, message_id, new_path=None):

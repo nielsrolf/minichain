@@ -305,12 +305,14 @@ async def edit(
         pylint_after = subprocess.run(['pylint', "--score=no", path], capture_output=True, text=True).stdout
     
         # Return the diff of the pylint outputs before and after the changes
-        diff = "\n".join(filtered_diff(pylint_before, pylint_after))
+        pylint_diff = filtered_diff(pylint_before, pylint_after)
+        pylint_new = [line for line in pylint_diff if line.startswith('+')]
+        pylint_new = "\n".join(pylint_diff)
         # diff = difflib.unified_diff(pylint_before.splitlines(), pylint_after.splitlines())
         # diff = "\n".join(list(diff))
-        if diff == "":
+        if pylint_new == "":
             return 'Edit done successfully.'
-        return f'Edit done. {path} now has {len(lines)} number of lines. Here is the diff of pylint before and after the edit:\n' + diff + "\nYou don't have to fix every linting issue, but check for important ones."
+        return f'Edit done. {path} now has {len(lines)} number of lines. Here are some of pylint hints that appeared since the edit:\n' + pylint_new + "\nYou don't have to fix every linting issue, but check for important ones."
     return truncate_updated(updated_in_context)
 
 

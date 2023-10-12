@@ -48,7 +48,6 @@ class Execute(BaseModel):
 class MessagePayload(BaseModel):
     role: Optional[str] = None
     content: Optional[str] = None
-    meta: Optional[Dict[str, Any]] = None
     function_call: Optional[Dict[str, Any]] = None
 
 
@@ -202,7 +201,7 @@ async def put_meta(path: str, meta: Dict[str, Any]):
     return message_or_conversation.as_json()
 
 @app.put("/chat/{path:path}")
-async def put_meta(path: str, update: MessagePayload):
+async def put_chat(path: str, update: MessagePayload):
     if path == "":
         path = "root"
     path = path.split('/')
@@ -249,6 +248,7 @@ async def preload_agents():
         module = __import__(module_name, fromlist=[class_name])
         agent_class = getattr(module, class_name)
         # create the agent
+        print("Creating agent", agent_name, agent_class, agent_settings)
         agent = agent_class(**agent_settings.get("init", {}))
         # add the agent to the agents dict
         agents[agent_name] = agent
