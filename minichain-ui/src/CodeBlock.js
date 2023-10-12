@@ -102,7 +102,8 @@ const CodeBlock = ({ code, save, run, editable=false, runnable=true }) => {
                 />
                 <button
                     onClick={async () => {
-                        await run(code)
+                        await save(editorValue);
+                        await run(editorValue);
                     }}
                 >
                     Run

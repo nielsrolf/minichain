@@ -45,6 +45,13 @@ class Execute(BaseModel):
     insert_after: List[str]
 
 
+class MessagePayload(BaseModel):
+    role: Optional[str] = None
+    content: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None
+    function_call: Optional[Dict[str, Any]] = None
+
+
 message_db = MessageDB()
 
 
@@ -193,6 +200,15 @@ async def put_meta(path: str, meta: Dict[str, Any]):
     path = path.split('/')
     message_or_conversation = await message_db.update_meta(path[-1], meta)
     return message_or_conversation.as_json()
+
+@app.put("/chat/{path:path}")
+async def put_meta(path: str, update: MessagePayload):
+    if path == "":
+        path = "root"
+    path = path.split('/')
+    update = update.dict()
+    message = await message_db.update_message(path[-1], update)
+    return message.as_json()
 
 
 @app.get("/static/{path:path}")

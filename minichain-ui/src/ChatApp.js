@@ -286,9 +286,29 @@ const ChatApp = () => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 code: code,
                 insert_after: message.path
+            }),
+        });
+        // update path to refresh the conversation
+        setPath([...path]);
+    }
+
+
+    const saveCodeInMessage = (message) => async (code) => {
+        // send the code as a PUT request to /chat/
+        console.log("saving code in message", message);
+        const response = await fetch(`http://localhost:8745/chat/${message.path[message.path.length - 1]}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                function_call: {
+                    name: message.chat.function_call.name,
+                    arguments: { ...message.chat.function_call.arguments, code: code },
+                },
             }),
         });
         // update path to refresh the conversation
@@ -323,7 +343,7 @@ const ChatApp = () => {
     return (
         <div className="main">
             <div className="header">
-                <ArrowBackIcon 
+                <ArrowBackIcon
                     style={{
                         position: "absolute",
                         left: "-30px",
@@ -335,7 +355,7 @@ const ChatApp = () => {
                             return;
                         }
                         setPath(prevPath => prevPath.slice(0, prevPath.length - 1));
-                }} />
+                    }} />
                 <button onClick={() => {
                     setIsAttached(false);
                     pushToPath("root")
@@ -404,20 +424,21 @@ const ChatApp = () => {
                             message={message}
                             handleSubConversationClick={handleSubConversationClick}
                             runCodeAfterMessage={runCodeAfterMessage}
+                            saveCodeInMessage={saveCodeInMessage}
                         />
                     );
                 })
                 }
-                {conversation.meta.agent === 'Programmer' && (
+                {conversation.meta?.agent === 'Programmer' && (
                     <NewCell onRun={(code) => {
                         // send the code to the websocket
                         const function_call = {
                             'name': 'jupyter',
-                            'arguments': {'code': code},
+                            'arguments': { 'code': code },
                         }
                         const messagePayload = JSON.stringify({ function_call, response_to: currentConversationId, agent: conversation.meta.agent || defaultAgentName });
                         client.send(messagePayload);
-                    }}/>
+                    }} />
                 )}
                 <div id="bottom"></div> {/* this is used to scroll to the bottom when a new message is added */}
             </div>

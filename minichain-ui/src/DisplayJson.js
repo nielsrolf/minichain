@@ -52,7 +52,7 @@ const MultiMedia = ({ path }) => {
 };
 
 
-const DisplayJson = ({ data, run, editable=false }) => {
+const DisplayJson = ({ data, run, save, editable=false }) => {
   const [isFolded, setIsFolded] = useState({});
   // First: all the special cases
   if (!data) {
@@ -137,7 +137,7 @@ const DisplayJson = ({ data, run, editable=false }) => {
       const newKey = `${parentKey}.${key}`;
       if (key === 'code') {
         return (
-            <CodeBlock key={newKey} code={removeLineNumbers(value)} editable={true} run={run} />
+            <CodeBlock key={newKey} code={removeLineNumbers(value)} editable={true} run={run} save={save} />
         );
       }
       return (

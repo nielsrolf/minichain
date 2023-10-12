@@ -355,7 +355,8 @@ class MessageDB():
         self.shared['consumers'] = alive
     
     def register_conversation(self, conversation):
-        self.conversations.append(conversation)
+        if not conversation.path[-1] in [c.path[-1] for c in self.conversations]:
+            self.conversations.append(conversation)
     
     def register_message(self, message):
         self.messages.append(message)
@@ -401,6 +402,14 @@ class MessageDB():
         if updated is None:
             updated = await self.update_conversation_meta(any_id, meta)
         return updated
+    
+    async def update_message(self, message_id, update):
+        message = self.get_message(message_id)
+        if message is None:
+            return
+        async with message as stream:
+            await stream.set(update)
+        return message
 
     def children_of(self, message_id):
         return [c for c in self.conversations if c.path[-2] == message_id and c.meta.get('deleted', False)==False]

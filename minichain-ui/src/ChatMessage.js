@@ -135,7 +135,7 @@ function sendMessageMeta(path, meta, children) {
 }
 
 
-function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage }){
+function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage }){
     // if the message has not streamed enough, return
     if (!message.chat) {
         return '';
@@ -180,7 +180,7 @@ function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage }
             {message.meta.display_data && message.meta.display_data.map((data, index) => {
                 return <DisplayData key={index} data={data} />;
             })}
-            {message.chat.function_call && <DisplayJson data={message.chat.function_call} editable={true}  run={runCodeAfterMessage(message)}/>}
+            {message.chat.function_call && <DisplayJson data={message.chat.function_call} editable={true}  run={runCodeAfterMessage(message)} save={saveCodeInMessage(message)}/>}
             {message.children?.map(subConversationId => {
                 return (
                     <div onClick={() => handleSubConversationClick(subConversationId)}><i>View thread</i></div>
