@@ -54,10 +54,7 @@
 }
 
 .message-system {
-  /* background-color: black; */
   background-color: rgba(41, 86, 91, 0.2);
-
-  /* background-color: rgba(69, 93, 69) */
 }
 
 .message-user {
@@ -66,7 +63,6 @@
 
 .message-assistant {
   background-color: rgba(10, 10, 10, 0.2);
-
 }
 
 .message-function {

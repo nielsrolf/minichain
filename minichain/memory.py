@@ -303,22 +303,21 @@ class SemanticParagraphMemory:
 
     def load(self, memory_dir):
         # load the vector db
-        with open(os.path.join(memory_dir, "vector_db_keys.pkl"), "rb") as f:
-            self.vector_db.keys = pickle.load(f)
-        with open(os.path.join(memory_dir, "vector_db_values.pkl"), "rb") as f:
-            self.vector_db.values = pickle.load(f)
-        with open(os.path.join(memory_dir, "memories.json"), "r") as f:
-            memories = json.load(f, object_hook=datetime_parser)
-        # /temp
         try:
+            with open(os.path.join(memory_dir, "vector_db_keys.pkl"), "rb") as f:
+                self.vector_db.keys = pickle.load(f)
+            with open(os.path.join(memory_dir, "vector_db_values.pkl"), "rb") as f:
+                self.vector_db.values = pickle.load(f)
+            with open(os.path.join(memory_dir, "memories.json"), "r") as f:
+                memories = json.load(f, object_hook=datetime_parser)
             with open(os.path.join(memory_dir, "ingested_hashed.json"), "r") as f:
                 ingested_hashed = json.load(f)
                 for key, hash in ingested_hashed.items():
                     if any([i.meta.source == key for i in self.memories]):
                         self.ingested_hashed[key] = hash
+            self.memories = [MemoryWithMeta(**i) for i in memories]
         except:
-            pass
-        self.memories = [MemoryWithMeta(**i) for i in memories]
+            print("No memories found in", memory_dir)
         self.auto_save_dir = memory_dir
     
     def reload(self):
