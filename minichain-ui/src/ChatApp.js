@@ -46,6 +46,31 @@ const ChatApp = () => {
 
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
 
+
+
+    // on initial load, check if there is a path in the URL
+    useEffect(() => {
+        const path = window.location.pathname.split("/").filter(i => i);
+        if (path.length === 0) {
+            return;
+        }
+        // if path is index.html, set the path to root
+        if (path[path.length - 1] === "index.html") {
+            setPath(["root"]);
+            return;
+        }
+        setPath(["root", path[path.length - 1]]);
+    }, []);
+
+    // when the path changes, update the route
+    useEffect(() => {
+        if (path.length === 1) {
+            window.history.pushState({}, "", "/");
+            return;
+        }
+        window.history.pushState({}, "", "/" + path[path.length - 1]);
+    }, [path]);
+
     // fetch the available agents
     useEffect(() => {
         fetch("http://localhost:8745/agents")
@@ -60,6 +85,7 @@ const ChatApp = () => {
 
     // fetch the history
     useEffect(() => {
+        console.log("fetching history", path)
         fetch("http://localhost:8745/messages/" + path[path.length - 1])
             .then(response => response.json())
             .then(conversation => {
