@@ -302,12 +302,11 @@ async def edit(
         with_line_numbers=True,
     )
     if path.endswith('.py'):
-        pylint_after = subprocess.run(['pylint', "--score=no", path], capture_output=True, text=True).stdout
-    
+        pylint_after = subprocess.run(['pylint', "--disable=missing-docstring,line-too-long,unused-import,missing-final-newline,bare-except,invalid-name,import-error", "--score=no", path], capture_output=True, text=True).stdout
         # Return the diff of the pylint outputs before and after the changes
         pylint_diff = filtered_diff(pylint_before, pylint_after)
         pylint_new = [line for line in pylint_diff if line.startswith('+')]
-        pylint_new = "\n".join(pylint_diff)
+        pylint_new = "\n".join(pylint_new)
         # diff = difflib.unified_diff(pylint_before.splitlines(), pylint_after.splitlines())
         # diff = "\n".join(list(diff))
         if pylint_new == "":

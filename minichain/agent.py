@@ -38,6 +38,7 @@ class Agent:
         init_history=[],
         message_handler=None,
         name=None,
+        # llm="gpt-3.5-turbo",
         llm="gpt-4-0613",
     ):
         functions = functions.copy()
@@ -174,7 +175,7 @@ class Session:
             except Exception as e:
                 if "missing 1 required positional argument: 'code'" in str(e) or "validation error for edit\ncode\n  field required" in str(e):
                     await message_handler.set(
-                        f"Error: this function requires a code. Use the normal message content field to put  the code like here:\n```\ncode here\n```"
+                        f"Error: this function requires a code. Write the code first into the normal content field like here:\n```\ncode here\n```\nThen call the {action['name']} function."
                     )
                 else:
                     print("yooo")
