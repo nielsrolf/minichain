@@ -7,6 +7,7 @@ import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
+import ForkRightIcon from '@mui/icons-material/ForkRight';
 
 const functionsToRenderAsCode = [
     "jupyter",
@@ -135,7 +136,10 @@ function sendMessageMeta(path, meta, children) {
 }
 
 
-function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage }){
+
+
+
+function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage, forkFromMessage }){
     // if the message has not streamed enough, return
     if (!message.chat) {
         return '';
@@ -155,6 +159,9 @@ function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, 
                     {formatMaybeDuration(message.meta.duration) + ' '}
                 </div>
                 <div className='message-header-right'>
+                    <ForkRightIcon fontSize="small" onClick={() => {
+                        forkFromMessage(message.path);
+                    }} />
                     {message.meta.rating === 1 ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOutlinedIcon fontSize="small" onClick={() => {
                         sendMessageMeta(message.path, {"rating": 1}, message.children);
                     }} />}

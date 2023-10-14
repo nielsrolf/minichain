@@ -3,11 +3,9 @@ from typing import List
 import json
 import os
 import traceback
-import uuid
-from collections import defaultdict
 from typing import Any, Dict, Optional
 import shutil
-
+from pydantic import BaseModel, Field
 import yaml
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +15,7 @@ from pydantic.error_wrappers import ValidationError
 from starlette.websockets import WebSocketDisconnect
 
 from minichain.dtypes import Cancelled, ConsumerClosed, FunctionCall
+from minichain.functions import tool
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
 
@@ -57,9 +56,7 @@ message_db = MessageDB()
 agents = {}
 
 
-from pydantic import BaseModel, Field
 
-from minichain.functions import tool
 
 
 @app.post("/run/")
@@ -208,6 +205,14 @@ async def put_chat(path: str, update: MessagePayload):
     update = update.dict()
     message = await message_db.update_message(path[-1], update)
     return message.as_json()
+
+
+@app.get("/fork/{path:path}")
+async def fork(path: str):
+    path = path.split('/')
+    conversation = message_db.get(path[-2])
+    forked_conversation = conversation.fork(path[-1])
+    return forked_conversation.as_json()
 
 
 @app.get("/static/{path:path}")

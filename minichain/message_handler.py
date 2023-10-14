@@ -223,7 +223,12 @@ class Conversation():
     def messages(self):
         result = []
         if self.forked_from is not None:
-            result += self.shared['message_db'].get(self.forked_from).messages
+            imported = self.shared['message_db'].get(self.forked_from[-2]).messages
+            for i in imported:
+                result.append(i)
+                if i.path[-1] == self.forked_from[-1]:
+                    break
+                
         result += [i for i in self._messages if i is not None and i.meta.get('deleted', False)==False]
         return result
     
@@ -231,7 +236,13 @@ class Conversation():
         """Returns a new conversation that is forked from the given message_id"""
         if new_path is None:
             new_path = self.path + [message_id, str(uuid4().hex[:8])]
-        return Conversation(path=new_path, conversation_id=new_path[-1], shared=self.shared, meta=self.meta, forked_from=message_id)
+        return Conversation(
+            path=new_path,
+            conversation_id=new_path[-1],
+            shared=self.shared,
+            meta=self.meta,
+            forked_from=self.path + [message_id]
+        )
     
     async def set(self, **meta):
         self.meta.update(meta)
