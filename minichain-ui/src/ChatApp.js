@@ -47,30 +47,6 @@ const ChatApp = () => {
     const currentConversationId = useMemo(() => path[path.length - 1], [path]);
 
 
-
-    // on initial load, check if there is a path in the URL
-    useEffect(() => {
-        const path = window.location.pathname.split("/").filter(i => i);
-        if (path.length === 0) {
-            return;
-        }
-        // if path is index.html, set the path to root
-        if (path[path.length - 1] === "index.html") {
-            setPath(["root"]);
-            return;
-        }
-        setPath(["root", path[path.length - 1]]);
-    }, []);
-
-    // when the path changes, update the route
-    useEffect(() => {
-        if (path.length === 1) {
-            window.history.pushState({}, "", "/");
-            return;
-        }
-        window.history.pushState({}, "", "/" + path[path.length - 1]);
-    }, [path]);
-
     // fetch the available agents
     useEffect(() => {
         fetch("http://localhost:8745/agents")
@@ -270,6 +246,18 @@ const ChatApp = () => {
         }
     };
 
+
+    function forkFromMessage(path) {
+        // Send GET request to /fork/{path} to fork a conversation
+        const pathString = path.join('/');
+        fetch(`http://localhost:8745/fork/${pathString}`, {
+            method: 'GET',
+        }).then(response => response.json())
+        .then(data => {
+            setPath(data.path);
+        });
+    }
+
     const sendMessage = () => {
         if (client.readyState !== client.OPEN) {
             console.error("Client is not connected");
@@ -449,6 +437,7 @@ const ChatApp = () => {
                         <ChatMessage
                             message={message}
                             handleSubConversationClick={handleSubConversationClick}
+                            forkFromMessage={forkFromMessage}
                             runCodeAfterMessage={runCodeAfterMessage}
                             saveCodeInMessage={saveCodeInMessage}
                         />

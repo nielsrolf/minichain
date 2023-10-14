@@ -21,7 +21,7 @@ default_ignore_files = [
     "htmlcov",
 ]
 
-default_extensions = [".py", ".js", ".ts", ".css", "README.md"]
+default_extensions = [".py", ".js", ".ts", ".css", "README.md", ".csv", ".json", ".xlsm"]
 
 
 class RelevantSection(BaseModel):
@@ -140,7 +140,7 @@ async def get_file_summary(path: str = Field(..., description="The path to the f
     text, error = open_or_search_file(path)
     if error is not None:
         return error
-    if os.isdir(path):
+    if os.path.isdir(path):
         return text
     if path.endswith(".py"):
         summary = summarize_python_file(path)
@@ -191,9 +191,12 @@ def open_or_search_file(path):
         else:
             return None, f"File not found: {path}. Did you mean: {matches[0]}"
     else:
-        with open(path, "r") as f:
-            content = f.read()
-        return content, None
+        try:
+            with open(path, "r") as f:
+                content = f.read()
+            return content, None
+        except Exception as e:
+            return None, f"Error opening file: {e} - use this command only for text / code files, and use pandas or other libraries to interact with other file types."
 
 @tool()
 async def view(
