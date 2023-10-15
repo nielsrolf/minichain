@@ -43,6 +43,8 @@ class VectorDB:
         return [dict[key] for key in sorted(self.keys.keys())]
 
     def search(self, query_questions, num_results=3) -> List[VectorSearchScore]:
+        if len(query_questions) == 0 or len(self.keys) == 0:
+            return []
         query_embeddings = self.encode(query_questions)
         K, V = self._dict_to_list(self.keys), self._dict_to_list(self.values)
         scores = np.dot(query_embeddings, np.array(K).T)
