@@ -178,7 +178,8 @@ class Session:
             # catch pydantic validation errors
             except ExceptionForAgent as e:
                 error_msg = str(e)
-                self._force_call = action['name']
+                if action['name'] == "return":
+                    self._force_call = action['name']
                 await message_handler.set(error_msg)
             except Exception as e:
                 if "missing 1 required positional argument: 'code'" in str(e) or "validation error for edit\ncode\n  field required" in str(e):

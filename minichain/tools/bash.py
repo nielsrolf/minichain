@@ -1,12 +1,13 @@
-import asyncio
-import os
-from typing import List, Optional
+import time
+from typing import Optional
+from enum import Enum
 import jupyter_client
+import os
+import signal
 
 from pydantic import BaseModel, Field
 
 from minichain.agent import Function
-from minichain.schemas import BashQuery
 
 
 def shorten_response(response: str) -> str:
@@ -24,21 +25,30 @@ def shorten_response(response: str) -> str:
     return response
 
 
+class PythonOrBashEnum(str, Enum):
+    python = "python"
+    bash = "bash"
+
 class JupyterQuery(BaseModel):
     code: str = Field(
         ...,
-        description="Python code to run",
+        description="Code or commands to run",
+    )
+    type: PythonOrBashEnum = Field(
+        PythonOrBashEnum.python,
+        description="The type of code to run.",
     )
     timeout: Optional[int] = Field(60, description="The timeout in seconds.")
+    background: Optional[bool] = Field(False, description="Set to true if you start e.g. a webserver in the background (Use: `node server.js` rather than `node server.js &` ). Commands will be run in a new jupyter kernel.")
 
 
 class Jupyter(Function):
-    def __init__(self, message_handler=None, **kwargs):
+    def __init__(self, message_handler=None, continue_on_timeout=False, **kwargs):
         super().__init__(
             name="jupyter",
             openapi=JupyterQuery,
             function=self,
-            description="Run python code and or `!bash_commands` in a jupyter kernel. ",
+            description="Run python code and or bash commands in a jupyter kernel. ",
             message_handler=message_handler,
         )
 
@@ -47,19 +57,44 @@ class Jupyter(Function):
         self.kernel_manager.start_kernel()
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
+        self.continue_on_timeout = continue_on_timeout
 
-    async def __call__(self, code: str, timeout: int = 60) -> str:
+    async def __call__(self, code: str, timeout: int = 60, type: str = "python", background=False) -> str:
+        if background:
+            # run this code in a new juptyer kernel
+            jupyter = Jupyter(continue_on_timeout=True)
+            # remove `&` from the end of the code
+            code = "\n".join([line if not line.strip().endswith("&") else line.strip()[:-1] for line in code.split("\n")])
+            initial_logs = await jupyter(code, timeout=10, type=type)
+            output = f"Started background process with logs:\n{initial_logs}"
+            await self.message_handler.set(output)
+            return output
+        if type == "bash" and not code.startswith("!"):
+            code = "\n".join([f"!{line}" for line in code.split("\n")])
         # Execute the code
         msg_id = self.kernel_client.execute(code)
         await self.message_handler.chunk(f"Out: \n")
 
+        start_time = time.time()
+
         while True:
             try:
                 # Get messages from the kernel
-                msg = self.kernel_client.get_iopub_msg(timeout=timeout)
-
+                remaining_time = timeout - (time.time() - start_time)
+                msg = self.kernel_client.get_iopub_msg(timeout=remaining_time)
+            except:
+                # Timeout
+                await self.message_handler.chunk("Timeout")
+                if self.continue_on_timeout:
+                    # just return the current output
+                    return self.message_handler.current_message['content']
+                else:
+                    output =  self.message_handler.current_message['content']
+                    # Interrupt the kernel
+                    self.kernel_manager.interrupt_kernel()
+                    return output
+            try:
                 # await self.message_handler.chunk(str(msg) + "\n")
-
                 # Check for output messages
                 if msg['parent_header'].get('msg_id') == msg_id:
                     msg_type = msg['header']['msg_type']
@@ -95,7 +130,6 @@ class Jupyter(Function):
             except KeyboardInterrupt:
                 # Cleanup in case of interruption
                 self.kernel_client.stop_channels()
-                self.kernel_manager.shutdown_kernel()
                 break
         # Return all the captured outputs as a single string
         output = self.message_handler.current_message['content']
