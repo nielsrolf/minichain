@@ -3,7 +3,7 @@ import asyncio
 from pydantic import BaseModel, Field
 
 from minichain.agent import Agent
-from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage
+from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage, SystemMessage
 from minichain.tools import codebase
 from minichain.tools.bash import Jupyter
 from minichain.agents.hippocampus import Hippocampus
@@ -21,8 +21,6 @@ class Programmer(Agent):
         self.jupyter = Jupyter()
         print("Init history for programmer:", kwargs.get("init_history", []))
         init_history = kwargs.pop("init_history", [])
-        if init_history == []:
-            init_history = self.get_init_history()
 
         functions = [
             self.jupyter,
@@ -43,14 +41,15 @@ class Programmer(Agent):
             **kwargs,
         )
 
-    def get_init_history(self):
-        init_history = []
+    @property
+    def init_history(self):
+        init_history = [SystemMessage(self.system_message)]
         demo_call = FunctionCall(
             name="jupyter",
             arguments={"code": "print('Hello world!')"}
         )
         demo_response = FunctionMessage(content="Hello world!", name='jupyter')
-        init_history = [
+        init_history += [
             AssistantMessage(content="Okay, let's see if I understood correctly.", function_call=demo_call),
             demo_response,
             UserMessage(content="Great! Now also try to edit tool to create a file /tmp/hello and write something in it."),

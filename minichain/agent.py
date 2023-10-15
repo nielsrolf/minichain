@@ -48,13 +48,17 @@ class Agent:
             [i.name == "return" for i in functions]
         ):
             functions.append(make_return_function(response_openapi))
+        self.system_message = system_message
         self.functions = functions
-        system_message = SystemMessage(system_message)
-        self.init_history = [system_message] + init_history
+        self._init_history = init_history
         self.prompt_template = prompt_template
         self.name = name or self.__class__.__name__
         self.llm = llm
         self.message_handler = message_handler or MessageDB()
+    
+    @property
+    def init_history(self):
+        return [SystemMessage(self.system_message)] + self._init_history
 
     @property
     def functions_openai(self):
@@ -123,6 +127,7 @@ class Session:
     def __init__(self, agent, conversation):
         self.agent = agent
         self.conversation = conversation
+        self._force_call = None
 
     async def run_until_done(self):
         while True:
@@ -149,6 +154,7 @@ class Session:
                 self.agent.functions_openai,
                 model=self.agent.llm,
                 stream=message_handler,
+                force_call=self._force_call,
             )
         return llm_response['function_call']
 
@@ -164,6 +170,7 @@ class Session:
                             )
                             return False
                         function_output = await function(**action['arguments'])
+                        self._force_call = None
                         return function_output
                 await message_handler.set(
                     f"Error: this function does not exist. Available functions: {', '.join([i.name for i in self.agent.functions])}"
@@ -171,6 +178,7 @@ class Session:
             # catch pydantic validation errors
             except ExceptionForAgent as e:
                 error_msg = str(e)
+                self._force_call = action['name']
                 await message_handler.set(error_msg)
             except Exception as e:
                 if "missing 1 required positional argument: 'code'" in str(e) or "validation error for edit\ncode\n  field required" in str(e):

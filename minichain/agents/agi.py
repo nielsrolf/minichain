@@ -9,6 +9,7 @@ from minichain.agents.webgpt import WebGPT
 from minichain.functions import tool
 from minichain.schemas import MultiModalResponse
 from minichain.tools import taskboard
+from minichain.dtypes import SystemMessage
 
 
 system_message = """You are a smart and friendly AGI.
@@ -145,20 +146,16 @@ class AGI(Agent):
         tools_dict.pop("return")
         all_tools = list(tools_dict.values()) + [assign, return_function]
 
-        init_history = kwargs.pop("init_history", [])
-        if init_history == []:
-            init_history = self.get_init_history()
-
         super().__init__(
             functions=all_tools,
             system_message=system_message,
             prompt_template="{query}".format,
             response_openapi=MultiModalResponse,
-            init_history=init_history,
             **kwargs,
         )
 
-    def get_init_history(self):
-        return self.programmer.get_init_history()
+    @property
+    def init_history(self):
+        return [SystemMessage(self.system_message)] + self.programmer.init_history[1:]
     
 

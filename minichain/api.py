@@ -240,7 +240,7 @@ async def preload_agents():
 
     with open(".minichain/settings.yml", "r") as f:
         settings = yaml.load(f, Loader=yaml.FullLoader)
-
+    
     # load the agents
     for agent_name, agent_settings in settings.get("agents", {}).items():
         if not agent_settings.get("display", False):

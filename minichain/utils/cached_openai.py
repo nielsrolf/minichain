@@ -113,7 +113,7 @@ def save_llm_call_for_debugging(messages, functions, parsed_response, raw_respon
 @async_disk_cache
 @retry(tries=10, delay=2, backoff=2, jitter=(1, 3))
 async def get_openai_response_stream(
-    chat_history, functions, model="gpt-4-0613", stream=None
+    chat_history, functions, model="gpt-4-0613", stream=None, force_call=None
 ) -> str:  # "gpt-4-0613", "gpt-3.5-turbo-16k"
     if stream is None:
         stream = StreamCollector()
@@ -123,6 +123,11 @@ async def get_openai_response_stream(
         messages, functions, None, None
     )
 
+    if force_call is not None:
+        force_call = {"name": force_call}
+    else:
+        force_call = "auto"
+
     try:
         if len(functions) > 0:
             openai_response = openai.ChatCompletion.create(
@@ -131,6 +136,7 @@ async def get_openai_response_stream(
                 functions=functions,
                 temperature=0.1,
                 stream=True,
+                function_call=force_call
             )
         else:
             openai_response = openai.ChatCompletion.create(
@@ -138,6 +144,7 @@ async def get_openai_response_stream(
                 messages=messages,
                 temperature=0.1,
                 stream=True,
+                function_call=force_call
             )
 
         # iterate through the stream of events
