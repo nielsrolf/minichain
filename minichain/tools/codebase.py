@@ -145,11 +145,16 @@ async def get_file_summary(path: str = Field(..., description="The path to the f
     if path.endswith(".py"):
         summary = summarize_python_file(path)
     else:
-        print("Summary:", path)
-        summary = await long_document_qa(
-            text=text,
-            question="Summarize the following file in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important sections. When referencing files, always use the path (rather than the filename).",
-        )
+        if len(text.replace("\n", " ").split(" ")) > 400:
+            print("Summary:", path)
+            summary = await long_document_qa(
+                text=text,
+                question="Summarize the following file in order to brief a coworker on this project. Be very concise, and cite important info such as types, function names, and variable names of important sections. When referencing files, always use the path (rather than the filename).",
+            )
+        else:
+            summary = text
+            if text.strip() == "":
+                summary = f"Empty file: {path}"
     return f"# {path}\n{summary}\n\n"
 
 

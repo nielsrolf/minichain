@@ -14,6 +14,7 @@ Your task is to find revelant memories or code sections for the user.
 Use the following strategy:
 - first, search for relevant memories using the `find_memory` function
 - if this doesn't yield the desired information, use the other tools to explore the files or try searching related questions in the memory
+- your task is only to find relevant memories or code sections, everything else is out of scope
 """
 
 class CodeSection(BaseModel):
