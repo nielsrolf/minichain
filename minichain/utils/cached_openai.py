@@ -60,7 +60,7 @@ def fix_common_errors(response: Dict[str, Any]) -> Dict[str, Any]:
     if "```" in response["content"] and response["function_call"]["name"] in ["jupyter", "edit"]:
         # move the code to the arguments
         raw = response["content"]
-        for language in ["python", "bash", "javascript", "html", "css", "json", "yaml", "sql", "markdown", "latex", "c", "cpp", "csharp", "go", "java", "kotlin", "php", "ruby", "rust", "scala", "swift", "py", "sh", "js"]:
+        for language in ["python", "bash", "javascript", "html", "css", "json", "yaml", "sql", "markdown", "latex", "c", "cpp", "csharp", "go", "java", "kotlin", "php", "ruby", "rust", "scala", "swift", "py", "sh", "js", "x", "jsx", "ts", "tsx", "typescript"]:
             raw = raw.replace(f"```{language}", "```")
         content, code = raw.split("```\n", 1)
         response["content"] = content
