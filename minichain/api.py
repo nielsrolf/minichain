@@ -41,6 +41,7 @@ class Payload(BaseModel):
 
 class Execute(BaseModel):
     code: str
+    type: str = "python"
     insert_after: List[str]
 
 
@@ -75,7 +76,7 @@ async def run_cell(cell: Execute):
         conversation=conversation,
         function_call=FunctionCall(
             name="jupyter",
-            arguments={"code": cell.code},
+            arguments={"code": cell.code, "type": cell.type},
         ),
         message_meta={"deleted": True}
     )

@@ -144,9 +144,9 @@ function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, 
     if (!message.chat) {
         return '';
     }
-    if (message.chat.name === 'return') {
-        return '';
-    }
+    // if (message.chat.name === 'return') {
+    //     return '';
+    // }
     if (message.meta.deleted) {
         return '';
     }

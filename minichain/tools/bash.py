@@ -2,26 +2,29 @@ import time
 from typing import Optional
 from enum import Enum
 import jupyter_client
-import os
-import signal
+import re
+
 
 from pydantic import BaseModel, Field
 
 from minichain.agent import Function
 
 
-def shorten_response(response: str) -> str:
+def shorten_response(response: str, max_lines = 100, max_chars = 200) -> str:
     # remove character in each line after the first 100 characters, add ... if the line is longer
+
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    response = ansi_escape.sub('', response)
     response = "\n".join(
         [
-            line[:200] + ("..." if len(line) > 200 else "")
+            line[:max_chars] + ("..." if len(line) > max_lines else "")
             for line in response.split("\n")
         ]
     )
     # if more than 100 lines, remove all lines except the first 5 and the last 5 and insert ...
     lines = response.split("\n")
-    if len(lines) > 100:
-        response = "\n".join(lines[:20] + ["..."] + lines[-80:])
+    if len(lines) > max_lines:
+        response = "\n".join(lines[:max_lines // 2] + ["..."] + lines[-max_lines // 2:])
     return response
 
 
@@ -66,6 +69,7 @@ class Jupyter(Function):
             # remove `&` from the end of the code
             code = "\n".join([line if not line.strip().endswith("&") else line.strip()[:-1] for line in code.split("\n")])
             initial_logs = await jupyter(code, timeout=10, type=type)
+            initial_logs = shorten_response(initial_logs, 20)
             output = f"Started background process with logs:\n{initial_logs}"
             await self.message_handler.set(output)
             return output

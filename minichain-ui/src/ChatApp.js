@@ -302,6 +302,7 @@ const ChatApp = () => {
             },
             body: JSON.stringify({
                 code: code,
+                type: message.chat.function_call.arguments.type,
                 insert_after: message.path
             }),
         });
