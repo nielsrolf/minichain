@@ -2,6 +2,7 @@ from typing import Any, List, Union, Dict
 import json
 import os
 from uuid import uuid4
+from collections import defaultdict
 
 from minichain.utils.json_datetime import datetime_converter
 from minichain.dtypes import Cancelled, ConsumerClosed
@@ -32,7 +33,8 @@ class StreamCollector():
         """Send the path info so that the client knows where to put the message"""
         try:
             await self.shared['on_message']({
-                "type": "path",
+                "type": "set",
+                "id": self.path[-1],
                 "path": self.path,
                 "meta": self.meta
             })
@@ -45,9 +47,12 @@ class StreamCollector():
         """Turn the stream off and trigger saving"""
         self.active = False
     
-    def conversation(self, meta=None):
+    async def conversation(self, meta=None):
         """Create a new conversation"""
-        return Conversation(meta=meta, shared=self.shared, path=self.path)
+        conversation = Conversation(meta=meta, shared=self.shared, path=self.path)
+        child_ids = self.meta["children"] + [conversation.path[-1]]
+        await self.set(meta={"children": child_ids})
+        return conversation
 
     async def chunk(self, diff=None, meta=None):
         if not self.active:
@@ -82,6 +87,7 @@ class StreamCollector():
             self.meta.update(meta)
         msg = {
             "id": self.path[-1],
+            "path": self.path,
             "type": "set",
             "chat": self.current_message,
             "meta": self.meta
@@ -120,6 +126,7 @@ class Message():
                  message_id: str=None,
                  path: List[str]=None,
                  shared=None):
+        self.shared = shared
         self.chat = chat or {}
         self.meta = get_default_meta()
         self.meta.update(meta or {})
@@ -128,8 +135,8 @@ class Message():
             message_id = str(uuid4().hex[:8])
             self.path = self.path + [message_id]
         self._stream_target = None
-        self.shared = shared
         self.shared['message_db'].register_message(self)
+        self.meta['children'] = self.child_ids
 
     async def __aenter__(self):
         """Returns a stream target that can be used to update the message"""
@@ -185,14 +192,16 @@ class Message():
         children = self.shared['message_db'].children_of(self.path[-1])
         return children
     
+    @property
+    def child_ids(self):
+        return [c.path[-1] for c in self.children]
+    
     def as_json(self):
-        children = self.children
-        child_ids = [c.path[-1] for c in children]
         return {
             "chat": self.chat,
             "meta": self.meta,
             "path": self.path,
-            "children": child_ids,
+            "children": self.child_ids,
         }
 
 
@@ -246,11 +255,6 @@ class Conversation():
     
     async def set(self, **meta):
         self.meta.update(meta)
-        await self.shared['on_message']({
-            "type": "path",
-            "path": self.path,
-            "meta": self.meta
-        })
     
     def to(self, chat, meta=None):
         """returns a new Message object"""
@@ -259,16 +263,10 @@ class Conversation():
         if self.insert_after is None:
             self._messages.append(message)
         else:
-            success=False
-            print([i.path[-1] for i in self._messages])
             for i, m in enumerate(self._messages):
                 if m.path[-1] == self.insert_after:
-                    print("inserting after", m.path[-1], "at pos", i)
                     self._messages.insert(i+1, message)
-                    success=True
                     break
-            if not success:
-                print("Could not insert message after", self.insert_after, "because it was not found in", [m.path[-1] for m in self._messages])
         self.save()
         return message
 
@@ -301,11 +299,8 @@ class Conversation():
         data['conversation_id'] = self.path[-1]
         data['message_ids'] = [m['path'][-1] for m in data.pop('messages')]
         print("--> saving conversation to", filepath)
-        print(data)
         with open(filepath, 'w') as f:
             json.dump(data, f, default=datetime_converter)
-        # for message in self.messages:
-        #     message.save()
     
     @classmethod
     def load(cls, filepath, **kwargs):
@@ -324,7 +319,6 @@ class Conversation():
         Arguments:
             chat_message {dict} -- e.g. {"role": "assistant", "content": "Hello"}
         """
-        # if the message is not
         print("sending", chat_message)
         async with self.to(chat_message, meta) as stream:
             await stream.set(chat_message)
@@ -342,30 +336,50 @@ class MessageDB():
         on_message = on_message or do_nothing
         self.shared = {
             'on_message': self.on_message,
-            'consumers': [on_message],
+            'consumers': defaultdict(list),
             'message_db': self,
             'save_dir': save_dir
         }
         self.conversations = []
         self.messages = []
         self.load()
+        self.meta = {
+            "path": ["root"]
+        }
+        self._cancelled = []
     
+    def cancel(self, conversation_id):
+        self._cancelled.append(conversation_id)
+
     async def on_message(self, msg):
         # send the message to all other consumers if they want to consume it
+        path = msg.get("path", None)
+        if path is None:
+            if (message := self.get_message(msg['id'])) is not None:
+                path = message.path
+            else:
+                path = self.get(msg['id']).path
+        for cancelled in self._cancelled:
+            if cancelled in path:
+                raise Cancelled()
+        """
+        we send to subscribers of:
+        path[-2] -> normal message of this conversation
+        path[-1] -> messages addressed to the conversation itsefl, e.g. meta updates. should actually not be used
+        """
+        for target in path[-2:]:
+            await self.send_to_consumers(target, msg)
+    
+    async def send_to_consumers(self, target, msg):
         alive = []
-        for consume in self.shared['consumers']:
+        consumers = self.shared['consumers'].get(target, [])
+        for consume in consumers:
             try:
                 await consume(msg)
                 alive += [consume]
             except ConsumerClosed:
                 print("Consumer closed")
-            except Cancelled as e:
-                # get the path of the Cancelled message and raise it again if the current message is this one or a sub message
-                # e was created with raise Cancel("cancel:{conversation_id}")
-                conversation_id = e.args[0].split(":")[1]
-                if conversation_id in msg['path']:
-                    raise e
-        self.shared['consumers'] = alive
+        self.shared['consumers'][target] = alive
     
     def register_conversation(self, conversation):
         if not conversation.path[-1] in [c.path[-1] for c in self.conversations]:
@@ -385,14 +399,12 @@ class MessageDB():
             return
         message.meta.update(meta)
         message.save()
-        breakpoint()
-        print("yoooo", message.meta)
-        print("consumers", self.shared['consumers'])
         await self.shared['on_message']({
             "type": "set",
             "id": message_id,
             "meta": message.meta,
-            "chat": message.chat
+            "chat": message.chat,
+            "path": message.path
         })
         return message
     
@@ -406,7 +418,8 @@ class MessageDB():
             "type": "set",
             "id": conversation_id,
             "meta": conversation.meta,
-            "chat": conversation.messages[-1].chat
+            "chat": conversation.messages[-1].chat,
+            "path": conversation.path
         })
         return conversation
     
@@ -427,11 +440,8 @@ class MessageDB():
     def children_of(self, message_id):
         return [c for c in self.conversations if c.path[-2] == message_id and c.meta.get('deleted', False)==False]
     
-    def add_consumer(self, consumer, is_main=False):
-        if is_main:
-            self.shared['consumers'].insert(0, consumer)
-        else:
-            self.shared['consumers'].append(consumer)
+    def add_consumer(self, consumer, conversation_id):
+        self.shared['consumers'][conversation_id].append(consumer)
 
     def load(self):
         load_dir = self.shared['save_dir'] + "/root"
@@ -448,22 +458,25 @@ class MessageDB():
             if conversation.path[-1] == conversation_id:
                 return conversation
 
-    def conversation(self, meta=None) -> Conversation:
+    async def conversation(self, meta=None) -> Conversation:
         conversation = Conversation(meta=meta, shared=self.shared, path=['root'])
         return conversation
     
-    def as_json(self):
+    def as_json(self, agent=None):
         # We return the same format as conversations, but we show only user messages that contain conv.meta['preview']
         conversations = self.children_of('root')
         conversations = sort_by_timestamp(conversations)
+        if agent:
+            conversations = [c for c in conversations if c.meta.get('agent') == agent]
+
         messages = [([
             m
             for m in c.messages if m.meta.get('is_initial', False)==False] + [None])[0] for c in conversations]
-        messages = [dict(**m.as_json(), fake_children=[c.path[-1]], agent=c.meta.get('agent')) for m, c in zip(messages, conversations) if m is not None]
+        messages = [dict(chat=m.chat, path=c.path, meta=c.meta, fake_children=[c.path[-1]], agent=c.meta.get('agent')) for m, c in zip(messages, conversations) if m is not None]
         for m in messages:
-            m['children'] = m.pop('fake_children')
+            m['meta']['children'] = m.pop('fake_children')
         return {
-            "meta": {},
+            "meta": self.meta,
             "path": ['root'],
             "messages": messages
         }
@@ -479,10 +492,8 @@ def nested(mode, dictionary, value):
         if mode == "add" and isinstance(dictionary, list):
             return dictionary + (value or [])
         elif mode == "add" and isinstance(value, list):
-            print(dictionary, ",", value)
             return (dictionary or []) + value
         elif mode == "add":
-            print(dictionary, ",", value)
             return dictionary + (value or "")
         elif mode == "set":
             return value

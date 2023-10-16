@@ -130,7 +130,7 @@ async def get_openai_response_stream(
 
     try:
         if len(functions) > 0:
-            openai_response = openai.ChatCompletion.create(
+            openai_response = await openai.ChatCompletion.acreate(
                 model=model,
                 messages=messages,
                 functions=functions,
@@ -139,7 +139,7 @@ async def get_openai_response_stream(
                 function_call=force_call
             )
         else:
-            openai_response = openai.ChatCompletion.create(
+            openai_response = await openai.ChatCompletion.acreate(
                 model=model,
                 messages=messages,
                 temperature=0.1,
@@ -148,7 +148,7 @@ async def get_openai_response_stream(
             )
 
         # iterate through the stream of events
-        for chunk in openai_response:
+        async for chunk in openai_response:
             chunk = chunk["choices"][0]["delta"].to_dict_recursive()
             await stream.chunk(chunk)
     except openai.error.RateLimitError as e:
