@@ -1,12 +1,27 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');  
 
 
 function activate(context) {
 
     let disposable = vscode.commands.registerCommand('extension.openMinichain', function () {
+		const config = vscode.workspace.getConfiguration('minichain');
+		const token = config.get('token');
+		// if token is not set, ask the user to enter it
+		if (!token) {
+			vscode.window.showInputBox({
+				prompt: 'Please enter your Minichain token',
+				placeHolder: 'Token',
+			}).then(token => {
+				if (!token) {
+					return;
+				}
+				// save the token in the config
+				config.update('token', token, true);
+			});
+		}
+
         let panel = vscode.window.createWebviewPanel(
             'minichain',
             'Minichain',
@@ -17,9 +32,11 @@ function activate(context) {
                 localResourceRoots: [
                     vscode.Uri.file(path.join(context.extensionPath, 'build')),
                 ],
+				retainContextWhenHidden: true,
             }
         );
-        const htmlContent = getWebviewContent(context, panel);
+		panel.webview.postMessage({ token: token });
+        const htmlContent = getWebviewContent(context, panel, token);
         console.log(htmlContent)
         panel.webview.html = htmlContent;
     });
@@ -34,7 +51,7 @@ function deactivate() { }
 exports.deactivate = deactivate;
 
 
-function getWebviewContent(context, panel) {
+function getWebviewContent(context, panel, token) {
 	const buildPath = path.join(context.extensionPath, 'build');
 	const indexPath = path.join(buildPath, 'index.html');
 	let html = fs.readFileSync(indexPath, 'utf8');

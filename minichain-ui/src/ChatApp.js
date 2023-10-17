@@ -9,10 +9,53 @@ import NewCell from "./NewCell";
 const backend = 'localhost:8745';
 
 
-function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultAgentName, availableAgents, setShowInitMessages, showInitMessages }) {
+function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultAgentName, availableAgents, setShowInitMessages, showInitMessages, token, setErrorMessage }) {
+    const [viewLinkCopied, setViewLinkCopied] = useState(false);
+    const [editLinkCopied, setEditLinkCopied] = useState(false);
+
     const sendCancelRequest = (conversationId) => {
         // Send a GET /cancel/{conversationId} request
-        fetch(`http://localhost:8745/cancel/${conversationId}`);
+        fetch(`http://${backend}/cancel/${conversationId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+    }
+
+    function createAndCopyShareLink(type) {
+        // Send a POST request to /share/ to create a share link
+        fetch(`http://${backend}/share/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                conversation_id: conversation.path[conversation.path.length - 1],
+                type: type,
+            }),
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+                throw new Error(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        }).then(data => {
+                // Copy the link to the clipboard
+                const url = window.location.href.split('?')[0];
+                const shareUrl = `${url}?token=${data.token}`;
+                navigator.clipboard.writeText(shareUrl);
+                if (type === 'view') {
+                    setViewLinkCopied(true);
+                    setTimeout(() => setViewLinkCopied(false), 2000);
+                } else {
+                    setEditLinkCopied(true);
+                    setTimeout(() => setEditLinkCopied(false), 2000);
+                }
+        }).catch(e => {
+            console.error(e);
+        });
     }
 
     return (
@@ -48,6 +91,10 @@ function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultA
             }}>Interrupt</button>
             <button onClick={() => setShowInitMessages(prev => !prev)}>{showInitMessages ? 'Hide full history' : 'Show full history'}</button>
             {conversation.path}
+            {/* create share link buttons */}
+            <button onClick={() => createAndCopyShareLink('view')}>{viewLinkCopied ? 'Copied' : 'Share link'}</button>
+            <button onClick={() => createAndCopyShareLink('edit')}>{editLinkCopied ? 'Copied' : 'Collaborate'}</button>
+
             {path[path.length - 1] === "root" && (
                 <select value={defaultAgentName} onChange={e => setDefaultAgentName(e.target.value)} style={{
                     position: "absolute",
@@ -80,6 +127,116 @@ function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultA
 
 
 function ChatApp() {
+    const [token, setToken] = useState(null);
+    const [tokenInput, setTokenInput] = useState(null);
+    const [isValidated, setIsValidated] = useState(false);
+    const [errorMessage, setErrorMessage] = useState(null);
+
+
+    useEffect(() => {
+        function handleMessage(event) {
+            const message = event.data;
+            if (message.token) {
+                setToken(message.token);
+            }
+        }
+
+        window.addEventListener('message', handleMessage);
+
+        return () => {
+            window.removeEventListener('message', handleMessage);
+        };
+    }, []);
+
+    // move the token from the get params to the state
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        if (token) {
+            setToken(token);
+        }
+    }, []);
+
+    // validate the token
+    useEffect(() => {
+        if (!token) {
+            return;
+        }
+        fetch(`http://${backend}/messages/root`, {headers: {'Authorization': `Bearer ${token}`}})
+            .then(response => {
+                if (!response.ok) {
+                    // If the response is not ok, throw an error
+                    throw new Error(`Permission error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(data)
+                setIsValidated(true);
+            })
+            .catch(e => {
+                console.error(e);
+                setErrorMessage(e.message);
+            });
+    }, [token]);
+
+
+    if (!isValidated) {
+        return (
+            <div className="main">
+                <div style={{ margin: 'auto', marginTop: '40vh', width: "350px" }}>
+                    Enter your token: <input type="text" value={tokenInput} onChange={e => setTokenInput(e.target.value)} />
+                    <button onClick={() => {
+                        setToken(tokenInput);
+                    }
+                    }>Submit</button>
+                    {errorMessage && (
+                        <div className="error-message">
+                            {errorMessage}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    console.log("token", token);
+
+
+    return (
+        <AuthorizedChatApp token={token} />
+    );
+}
+
+function ErrorHeader({ errorMessage, setErrorMessage }) {
+    const [show, setShow] = useState(true);
+
+    useEffect(() => {
+        if (errorMessage) {
+            setShow(true);
+            // hide the error message after 1.5 seconds
+            setTimeout(() => {
+                setShow(false);
+                setErrorMessage(null);
+            }, 1500);
+        }
+    }, [errorMessage, setErrorMessage]);
+
+    if (!show || !errorMessage) {
+        return '';
+    }
+
+    return (
+        <div className="error-header">
+            <button onClick={() => setErrorMessage(null)}>X</button>
+            <div className="error-message">
+                {errorMessage}
+            </div>
+        </div>
+    );
+}
+
+
+function AuthorizedChatApp({token}) {
     const [path, setPath] = useState(["root"]);
     const [messages, setMessages] = useState([]);
     const [userMessage, setUserMessage] = useState("");
@@ -94,10 +251,12 @@ function ChatApp() {
         messages: {},
         sortedIds: []
     });
+    const [errorMessage, setErrorMessage] = useState(null);
+
 
     // fetch the available agents
     useEffect(() => {
-        fetch("http://localhost:8745/agents")
+        fetch(`http://${backend}/agents`, {headers: {'Authorization': `Bearer ${token}`}})
             .then(response => response.json())
             .then(data => {
                 setAvailableAgents(data);
@@ -105,7 +264,7 @@ function ChatApp() {
             .catch(e => {
                 console.error(e);
             });
-    }, []);
+    }, [token]);
 
     // fetch the root conversation
     useEffect(() => {
@@ -113,21 +272,27 @@ function ChatApp() {
             return;
         }
         const url = `http://${backend}/byagent/${defaultAgentName}`;
-        fetch(url)
-            .then(response => response.json())
+        fetch(url, {headers: {'Authorization': `Bearer ${token}`}})
+            .then(response => {
+                if (!response.ok) {
+                    // If the response is not ok, throw an error
+                    throw new Error(`Permission error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 console.log("got conversation", data);
                 setConversation(data);
-                setMessages(data.messages);
+                setMessages(data.messages || []);
                 setStreamingState({
                     messages: {},
                     sortedIds: []
                 });
             })
             .catch(e => {
-                console.error(e);
+                setErrorMessage(e.message);
             });
-    }, [path, defaultAgentName]);
+    }, [path, defaultAgentName, token]);
 
 
     // fetch the conversation
@@ -143,7 +308,11 @@ function ChatApp() {
             return;
         }
 
-        fetch(`http://${backend}/messages/${path[path.length - 1]}`)
+        fetch(`http://${backend}/messages/${path[path.length - 1]}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        })
             .then(response => response.json())
             .then(data => {
                 console.log("got conversation", data);
@@ -162,6 +331,8 @@ function ChatApp() {
                 messages: {},
                 sortedIds: []
             });
+            // send token as first message
+            client.send(token);
         };
 
         client.onmessage = (messageRaw) => {
@@ -255,7 +426,7 @@ function ChatApp() {
         return () => {
             client.close();
         }
-    }, [path]);
+    }, [path, token]);
 
 
     const handleSubConversationClick = (subConversationId) => {
@@ -275,13 +446,19 @@ function ChatApp() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 code: code,
                 type: message.chat.function_call.arguments.type,
                 insert_after: message.path
             }),
-        });
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+            }
+        })
         // update path to refresh the conversation
         // setPath([...path]);
     }
@@ -293,6 +470,7 @@ function ChatApp() {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 function_call: {
@@ -300,9 +478,14 @@ function ChatApp() {
                     arguments: { ...message.chat.function_call.arguments, code: code },
                 },
             }),
-        });
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+            }
+        })
         // update path to refresh the conversation
-        setPath([...path]);
+        // setPath([...path]);
     }
 
     function forkFromMessage(path) {
@@ -310,10 +493,22 @@ function ChatApp() {
         const pathString = path.join('/');
         fetch(`http://localhost:8745/fork/${pathString}`, {
             method: 'GET',
-        }).then(response => response.json())
-            .then(data => {
-                setPath(data.path);
-            });
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+                throw new Error(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        }).then(data => {
+            setPath(data.path);
+        }).catch(e => {
+            console.error(e);
+        });
     }
 
     function createNewCell(code) {
@@ -321,12 +516,19 @@ function ChatApp() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 code: code,
                 insert_after: messages[messages.length - 1].path,
             }),
-        });
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        })
     }
 
     function postMessage() {
@@ -334,18 +536,28 @@ function ChatApp() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 query: userMessage,
                 response_to: conversation.path[conversation.path.length - 1],
                 agent: conversation.meta.agent || defaultAgentName,
             }),
-        }).then(response => response.json())
-            .then(data => {
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+                throw new Error(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        }).then(data => {
                 setPath([...path, data.path[data.path.length - 1]]);
-            });
+        }).catch(e => {
+            console.error(e);
+        });
         setUserMessage("");
     }
+
 
 
     return (
@@ -359,8 +571,11 @@ function ChatApp() {
                 setDefaultAgentName={setDefaultAgentName}
                 setShowInitMessages={setShowInitMessages}
                 showInitMessages={showInitMessages}
+                token={token}
+                setErrorMessage={setErrorMessage}
             />
             <div style={{ height: "50px" }}></div>
+            <ErrorHeader errorMessage={errorMessage} setErrorMessage={setErrorMessage} />
             <div className="chat">
                 {(messages).map((message, i) => {
                     if (message.meta.deleted || (message.meta.is_initial && !showInitMessages))
@@ -373,6 +588,8 @@ function ChatApp() {
                             runCodeAfterMessage={runCodeAfterMessage}
                             saveCodeInMessage={saveCodeInMessage}
                             forkFromMessage={forkFromMessage}
+                            token={token}
+                            setErrorMessage={setErrorMessage}
                         />
                     )
                 })}
@@ -387,6 +604,8 @@ function ChatApp() {
                             runCodeAfterMessage={runCodeAfterMessage}
                             saveCodeInMessage={saveCodeInMessage}
                             forkFromMessage={forkFromMessage}
+                            token={token}
+                            setErrorMessage={setErrorMessage}
                         />
                     )
                 })}

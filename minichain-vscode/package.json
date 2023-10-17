@@ -24,6 +24,21 @@
         "command": "extension.openMinichain",
         "title": "Open Minichain"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Minichain Configuration",
+      "properties": {
+        "minichain.token": {
+          "type": "string",
+          "default": "",
+          "description": "Token for Minichain authentication."
+        },
+        "minichain.jwt_secret": {
+          "type": "string",
+          "default": "",
+          "description": "JWT secret for Minichain authentication."
+        }
+      }
+    }
   }
 }
