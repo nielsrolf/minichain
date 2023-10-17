@@ -117,12 +117,13 @@ function formatCost(cost) {
 }
 
 
-function sendMessageMeta(path, meta) {
+function sendMessageMeta(path, meta, token) {
     // Send PUT request to /messages/{path} with meta data
     fetch(`http://localhost:8745/meta/${path[path.length - 1]}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
         },
         body: JSON.stringify(meta),
     });
@@ -131,7 +132,7 @@ function sendMessageMeta(path, meta) {
 
 
 
-function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage, forkFromMessage }){
+function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage, forkFromMessage, token }){
     // if the message has not streamed enough, return
     if (!message.chat) {
         return '';
@@ -155,13 +156,13 @@ function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, 
                         forkFromMessage(message.path);
                     }} />
                     {message.meta.rating === 1 ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOutlinedIcon fontSize="small" onClick={() => {
-                        sendMessageMeta(message.path, {"rating": 1}, message.children);
+                        sendMessageMeta(message.path, {"rating": 1}, token);
                     }} />}
                     {message.meta.rating === -1 ? <ThumbDownIcon fontSize="small" /> : <ThumbDownOutlinedIcon fontSize="small" onClick={() => {
-                        sendMessageMeta(message.path, {"rating": -1}, message.children);
+                        sendMessageMeta(message.path, {"rating": -1}, token);
                     }} />}
                     <CloseIcon onClick={() => {
-                            sendMessageMeta(message.path, {"deleted": true}, message.children)
+                            sendMessageMeta(message.path, {"deleted": true}, token)
                         }}
                         fontSize="small" />
                 </div>

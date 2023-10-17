@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 import shutil
 from pydantic import BaseModel, Field
 import yaml
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException, WebSocket, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ from minichain.dtypes import ConsumerClosed, FunctionCall, UserMessage
 from minichain.functions import tool
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
+from minichain.auth import get_token_payload, create_access_token
 
 
 
@@ -59,18 +60,18 @@ async def root():
 
 
 @app.get("/agents")
-async def get_agents():
+async def get_agents(token_payload: dict = Depends(get_token_payload)):
     return list(agents.keys())
 
 
 @app.get("/byagent/{agent}")
-async def get_conversations_by_agent(agent: str):
+async def get_conversations_by_agent(agent: str, token_payload: dict = Depends(get_token_payload)):
     messages = message_db.as_json(agent)
     return messages
 
 
 @app.get("/messages/{path:path}")
-async def read_messages(path: str):
+async def read_messages(path: str, token_payload: dict = Depends(get_token_payload)):
     if path == "":
         path = "root"
     path = path.split('/')
@@ -82,7 +83,7 @@ async def read_messages(path: str):
 
 
 @app.put("/meta/{path:path}")
-async def put_meta(path: str, meta: Dict[str, Any]):
+async def put_meta(path: str, meta: Dict[str, Any], token_payload: dict = Depends(get_token_payload)):
     if path == "":
         path = "root"
     path = path.split('/')
@@ -91,7 +92,7 @@ async def put_meta(path: str, meta: Dict[str, Any]):
 
 
 @app.get("/meta/{path:path}")
-async def put_meta(path: str):
+async def put_meta(path: str, token_payload: dict = Depends(get_token_payload)):
     if path == "":
         path = "root"
     path = path.split('/')
@@ -102,7 +103,7 @@ async def put_meta(path: str):
 
 
 @app.put("/chat/{path:path}")
-async def put_chat(path: str, update: MessagePayload):
+async def put_chat(path: str, update: MessagePayload, token_payload: dict = Depends(get_token_payload)):
     if path == "":
         path = "root"
     path = path.split('/')
@@ -112,7 +113,7 @@ async def put_chat(path: str, update: MessagePayload):
 
 
 @app.get("/fork/{path:path}")
-async def fork(path: str):
+async def fork(path: str, token_payload: dict = Depends(get_token_payload)):
     path = path.split('/')
     conversation = message_db.get(path[-2])
     new_path = conversation.path + [uuid.uuid4().hex[:8]]
@@ -121,7 +122,7 @@ async def fork(path: str):
 
 
 @app.get("/static/{path:path}")
-async def static(path):
+async def static(path, token_payload: dict = Depends(get_token_payload)):
     print("static", path)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -130,7 +131,7 @@ async def static(path):
 
 
 @app.post("/run/")
-async def run_cell(cell: Execute):
+async def run_cell(cell: Execute, token_payload: dict = Depends(get_token_payload)):
     """Run a cell and insert the function call output after the specified cell."""
     print("running cell", cell)
     # get the conversation
@@ -152,7 +153,7 @@ async def run_cell(cell: Execute):
 
 
 @app.post("/cell/")
-async def create_cell(cell: Execute):
+async def create_cell(cell: Execute, token_payload: dict = Depends(get_token_payload)):
     """Create a cell."""
     # get the conversation
     conversation = message_db.get(cell.insert_after[-2])
@@ -174,7 +175,7 @@ async def create_cell(cell: Execute):
 
 
 @app.get("/cancel/{conversation_id}")
-async def cancel_agent(conversation_id: str):
+async def cancel_agent(conversation_id: str, token_payload: dict = Depends(get_token_payload)):
     """Cancel an agent."""
     message_db.cancel(conversation_id)
 
@@ -198,7 +199,7 @@ async def upload_file_to_chat(
 
 
 @app.post("/message/")
-async def run_agent(payload: Payload):
+async def run_agent(payload: Payload, token_payload: dict = Depends(get_token_payload)):
     """Run an agent."""
 
     agent_name = payload.agent
@@ -226,6 +227,15 @@ async def run_agent(payload: Payload):
 async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
     await websocket.accept()
     print("websocket accepted")
+    # wait for the token
+    try:
+        token = await websocket.receive_text()
+        print("websocket token", token)
+        token_payload = get_token_payload(token)
+        print("websocket token_payload", token_payload)
+    except Exception as e:
+        print("websocket error", e)
+        raise HTTPException(status_code=401, detail="Invalid token")
     if conversation_id == "root":
         # we close the websocket, because we don't want to send the root messages
         await websocket.close()

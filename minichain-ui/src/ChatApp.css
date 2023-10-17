@@ -137,3 +137,14 @@
   max-width: 100%;
   border-radius: 5px;
 }
+
+
+.error-header {
+  z-index: 2;
+}
+
+.error-message {
+  color: red;
+  font-size: 20px;
+  font-weight: bold;
+}
