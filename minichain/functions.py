@@ -9,7 +9,7 @@ from minichain.dtypes import ExceptionForAgent
 
 
 class Function:
-    def __init__(self, openapi, name, function, description, message_handler=None):
+    def __init__(self, openapi, name, function, description, message_handler=None, has_conversation_argument=False):
         """
         Arguments:
             openapi (dict): the openapi.json describing the function
@@ -37,6 +37,7 @@ class Function:
                 f"\nUse the normal message content fiield to put ```{code_param['description']}```"
             )
             parameters_openapi["required"].remove("code")
+        self.has_conversation_argument = has_conversation_argument
         self.parameters_openapi = parameters_openapi
         self.name = name
         self.function = function
@@ -44,8 +45,6 @@ class Function:
     
     def check_arguments_raise_error(self, arguments):
         """Check if the arguments are valid. If not, raise an error."""
-        with open("arguments.json", "w") as f:
-            json.dump(arguments, f)
         if "code" in arguments and not self.has_code_argument:
             arguments.pop("code")
         if self.pydantic_model is not None:
@@ -67,7 +66,9 @@ class Function:
 
     async def __call__(self, **arguments):
         """Call the function with the given arguments."""
-        arguments = self.check_arguments_raise_error(arguments)    
+        arguments = self.check_arguments_raise_error(arguments)
+        if self.has_conversation_argument:
+            arguments['conversation'] = self.message_handler.context 
         response = await self.function(**arguments)
         if not isinstance(response, str):
             response = json.dumps(response)
@@ -114,8 +115,9 @@ def tool(name=None, description=None, **kwargs):
         fields = {
             arg: (argspec.annotations[arg], Field(..., description=field.description))
             for arg, field in zip(argspec.args, argspec.defaults)
-            if not arg in kwargs.keys()
+            if not arg in kwargs.keys() and not arg == "conversation"
         }
+
 
         pydantic_model = create_model(f.__name__, **fields)
         function = Function(
@@ -123,6 +125,7 @@ def tool(name=None, description=None, **kwargs):
             description=description or f.__doc__,
             openapi=pydantic_model,
             function=f_with_args,
+            has_conversation_argument="conversation" in argspec.args,
         )
         return function
 

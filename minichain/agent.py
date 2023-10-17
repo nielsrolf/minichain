@@ -69,7 +69,6 @@ class Agent:
         pass
 
     async def session(self, conversation=None, **arguments):
-        await self.before_run()
         if not isinstance(conversation, Conversation):
             if conversation is None:
                 conversation = await self.message_handler.conversation(meta=dict(agent=self.name))
@@ -78,6 +77,7 @@ class Agent:
             for message in self.init_history:
                 await conversation.send(message, is_initial=True)
         agent_session = Session(self, conversation)
+        await self.before_run(agent_session.conversation, **arguments)
         return agent_session
 
     async def run(self, conversation=None, message_meta=None, **arguments):

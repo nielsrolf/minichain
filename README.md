@@ -27,7 +27,7 @@ docker pull nielsrolf/minichain:latest
 docker run -v $(pwd):$(pwd) \
      -w $(pwd) -p 8745:8745 \
      --env-file .env.example \
-     -e your_image_name # optionally:  --gpus all 
+     nielsrolf/minichain # optionally:  --gpus all 
 ```
 
 ## Defining a tool
@@ -117,4 +117,4 @@ Create the VSCode extension .vsix file:
 vsce package
 ```
 
- To start the extension, you can open Visual Studio Code, go to the Extensions view (Ctrl+Shift+X), and click on the ... (More Actions) button at the top of the view and select Install from VSIX.... Navigate to the minichain-vscode/ directory, select the .vsix file, and click Install. After the installation, you should be able to use the "Open Minichain" command.
+To start the extension, you can open Visual Studio Code, go to the Extensions view (Ctrl+Shift+X), and click on the ... (More Actions) button at the top of the view and select Install from VSIX.... Navigate to the minichain-vscode/ directory, select the .vsix file, and click Install. After the installation, you should be able to use the "Open Minichain" command.

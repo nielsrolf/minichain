@@ -119,6 +119,10 @@ function ChatApp() {
                 console.log("got conversation", data);
                 setConversation(data);
                 setMessages(data.messages);
+                setStreamingState({
+                    messages: {},
+                    sortedIds: []
+                });
             })
             .catch(e => {
                 console.error(e);

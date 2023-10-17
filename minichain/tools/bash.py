@@ -74,7 +74,7 @@ class Jupyter(Function):
             jupyter = Jupyter(continue_on_timeout=True)
             # remove `&` from the end of the code
             code = "\n".join([line if not line.strip().endswith("&") else line.strip()[:-1] for line in code.split("\n")])
-            initial_logs = await jupyter(code, timeout=10, type=type)
+            initial_logs = await jupyter(code=code, timeout=10, type=type)
             initial_logs = shorten_response(initial_logs, 20)
             output = f"Started background process with logs:\n{initial_logs}"
             await self.message_handler.set(output)

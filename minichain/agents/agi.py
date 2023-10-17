@@ -9,7 +9,7 @@ from minichain.agents.webgpt import WebGPT
 from minichain.functions import tool
 from minichain.schemas import MultiModalResponse
 from minichain.tools import taskboard
-from minichain.dtypes import SystemMessage
+from minichain.dtypes import SystemMessage, UserMessage
 
 
 system_message = """You are a smart and friendly AGI.
@@ -66,6 +66,7 @@ class AGI(Agent):
             additional_info: str = Field(
                 "", description="Additional message to the programmer."
             ),
+            conversation=None,
         ):
             """Assign a task to an agent (copy-of-self: for complex tasks with sub tasks, programmer: to work on the codebase, webgpt (rarely): to research something on the web, artist: for generating images and music). The assignee will immediately start working on the task."""
             task = [i for i in self.board.tasks if i.id == task_id][0]
@@ -73,7 +74,8 @@ class AGI(Agent):
                 self.board, task_id, "IN_PROGRESS"
             )
             query = (
-                f"Please work on the following ticket: \n{str(task)}\n{additional_info}\nThe ticket is already assigned to you and set to 'IN_PROGRESS'.\n"
+                f"Your team is working on this customer request: \n{conversation.first_user_message.chat['content']}\n"
+                f"Please work on the following ticket: \n{str(task)}\n{additional_info}\n"
                 "When you are done, return with a detailed explanation of what you did, including a list of all the files you changed and an explanation of how to test and use the new feature.\n"
             )
             if len(relevant_code) > 0:
@@ -157,5 +159,10 @@ class AGI(Agent):
     @property
     def init_history(self):
         return [SystemMessage(self.system_message)] + self.programmer.init_history[1:]
+    
+    async def before_run(self, conversation=None, **arguments):
+        # Add the initial user message to to init messages of the programmer
+        message = f"Your team is working on the following tasks:\n{conversation.first_user_message}"
+        self.programmer._init_history.append(UserMessage(message))
     
 

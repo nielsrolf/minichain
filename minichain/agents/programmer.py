@@ -61,6 +61,6 @@ class Programmer(Agent):
         if len(self.hippocampus.memory.memories) > 0:
             init_msg += f"\nHere is a summary of your memory: \n{self.hippocampus.memory.get_content_summary()}\nUse the `find_memory` function to find relevant memories."
         init_history.append(UserMessage(init_msg))
-        return init_history
+        return init_history + self._init_history
     
 

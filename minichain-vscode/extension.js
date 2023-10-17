@@ -1,10 +1,10 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');  
 
 
 function activate(context) {
-
 
     let disposable = vscode.commands.registerCommand('extension.openMinichain', function () {
         let panel = vscode.window.createWebviewPanel(

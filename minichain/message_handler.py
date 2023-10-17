@@ -29,6 +29,11 @@ class StreamCollector():
         self.active = True
         self.meta = meta or {}
     
+    @property
+    def context(self):
+        """Returns the conversation object that contians this message"""
+        return self.shared['message_db'].get(self.path[-2])
+    
     async def prepare(self):
         """Send the path info so that the client knows where to put the message"""
         try:
@@ -227,6 +232,13 @@ class Conversation():
         self.shared['message_db'].register_conversation(self)
         self.forked_from = forked_from
         self.insert_after = insert_after
+    
+    @property
+    def first_user_message(self):
+        for m in self.messages:
+            if m.meta.get('is_initial', False)==False and m.chat.get('role', None) == 'user':
+                return m
+        return None
     
     @property
     def messages(self):
@@ -472,9 +484,7 @@ class MessageDB():
         if agent:
             conversations = [c for c in conversations if c.meta.get('agent') == agent]
 
-        messages = [([
-            m
-            for m in c.messages if m.meta.get('is_initial', False)==False] + [None])[0] for c in conversations]
+        messages = [c.first_user_message for c in conversations]
         messages = [dict(chat=m.chat, path=c.path, meta=c.meta, fake_children=[c.path[-1]], agent=c.meta.get('agent')) for m, c in zip(messages, conversations) if m is not None]
         for m in messages:
             m['meta']['children'] = m.pop('fake_children')
