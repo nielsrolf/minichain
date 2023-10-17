@@ -190,6 +190,7 @@ class Message():
         if os.path.exists(filepath) and os.path.isdir(filepath):
             for sub_conversation_id in os.listdir(filepath):
                 Conversation.load(os.path.join(filepath, sub_conversation_id, "conversation.json"), **kwargs)
+        message.meta['children'] = message.child_ids
         return message
     
     @property
@@ -300,6 +301,7 @@ class Conversation():
     async def __aenter__(self):
         # Send the path message to the client
         await self.set()
+        self.save()
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
@@ -334,7 +336,6 @@ class Conversation():
         Arguments:
             chat_message {dict} -- e.g. {"role": "assistant", "content": "Hello"}
         """
-        print("sending", chat_message)
         async with self.to(chat_message, meta) as stream:
             await stream.set(chat_message)
     
