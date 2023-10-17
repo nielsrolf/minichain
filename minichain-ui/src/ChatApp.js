@@ -9,13 +9,52 @@ import NewCell from "./NewCell";
 const backend = 'localhost:8745';
 
 
-function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultAgentName, availableAgents, setShowInitMessages, showInitMessages, token }) {
+function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultAgentName, availableAgents, setShowInitMessages, showInitMessages, token, setErrorMessage }) {
+    const [viewLinkCopied, setViewLinkCopied] = useState(false);
+    const [editLinkCopied, setEditLinkCopied] = useState(false);
+
     const sendCancelRequest = (conversationId) => {
         // Send a GET /cancel/{conversationId} request
-        fetch(`http://localhost:8745/cancel/${conversationId}`, {
+        fetch(`http://${backend}/cancel/${conversationId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
+        });
+    }
+
+    function createAndCopyShareLink(type) {
+        // Send a POST request to /share/ to create a share link
+        fetch(`http://${backend}/share/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                conversation_id: conversation.path[conversation.path.length - 1],
+                type: type,
+            }),
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+                throw new Error(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        }).then(data => {
+                // Copy the link to the clipboard
+                const url = window.location.href.split('?')[0];
+                const shareUrl = `${url}?token=${data.token}`;
+                navigator.clipboard.writeText(shareUrl);
+                if (type === 'view') {
+                    setViewLinkCopied(true);
+                    setTimeout(() => setViewLinkCopied(false), 2000);
+                } else {
+                    setEditLinkCopied(true);
+                    setTimeout(() => setEditLinkCopied(false), 2000);
+                }
+        }).catch(e => {
+            console.error(e);
         });
     }
 
@@ -52,6 +91,10 @@ function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultA
             }}>Interrupt</button>
             <button onClick={() => setShowInitMessages(prev => !prev)}>{showInitMessages ? 'Hide full history' : 'Show full history'}</button>
             {conversation.path}
+            {/* create share link buttons */}
+            <button onClick={() => createAndCopyShareLink('view')}>{viewLinkCopied ? 'Copied' : 'Share link'}</button>
+            <button onClick={() => createAndCopyShareLink('edit')}>{editLinkCopied ? 'Copied' : 'Collaborate'}</button>
+
             {path[path.length - 1] === "root" && (
                 <select value={defaultAgentName} onChange={e => setDefaultAgentName(e.target.value)} style={{
                     position: "absolute",
@@ -123,7 +166,7 @@ function ChatApp() {
             .then(response => {
                 if (!response.ok) {
                     // If the response is not ok, throw an error
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+                    throw new Error(`Permission error! Status: ${response.status}`);
                 }
                 return response.json();
             })
@@ -165,15 +208,29 @@ function ChatApp() {
 }
 
 function ErrorHeader({ errorMessage, setErrorMessage }) {
-    if (!errorMessage) {
+    const [show, setShow] = useState(true);
+
+    useEffect(() => {
+        if (errorMessage) {
+            setShow(true);
+            // hide the error message after 1.5 seconds
+            setTimeout(() => {
+                setShow(false);
+                setErrorMessage(null);
+            }, 1500);
+        }
+    }, [errorMessage, setErrorMessage]);
+
+    if (!show || !errorMessage) {
         return '';
     }
+
     return (
         <div className="error-header">
+            <button onClick={() => setErrorMessage(null)}>X</button>
             <div className="error-message">
                 {errorMessage}
             </div>
-            <button onClick={() => setErrorMessage(null)}>X</button>
         </div>
     );
 }
@@ -219,7 +276,7 @@ function AuthorizedChatApp({token}) {
             .then(response => {
                 if (!response.ok) {
                     // If the response is not ok, throw an error
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+                    throw new Error(`Permission error! Status: ${response.status}`);
                 }
                 return response.json();
             })
@@ -396,7 +453,12 @@ function AuthorizedChatApp({token}) {
                 type: message.chat.function_call.arguments.type,
                 insert_after: message.path
             }),
-        });
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+            }
+        })
         // update path to refresh the conversation
         // setPath([...path]);
     }
@@ -416,9 +478,14 @@ function AuthorizedChatApp({token}) {
                     arguments: { ...message.chat.function_call.arguments, code: code },
                 },
             }),
-        });
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+            }
+        })
         // update path to refresh the conversation
-        setPath([...path]);
+        // setPath([...path]);
     }
 
     function forkFromMessage(path) {
@@ -430,10 +497,18 @@ function AuthorizedChatApp({token}) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-        }).then(response => response.json())
-            .then(data => {
-                setPath(data.path);
-            });
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+                throw new Error(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        }).then(data => {
+            setPath(data.path);
+        }).catch(e => {
+            console.error(e);
+        });
     }
 
     function createNewCell(code) {
@@ -447,7 +522,13 @@ function AuthorizedChatApp({token}) {
                 code: code,
                 insert_after: messages[messages.length - 1].path,
             }),
-        });
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        })
     }
 
     function postMessage() {
@@ -462,10 +543,18 @@ function AuthorizedChatApp({token}) {
                 response_to: conversation.path[conversation.path.length - 1],
                 agent: conversation.meta.agent || defaultAgentName,
             }),
-        }).then(response => response.json())
-            .then(data => {
+        }).then(response => {
+            if (!response.ok) {
+                // If the response is not ok, throw an error
+                setErrorMessage(`Permission error! Status: ${response.status}`);
+                throw new Error(`Permission error! Status: ${response.status}`);
+            }
+            return response.json()
+        }).then(data => {
                 setPath([...path, data.path[data.path.length - 1]]);
-            });
+        }).catch(e => {
+            console.error(e);
+        });
         setUserMessage("");
     }
 
@@ -483,6 +572,7 @@ function AuthorizedChatApp({token}) {
                 setShowInitMessages={setShowInitMessages}
                 showInitMessages={showInitMessages}
                 token={token}
+                setErrorMessage={setErrorMessage}
             />
             <div style={{ height: "50px" }}></div>
             <ErrorHeader errorMessage={errorMessage} setErrorMessage={setErrorMessage} />
@@ -499,6 +589,7 @@ function AuthorizedChatApp({token}) {
                             saveCodeInMessage={saveCodeInMessage}
                             forkFromMessage={forkFromMessage}
                             token={token}
+                            setErrorMessage={setErrorMessage}
                         />
                     )
                 })}
@@ -514,6 +605,7 @@ function AuthorizedChatApp({token}) {
                             saveCodeInMessage={saveCodeInMessage}
                             forkFromMessage={forkFromMessage}
                             token={token}
+                            setErrorMessage={setErrorMessage}
                         />
                     )
                 })}

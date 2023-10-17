@@ -59,6 +59,34 @@ async def root():
     return {"message": "Hello World"}
 
 
+class ShareRequest(BaseModel):
+    conversation_id: str
+    type: str = "view"
+
+
+def check_permission_return_item(token_payload, item_id=None, permission='edit'):
+    """Check if the user has the permission to access the item."""
+    if permission == 'edit' and permission not in token_payload['scopes']:
+        raise HTTPException(status_code=401, detail="Not enough permissions")
+    if item_id is None:
+        return
+    message_or_conversation = message_db.get(item_id)
+    if message_or_conversation is None:
+        message_or_conversation = message_db.get_message(item_id)
+    if message_or_conversation is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return message_or_conversation
+
+
+@app.post("/share/")
+async def share(share_request: ShareRequest, token_payload: dict = Depends(get_token_payload)):
+    """Create a new token that can be used to access the conversation."""
+    conversation = check_permission_return_item(token_payload, share_request.conversation_id, share_request.type)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"token": create_access_token({"sub": "frontend", "scopes": [share_request.conversation_id, share_request.type]})}
+
+
 @app.get("/agents")
 async def get_agents(token_payload: dict = Depends(get_token_payload)):
     return list(agents.keys())
@@ -66,6 +94,10 @@ async def get_agents(token_payload: dict = Depends(get_token_payload)):
 
 @app.get("/byagent/{agent}")
 async def get_conversations_by_agent(agent: str, token_payload: dict = Depends(get_token_payload)):
+    if "root" not in token_payload['scopes']:
+        # return the conversation that the user has access to
+        conversation = message_db.get(token_payload['scopes'][0])
+        return conversation.as_json()
     messages = message_db.as_json(agent)
     return messages
 
@@ -75,7 +107,8 @@ async def read_messages(path: str, token_payload: dict = Depends(get_token_paylo
     if path == "":
         path = "root"
     path = path.split('/')
-    conversation = message_db.get(path[-1])
+    # conversation = message_db.get(path[-1])
+    conversation = check_permission_return_item(token_payload, path[-1], 'view')
     if conversation:
         return conversation.as_json()
     else:
@@ -87,18 +120,19 @@ async def put_meta(path: str, meta: Dict[str, Any], token_payload: dict = Depend
     if path == "":
         path = "root"
     path = path.split('/')
+    check_permission_return_item(token_payload, path[-1], 'edit')
     message_or_conversation = await message_db.update_meta(path[-1], meta)
     return message_or_conversation.as_json()
 
 
 @app.get("/meta/{path:path}")
-async def put_meta(path: str, token_payload: dict = Depends(get_token_payload)):
+async def get_meta(path: str, token_payload: dict = Depends(get_token_payload)):
     if path == "":
         path = "root"
     path = path.split('/')
     if path[-1] == "root":
         return {"path": ["root"]}
-    message_or_conversation = message_db.get(path[-1]) or message_db.get_message(path[-1])
+    message_or_conversation = check_permission_return_item(token_payload, path[-1], 'view')
     return message_or_conversation.meta
 
 
@@ -108,6 +142,7 @@ async def put_chat(path: str, update: MessagePayload, token_payload: dict = Depe
         path = "root"
     path = path.split('/')
     update = update.dict()
+    check_permission_return_item(token_payload, path[-1], 'edit')
     message = await message_db.update_message(path[-1], update)
     return message.as_json()
 
@@ -115,7 +150,7 @@ async def put_chat(path: str, update: MessagePayload, token_payload: dict = Depe
 @app.get("/fork/{path:path}")
 async def fork(path: str, token_payload: dict = Depends(get_token_payload)):
     path = path.split('/')
-    conversation = message_db.get(path[-2])
+    conversation = check_permission_return_item(token_payload, path[-2], 'edit')
     new_path = conversation.path + [uuid.uuid4().hex[:8]]
     forked_conversation = conversation.fork(path[-1], new_path)
     return forked_conversation.as_json()
@@ -133,12 +168,11 @@ async def static(path, token_payload: dict = Depends(get_token_payload)):
 @app.post("/run/")
 async def run_cell(cell: Execute, token_payload: dict = Depends(get_token_payload)):
     """Run a cell and insert the function call output after the specified cell."""
+    conversation = check_permission_return_item(token_payload, cell.insert_after[-2], 'edit')
     print("running cell", cell)
     # get the conversation
-    conversation = message_db.get(cell.insert_after[-2])
     conversation = conversation.at(cell.insert_after[-1])
     # get the agent
-    print(conversation.meta)
     agent = agents[conversation.meta['agent']]
 
     session = await agent.session(conversation)
@@ -156,7 +190,7 @@ async def run_cell(cell: Execute, token_payload: dict = Depends(get_token_payloa
 async def create_cell(cell: Execute, token_payload: dict = Depends(get_token_payload)):
     """Create a cell."""
     # get the conversation
-    conversation = message_db.get(cell.insert_after[-2])
+    conversation = check_permission_return_item(token_payload, cell.insert_after[-2], 'edit')
     conversation = conversation.at(cell.insert_after[-1])
 
     function_call = FunctionCall(
@@ -177,6 +211,7 @@ async def create_cell(cell: Execute, token_payload: dict = Depends(get_token_pay
 @app.get("/cancel/{conversation_id}")
 async def cancel_agent(conversation_id: str, token_payload: dict = Depends(get_token_payload)):
     """Cancel an agent."""
+    conversation = check_permission_return_item(token_payload, conversation_id, 'edit')
     message_db.cancel(conversation_id)
 
 
@@ -202,13 +237,13 @@ async def upload_file_to_chat(
 async def run_agent(payload: Payload, token_payload: dict = Depends(get_token_payload)):
     """Run an agent."""
 
+    conversation = check_permission_return_item(token_payload, payload.response_to, 'edit')
+
     agent_name = payload.agent
     if agent_name not in agents:
         raise HTTPException(status_code=404, detail="Agent not found")
     
     agent = agents[agent_name]
-
-    conversation = message_db.get(payload.response_to)
 
     # start the agent.run in the background, so we can return the conversation id
     session = await agent.session(conversation)

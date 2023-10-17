@@ -141,10 +141,18 @@
 
 .error-header {
   z-index: 2;
+  position: fixed;
+  top: 40vh;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #515151;
+  color: #CCCCCC;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid black;
 }
 
 .error-message {
-  color: red;
   font-size: 20px;
   font-weight: bold;
 }

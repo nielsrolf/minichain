@@ -22,7 +22,9 @@ def get_or_create_secret_and_token():
         with open(".vscode/settings.json") as f:
             settings = json.load(f)
         secret = settings["minichain.jwt_secret"]
-    except:
+    except Exception as e:
+        print(e)
+        breakpoint()
         secret = uuid4().hex
         os.makedirs(".vscode", exist_ok=True)
         settings = settings or {}
@@ -33,7 +35,7 @@ def get_or_create_secret_and_token():
     try:
         token = settings["minichain.token"]
     except:
-        token = create_access_token({"sub": "frontend", "scopes": ["root"]}, secret)
+        token = create_access_token({"sub": "frontend", "scopes": ["root", "edit"]}, secret)
         settings["minichain.token"] = token
         with open(".vscode/settings.json", "w") as f:
             json.dump(settings, f, indent=4)
@@ -44,10 +46,12 @@ def get_or_create_secret_and_token():
 def create_access_token(data: dict, secret: str = None):
     """Create a JWT token"""
     secret = secret or JWT_SECRET
+    print("Creating token with secret:", secret)
     to_encode = data.copy()
     encoded_jwt = jwt.encode(to_encode, secret, algorithm=ALGORITHM)
+    print("Token:", encoded_jwt)
+    test_decoded = jwt.decode(encoded_jwt, secret, algorithms=[ALGORITHM])
     return encoded_jwt
-
 
 JWT_SECRET = get_or_create_secret_and_token()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -67,6 +71,10 @@ def get_token_payload(token: str = Depends(oauth2_scheme)):
         )
 
 
+if __name__ == "__main__":
+    data = {"sub": "frontend", "scopes": ["root"]}
+    test_token = create_access_token(data)
+    print(get_token_payload(test_token))
 
 
 
