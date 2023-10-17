@@ -162,26 +162,34 @@ class Session:
 
     async def execute_action(self, action):
         async with self.conversation.to(FunctionMessage(name=action['name'])) as message_handler:
-            try:
-                for function in self.agent.functions:
-                    if function.name == action['name']:
-                        function.register_message_handler(message_handler)
-                        if not isinstance(action['arguments'], dict):
-                            await message_handler.set(
-                                f"Error: arguments for {function.name} are not valid JSON."
-                            )
-                            return False
-                        function_output = await function(**action['arguments'])
-                        self._force_call = None
-                        return function_output
+            if not isinstance(action['arguments'], dict):
+                await message_handler.set(f"Error: arguments for {function.name} are not valid JSON.")
+                return False
+            
+            found = False
+            for function in self.agent.functions:
+                if function.name == action['name']:
+                    found = True
+                    break
+            
+            if not found:
                 await message_handler.set(
-                    f"Error: this function does not exist. Available functions: {', '.join([i.name for i in self.agent.functions])}"
+                    f"Error: this function does not exist. "
+                    f"Available functions: {', '.join([i.name for i in self.agent.functions])}"
                 )
+                return False
+            
+            try:
+                function.register_message_handler(message_handler)
+                function_output = await function(**action['arguments'])
+                self._force_call = None
+                return function_output
             except ExceptionForAgent as e:
                 error_msg = str(e)
                 if action['name'] == "return":
                     self._force_call = action['name']
                 await message_handler.set(error_msg)
+                
         return False
 
     def register_message_handler(self, message_handler):
