@@ -258,6 +258,9 @@ class Conversation():
     
     def to(self, chat, meta=None):
         """returns a new Message object"""
+        meta = dict(**(meta or {}))
+        if self.insert_after is not None:
+            meta['insert_after'] = self.insert_after
         message = Message(chat=chat, path=self.path, shared=self.shared, meta=meta)
         print("insert after", self.insert_after)
         if self.insert_after is None:

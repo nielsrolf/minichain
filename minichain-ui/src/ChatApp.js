@@ -196,7 +196,13 @@ function ChatApp() {
                     if (existingMessageIndex !== -1) {
                         newMessages[existingMessageIndex] = message;
                     } else {
-                        newMessages.push(message);
+                        console.log("insert after", message.meta.insert_after);
+                        const pos = newMessages.findIndex(i => i.path[i.path.length - 1] === message.meta.insert_after);
+                        if (pos === -1) {
+                            newMessages.push(message);
+                        } else {
+                            newMessages.splice(pos + 1, 0, message);
+                        }
                     }
                     return newMessages;
                 });
