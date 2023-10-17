@@ -117,9 +117,8 @@ function formatCost(cost) {
 }
 
 
-function sendMessageMeta(path, meta, children) {
+function sendMessageMeta(path, meta) {
     // Send PUT request to /messages/{path} with meta data
-    console.log("sending meta:", meta, "to path:", path, "with children:", children);
     fetch(`http://localhost:8745/meta/${path[path.length - 1]}`, {
         method: 'PUT',
         headers: {
@@ -127,15 +126,8 @@ function sendMessageMeta(path, meta, children) {
         },
         body: JSON.stringify(meta),
     });
-    if (!children) {
-        return;
-    }
-    for (let subConversationId of children) {
-        sendMessageMeta([...path, subConversationId], meta);
-    }
+
 }
-
-
 
 
 
@@ -170,7 +162,6 @@ function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, 
                     }} />}
                     <CloseIcon onClick={() => {
                             sendMessageMeta(message.path, {"deleted": true}, message.children)
-                            handleSubConversationClick();
                         }}
                         fontSize="small" />
                 </div>
@@ -188,7 +179,7 @@ function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, 
                 return <DisplayData key={index} data={data} />;
             })}
             {message.chat.function_call && <DisplayJson data={message.chat.function_call} editable={true}  run={runCodeAfterMessage(message)} save={saveCodeInMessage(message)}/>}
-            {message.children?.map(subConversationId => {
+            {message.meta.children?.map(subConversationId => {
                 return (
                     <div onClick={() => handleSubConversationClick(subConversationId)}><i>View thread</i></div>
                 );

@@ -35,7 +35,7 @@ function NewCell({onRun}) {
                 await onRun(editorValue);
                 setEditorIsOpen(false);
             }}>
-                Run
+                Save
             </button>
         </div>
     );

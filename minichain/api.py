@@ -2,7 +2,7 @@ import asyncio
 from typing import List
 import json
 import os
-import traceback
+import uuid
 from typing import Any, Dict, Optional
 import shutil
 from pydantic import BaseModel, Field
@@ -11,10 +11,8 @@ from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from pydantic.error_wrappers import ValidationError
-from starlette.websockets import WebSocketDisconnect
 
-from minichain.dtypes import Cancelled, ConsumerClosed, FunctionCall
+from minichain.dtypes import ConsumerClosed, FunctionCall, UserMessage
 from minichain.functions import tool
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
@@ -52,120 +50,7 @@ class MessagePayload(BaseModel):
 
 
 message_db = MessageDB()
-
-
 agents = {}
-
-
-
-
-
-@app.post("/run/")
-async def run_cell(cell: Execute):
-    """Run a cell and insert the function call output after the specified cell."""
-    print("running cell", cell)
-    # get the conversation
-    conversation = message_db.get(cell.insert_after[-2])
-    conversation = conversation.at(cell.insert_after[-1])
-    # get the agent
-    print(conversation.meta)
-    agent = agents[conversation.meta['agent']]
-    # run the cell
-    await agent.run(
-        query="",
-        conversation=conversation,
-        function_call=FunctionCall(
-            name="jupyter",
-            arguments={"code": cell.code, "type": cell.type},
-        ),
-        message_meta={"deleted": True}
-    )
-    return {"message": "success"}
-
-
-@tool()
-async def upload_file_to_chat(
-    file: str = Field(..., description="The path to the file to upload."),
-):
-    """Upload a file to the chat."""
-    # if the file is not in the cwd or a sub dir, we need to copy it to a download folder
-    full_path = os.path.abspath(file)
-    if not full_path.startswith(os.getcwd()):
-        # copy it to ./minichain/downloads/{len(os.listdir('./minichain/downloads'))}/{filename}
-        filename = os.path.basename(file)
-        downloads_path = "./minichain/downloads"
-        os.makedirs(downloads_path, exist_ok=True)
-        new_path = f"{downloads_path}/{len(os.listdir(downloads_path))}_{filename}"
-        shutil.copyfile(file, new_path)
-        file = new_path
-    return f"displaying file: {file}"
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    print("websocket accepted")
-
-    async def send_message_raise_cancelled(message):
-        # check the websocket: has a cancel message been sent? if no message has
-        # been sent, avoid blocking by using asyncio.wait_for
-        try:
-            data = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
-            if data.startswith("cancel:"):
-                raise Cancelled(data)
-        except asyncio.TimeoutError:
-            pass
-        except Cancelled as e:
-            raise e
-        except (WebSocketDisconnect, RuntimeError) as e:
-            # Maybe another coroutine is already awaiting a message
-            pass
-        message = json.loads(json.dumps(message, default=datetime_converter))
-        try:
-            await websocket.send_json(message)
-        except Exception as e:
-            print("websocket error", e)
-            raise ConsumerClosed()
-        
-    message_db.add_consumer(send_message_raise_cancelled, is_main=True)
-    
-    try:
-        while True:
-            try:
-                data = await websocket.receive_text()
-            except Exception:
-                # sleep for a bit and try again
-                await asyncio.sleep(1)
-                continue
-            print("received data", data)
-            try:
-                payload = Payload(**json.loads(data))
-                print("payload", payload)
-                if not payload.response_to:
-                    payload.response_to = "root"
-            except ValidationError as e:
-                print(e)
-                # probably a heart beat
-                continue
-
-            agent_name = payload.agent
-            if agent_name not in agents:
-                await websocket.send_text(f"Agent {agent_name} not found")
-                continue
-            print("agent_name", agent_name)
-            agent = agents[agent_name]
-
-            conversation = message_db.get(payload.response_to)
-            print("Running", payload)
-            await agent.run(
-                query=payload.query,
-                function_call=payload.function_call,
-                conversation=conversation
-            )
-
-
-    except Exception as e:
-        traceback.print_exc()
 
 
 @app.get("/")
@@ -176,6 +61,12 @@ async def root():
 @app.get("/agents")
 async def get_agents():
     return list(agents.keys())
+
+
+@app.get("/byagent/{agent}")
+async def get_conversations_by_agent(agent: str):
+    messages = message_db.as_json(agent)
+    return messages
 
 
 @app.get("/messages/{path:path}")
@@ -198,6 +89,18 @@ async def put_meta(path: str, meta: Dict[str, Any]):
     message_or_conversation = await message_db.update_meta(path[-1], meta)
     return message_or_conversation.as_json()
 
+
+@app.get("/meta/{path:path}")
+async def put_meta(path: str):
+    if path == "":
+        path = "root"
+    path = path.split('/')
+    if path[-1] == "root":
+        return {"path": ["root"]}
+    message_or_conversation = message_db.get(path[-1]) or message_db.get_message(path[-1])
+    return message_or_conversation.meta
+
+
 @app.put("/chat/{path:path}")
 async def put_chat(path: str, update: MessagePayload):
     if path == "":
@@ -212,7 +115,8 @@ async def put_chat(path: str, update: MessagePayload):
 async def fork(path: str):
     path = path.split('/')
     conversation = message_db.get(path[-2])
-    forked_conversation = conversation.fork(path[-1])
+    new_path = conversation.path + [uuid.uuid4().hex[:8]]
+    forked_conversation = conversation.fork(path[-1], new_path)
     return forked_conversation.as_json()
 
 
@@ -222,6 +126,138 @@ async def static(path):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path)
+
+
+
+@app.post("/run/")
+async def run_cell(cell: Execute):
+    """Run a cell and insert the function call output after the specified cell."""
+    print("running cell", cell)
+    # get the conversation
+    conversation = message_db.get(cell.insert_after[-2])
+    conversation = conversation.at(cell.insert_after[-1])
+    # get the agent
+    print(conversation.meta)
+    agent = agents[conversation.meta['agent']]
+
+    session = await agent.session(conversation)
+
+    function_call = FunctionCall(
+        name="jupyter",
+        arguments={"code": cell.code, "type": cell.type},
+    )
+    # result = await session.execute_action(function_call)
+    asyncio.create_task(session.execute_action(function_call))
+    return {"message": "success"}
+
+
+@app.post("/cell/")
+async def create_cell(cell: Execute):
+    """Create a cell."""
+    # get the conversation
+    conversation = message_db.get(cell.insert_after[-2])
+    conversation = conversation.at(cell.insert_after[-1])
+
+    function_call = FunctionCall(
+        name="jupyter",
+        arguments={"code": cell.code, "type": cell.type},
+    )
+
+    message = UserMessage(
+        content="",
+        function_call=function_call,
+    )
+
+    await conversation.send(message)
+    return {"message": "success"}
+
+
+
+@app.get("/cancel/{conversation_id}")
+async def cancel_agent(conversation_id: str):
+    """Cancel an agent."""
+    message_db.cancel(conversation_id)
+
+
+@tool()
+async def upload_file_to_chat(
+    file: str = Field(..., description="The path to the file to upload."),
+):
+    """Upload a file to the chat."""
+    # if the file is not in the cwd or a sub dir, we need to copy it to a download folder
+    full_path = os.path.abspath(file)
+    if not full_path.startswith(os.getcwd()):
+        # copy it to ./minichain/downloads/{len(os.listdir('./minichain/downloads'))}/{filename}
+        filename = os.path.basename(file)
+        downloads_path = "./minichain/downloads"
+        os.makedirs(downloads_path, exist_ok=True)
+        new_path = f"{downloads_path}/{len(os.listdir(downloads_path))}_{filename}"
+        shutil.copyfile(file, new_path)
+        file = new_path
+    return f"displaying file: {file}"
+
+
+@app.post("/message/")
+async def run_agent(payload: Payload):
+    """Run an agent."""
+
+    agent_name = payload.agent
+    if agent_name not in agents:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    agent = agents[agent_name]
+
+    conversation = message_db.get(payload.response_to)
+
+    # start the agent.run in the background, so we can return the conversation id
+    session = await agent.session(conversation)
+
+    # send the message
+    message = UserMessage(
+        content=payload.query,
+        function_call=payload.function_call,
+    )
+    await session.conversation.send(message)
+    asyncio.create_task(session.run_until_done())
+    return {"path": session.conversation.path}
+
+
+@app.websocket("/ws/{conversation_id}")
+async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
+    await websocket.accept()
+    print("websocket accepted")
+    if conversation_id == "root":
+        # we close the websocket, because we don't want to send the root messages
+        await websocket.close()
+        return
+
+    async def send_to_websocket(message):
+        message = json.loads(json.dumps(message, default=datetime_converter))
+        try:
+            await websocket.send_json(message)
+        except Exception as e:
+            print("websocket error", e)
+            raise ConsumerClosed()
+        
+    conversation = message_db.get(conversation_id)
+    for message in conversation.messages:
+        await send_to_websocket({
+            "type": "set",
+            "chat": message.chat,
+            "meta": message.meta,
+            "id": message.path[-1],
+            "path": message.path,
+        })
+    
+    message_db.add_consumer(send_to_websocket, conversation_id)
+
+    # avoid closing the websocket
+    while True:
+        await asyncio.sleep(1)
+        if websocket.client_state == 3:
+            print("websocket closed")
+            break
+    
 
 
 @app.on_event("startup")
@@ -270,7 +306,6 @@ async def preload_agents():
 
 def start(port=8745):
     import uvicorn
-
     uvicorn.run(app, host="localhost", port=port)
 
 

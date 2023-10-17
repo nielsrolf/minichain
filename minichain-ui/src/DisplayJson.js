@@ -84,10 +84,6 @@ const DisplayJson = ({ data, run, save, editable=false }) => {
     );
   }
 
-  const toggleFold = key => {
-    setIsFolded({ ...isFolded, [key]: !isFolded[key] });
-  };
-
   const removeLineNumbers = code => 
     code.split('\n').map(line => line.replace(/^\d+:\s*/, '')).join('\n');
 
