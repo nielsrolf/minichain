@@ -177,23 +177,11 @@ class Session:
                 await message_handler.set(
                     f"Error: this function does not exist. Available functions: {', '.join([i.name for i in self.agent.functions])}"
                 )
-            # catch pydantic validation errors
             except ExceptionForAgent as e:
                 error_msg = str(e)
                 if action['name'] == "return":
                     self._force_call = action['name']
                 await message_handler.set(error_msg)
-            except Exception as e:
-                if "missing 1 required positional argument: 'code'" in str(e) or "validation error for edit\ncode\n  field required" in str(e):
-                    await message_handler.set(
-                        f"Error: this function requires a code. Write the code first into the normal content field like here:\n```\ncode here\n```\nThen call the {action['name']} function."
-                    )
-                else:
-                    print("yooo")
-                    traceback.print_stack()
-                    traceback.print_exc()
-                    # breakpoint()
-                    raise e
         return False
 
     def register_message_handler(self, message_handler):

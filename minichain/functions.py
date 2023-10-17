@@ -41,21 +41,33 @@ class Function:
         self.name = name
         self.function = function
         self.description = description
-
-    async def __call__(self, **arguments):
-        """Call the function with the given arguments."""
+    
+    def check_arguments_raise_error(self, arguments):
+        """Check if the arguments are valid. If not, raise an error."""
+        with open("arguments.json", "w") as f:
+            json.dump(arguments, f)
         if "code" in arguments and not self.has_code_argument:
             arguments.pop("code")
         if self.pydantic_model is not None:
             try:
                 arguments = self.pydantic_model(**arguments).dict()
             except pydantic.error_wrappers.ValidationError as e:
-                msg = "Error: arguments passed to return are not valid. Check the function call arguments and correct it."
+                if "missing 1 required positional argument: 'code'" in str(e) or "\ncode\n  field required" in str(e):
+                    msg = ("Error: this function requires a code. "
+                           "Write the code first into the normal content field like here:\n```\ncode here\n```\n"
+                           f"Then call the {self.name} function.")
+                    print(arguments)
+                    raise ExceptionForAgent(msg)
+                msg = f"Error: arguments passed to {self.name} are not valid. Check the function call arguments and correct it."
                 msg += f"You need to call {self.name} with arguments for: {self.parameters_openapi['required']}\n"
                 msg += f"Validation errors: {e}\n"
                 msg += f"Please fix this and call the function {self.name} again."
                 raise ExceptionForAgent(msg)
-            
+        return arguments
+
+    async def __call__(self, **arguments):
+        """Call the function with the given arguments."""
+        arguments = self.check_arguments_raise_error(arguments)    
         response = await self.function(**arguments)
         if not isinstance(response, str):
             response = json.dumps(response)

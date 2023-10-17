@@ -61,8 +61,14 @@ class Jupyter(Function):
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
         self.continue_on_timeout = continue_on_timeout
+        self.has_code_argument = True
+    
+    async def __call__(self, **arguments):
+        self.check_arguments_raise_error(arguments)
+        result = await self.call(**arguments)
+        return result
 
-    async def __call__(self, code: str, timeout: int = 60, type: str = "python", background=False) -> str:
+    async def call(self, code: str, timeout: int = 60, type: str = "python", background=False) -> str:
         if background:
             # run this code in a new juptyer kernel
             jupyter = Jupyter(continue_on_timeout=True)
