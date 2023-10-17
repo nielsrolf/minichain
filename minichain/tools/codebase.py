@@ -73,7 +73,9 @@ def get_visible_files(
         depth += 1
 
     if files == []:
-        files = new_files[:max_lines] + ["..."]
+        files = new_files[:max_lines]
+        if len(new_files) > max_lines:
+            files.append("...")
     return files
 
 
@@ -89,6 +91,8 @@ def get_initial_summary(
         ignore_files=ignore_files,
         max_lines=max_lines,
     )
+    if len(available_files) == 0:
+        return "The current directory is empty."
     try:
         with open("README.md") as f:
             summary = "\n".join(f.readlines()[:5]) + "...\n"
@@ -266,7 +270,7 @@ def filtered_diff(before, after):
 async def edit(
     path: str = Field(..., description="The path to the file."),
     start: int = Field(..., description="The start line."),
-    end: int = Field(..., description="The end line. If end = start, you insert without replacing. To replace a line, set end = start + 1."),
+    end: int = Field(..., description="The end line. If end = start, you insert without replacing. To replace a line, set end = start + 1. Use end = -1 to replace until the end of the file."),
     indent: str = Field("", description="Prefix of spaces for each line to use as indention. Example: '    '"),
     code: str = Field(
         ...,

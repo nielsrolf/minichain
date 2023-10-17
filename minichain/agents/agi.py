@@ -94,7 +94,7 @@ class AGI(Agent):
             elif "copy-of-self" in assignee.lower():
                 copy_of_me = AGI(**kwargs)
                 copy_of_me.register_message_handler(self.message_handler)
-                response = await copy_of_me(
+                response = await copy_of_me.run(
                     query=query,
                 )
             elif "artist" in assignee.lower():
@@ -159,10 +159,3 @@ class AGI(Agent):
     @property
     def init_history(self):
         return [SystemMessage(self.system_message)] + self.programmer.init_history[1:]
-    
-    async def before_run(self, conversation=None, **arguments):
-        # Add the initial user message to to init messages of the programmer
-        message = f"Your team is working on the following tasks:\n{conversation.first_user_message}"
-        self.programmer._init_history.append(UserMessage(message))
-    
-

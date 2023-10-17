@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from minichain.agent import Agent
-from minichain.dtypes import UserMessage
+from minichain.dtypes import SystemMessage, UserMessage
 from minichain.memory import SemanticParagraphMemory
 from minichain.tools import codebase
 from minichain.tools.bash import Jupyter
@@ -45,15 +45,11 @@ class Hippocampus(Agent):
             codebase.edit,
             codebase.scan_file_for_info,
         ]
-        init_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
-        if self.memory and len(self.memory.memories) > 0:
-            init_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}\nUse the `find_memory` function to find relevant memories."
-        init_history = [UserMessage(init_msg)]
+        
         super().__init__(
             functions=functions,
             system_message=system_message,
             prompt_template="Find memories related to: {query}".format,
-            init_history=init_history,
             response_openapi=RelevantInfos,
             **kwargs,
         )
@@ -64,4 +60,15 @@ class Hippocampus(Agent):
     def register_message_handler(self, message_handler):
         self.memory.register_message_handler(message_handler)
         return super().register_message_handler(message_handler)
+    
+    @property
+    def init_history(self):
+        init_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
+        if self.memory and len(self.memory.memories) > 0:
+            init_msg += f"\nHere is a summary of your memory: \n{self.memory.get_content_summary()}\nUse the `find_memory` function to find relevant memories."
+        init_history = [
+            SystemMessage(self.system_message),
+            UserMessage(init_msg)
+        ]
+        return init_history
 

@@ -42,7 +42,9 @@ class JupyterQuery(BaseModel):
         description="The type of code to run.",
     )
     timeout: Optional[int] = Field(60, description="The timeout in seconds.")
-    background: Optional[bool] = Field(False, description="Set to true if you start e.g. a webserver in the background (Use: `node server.js` rather than `node server.js &` ). Commands will be run in a new jupyter kernel.")
+    background: Optional[bool] = Field(
+        False,
+        description="Set to true if you start e.g. a webserver in the background (Use: `node server.js` rather than `node server.js &` ). Commands will be run in a new jupyter kernel. Tasks like installing dependencies should not run in the background.")
 
 
 class Jupyter(Function):
