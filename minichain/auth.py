@@ -44,11 +44,8 @@ def get_or_create_secret_and_token():
 def create_access_token(data: dict, secret: str = None):
     """Create a JWT token"""
     secret = secret or JWT_SECRET
-    print("Creating token with secret:", secret)
     to_encode = data.copy()
     encoded_jwt = jwt.encode(to_encode, secret, algorithm=ALGORITHM)
-    print("Token:", encoded_jwt)
-    test_decoded = jwt.decode(encoded_jwt, secret, algorithms=[ALGORITHM])
     return encoded_jwt
 
 JWT_SECRET = get_or_create_secret_and_token()
@@ -57,6 +54,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_token_payload(token: str = Depends(oauth2_scheme)):
     """Check if the token is valid and return the payload"""
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
         print(token, JWT_SECRET)
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
@@ -67,6 +70,17 @@ def get_token_payload(token: str = Depends(oauth2_scheme)):
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def get_token_payload_or_none(token: str = Depends(oauth2_scheme)):
+    """Check if the token is valid and return the payload"""
+    try:
+        print(token, JWT_SECRET)
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
 
 
 if __name__ == "__main__":

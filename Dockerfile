@@ -46,9 +46,21 @@ RUN pip install moviepy
 RUN pip install jupyterlab
 
 
-RUN pip install git+https://github.com/nielsrolf/minichain
-
 RUN pip install python-jose[cryptography]
 
+RUN pip install click python-dotenv openai replicate retry google-search-results fastapi pytest pytest-asyncio pylint!=2.5.0 black mypy flake8 pytest-cov httpx playwright requests pydantic docker html2text uvicorn numpy tiktoken uvicorn[standard] python-jose[cryptography]
+
+WORKDIR /app
+# RUN git clone https://github.com/nielsrolf/minichain.git
+RUN mkdir minichain
+WORKDIR /app/minichain
+COPY minichain /app/minichain/minichain
+COPY setup.py /app/minichain
+RUN pip install -e .
+WORKDIR /app
+
+# Add build files
+COPY minichain-ui/build /app/minichain-ui/build
+
 # Start minichain api
-CMD ["python", "-m", "minichain.api"]
+CMD ["python", "-m", "minichain.api", "--build-dir", "/app/minichain-ui/build"]

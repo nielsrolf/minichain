@@ -2,7 +2,7 @@ notes.md
 todo.md
 
 demo/
-
+minichain-vscode/
 
 .cache/
 **/.cache/
@@ -211,3 +211,6 @@ sine_plot.png
 sine_wave.png
 webdesign/
 .minichain_old/
+
+
+!minichain-ui/build/

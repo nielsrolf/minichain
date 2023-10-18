@@ -10,8 +10,6 @@ import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 import ForkRightIcon from '@mui/icons-material/ForkRight';
 
 
-const backend = window.REACT_APP_BACKEND_URL || 'http://localhost:8745';
-
 
 const functionsToRenderAsCode = [
     "jupyter",
@@ -121,8 +119,9 @@ function formatCost(cost) {
 }
 
 
-function sendMessageMeta(path, meta, token, setErrorMessage) {
+function sendMessageMeta(path, meta, token, setErrorMessage, backend) {
     // Send PUT request to /messages/{path} with meta data
+    console.log("backend", backend)
     fetch(`${backend}/meta/${path[path.length - 1]}`, {
         method: 'PUT',
         headers: {
@@ -141,7 +140,7 @@ function sendMessageMeta(path, meta, token, setErrorMessage) {
 
 
 
-function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage, forkFromMessage, token, setErrorMessage }){
+function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, saveCodeInMessage, forkFromMessage, token, setErrorMessage, backend }){
     // if the message has not streamed enough, return
     if (!message.chat) {
         return '';
@@ -165,13 +164,13 @@ function ChatMessage({message, handleSubConversationClick, runCodeAfterMessage, 
                         forkFromMessage(message.path);
                     }} />
                     {message.meta.rating === 1 ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOutlinedIcon fontSize="small" onClick={() => {
-                        sendMessageMeta(message.path, {"rating": 1}, token, setErrorMessage);
+                        sendMessageMeta(message.path, {"rating": 1}, token, setErrorMessage, backend);
                     }} />}
                     {message.meta.rating === -1 ? <ThumbDownIcon fontSize="small" /> : <ThumbDownOutlinedIcon fontSize="small" onClick={() => {
-                        sendMessageMeta(message.path, {"rating": -1}, token, setErrorMessage);
+                        sendMessageMeta(message.path, {"rating": -1}, token, setErrorMessage, backend);
                     }} />}
                     <CloseIcon onClick={() => {
-                            sendMessageMeta(message.path, {"deleted": true}, token, setErrorMessage)
+                            sendMessageMeta(message.path, {"deleted": true}, token, setErrorMessage, backend)
                         }}
                         fontSize="small" />
                 </div>
