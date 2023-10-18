@@ -6,11 +6,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import NewCell from "./NewCell";
 
 
-const backend = window.REACT_APP_BACKEND_URL || 'http://localhost:8745';
-const ws_backend = backend.replace('http', 'ws')
+// const backend = window.REACT_APP_BACKEND_URL || 'http://localhost:8745';
+// const ws_backend = backend.replace('http', 'ws')
 
 
-function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultAgentName, availableAgents, setShowInitMessages, showInitMessages, token, setErrorMessage }) {
+function ChatHeader({ 
+    path, setPath, conversation, defaultAgentName, setDefaultAgentName, availableAgents,
+    setShowInitMessages, showInitMessages, token, setErrorMessage, backend
+}) {
     const [viewLinkCopied, setViewLinkCopied] = useState(false);
     const [editLinkCopied, setEditLinkCopied] = useState(false);
 
@@ -132,6 +135,18 @@ function ChatApp() {
     const [tokenInput, setTokenInput] = useState(null);
     const [isValidated, setIsValidated] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+    const currentDomain = window.location.origin;
+    const [protocol, domainWithPort] = currentDomain.split('//');
+    const [domain, frontendPort] = domainWithPort.split(':');
+    // const [port, setPort] = useState(frontendPort);
+    const [port, setPort] = useState(8745);
+    // backend needs to change automatically when the port changes - we use a memoized value for this
+    const backend = useMemo(() => {
+        return `${protocol}//${domain}:${port}`;
+    }, [protocol, domain, port]);
+    const ws_backend = useMemo(() => {
+        return backend.replace('http', 'ws');
+    }, [backend]);
 
 
     useEffect(() => {
@@ -140,6 +155,32 @@ function ChatApp() {
             if (message.token) {
                 setToken(message.token);
             }
+            // if (message.cwd) {
+            //     // request the start up of a new backend
+            //     const masterBackend = `${protocol}//${domain}:8745`;
+            //     fetch(`${masterBackend}/workspace/`, {
+            //         // POST request to /workspace/ with cwd
+            //         method: 'POST',
+            //         headers: {
+            //             'Content-Type': 'application/json',
+            //             'Authorization': `Bearer ${token}`
+            //         },
+            //         body: JSON.stringify({
+            //             cwd: message.cwd,
+            //         }),
+            //     }).then(response => {
+            //         if (!response.ok) {
+            //             // If the response is not ok, throw an error
+            //             setErrorMessage(`Permission error! Status: ${response.status}`);
+            //         }
+            //         return response.json()
+            //     }).then(data => {
+            //         // set the port to the new port
+            //         setPort(data.port);
+            //     }).catch(e => {
+            //         console.error(e);
+            //     });
+            // }
         }
 
         window.addEventListener('message', handleMessage);
@@ -179,7 +220,7 @@ function ChatApp() {
                 console.error(e);
                 setErrorMessage(e.message);
             });
-    }, [token]);
+    }, [token, backend]);
 
 
     if (!isValidated) {
@@ -204,7 +245,7 @@ function ChatApp() {
 
 
     return (
-        <AuthorizedChatApp token={token} />
+        <AuthorizedChatApp token={token} backend={backend} ws_backend={ws_backend} />
     );
 }
 
@@ -237,7 +278,7 @@ function ErrorHeader({ errorMessage, setErrorMessage }) {
 }
 
 
-function AuthorizedChatApp({token}) {
+function AuthorizedChatApp({token, backend, ws_backend}) {
     const [path, setPath] = useState(["root"]);
     const [messages, setMessages] = useState([]);
     const [userMessage, setUserMessage] = useState("");
@@ -265,7 +306,7 @@ function AuthorizedChatApp({token}) {
             .catch(e => {
                 console.error(e);
             });
-    }, [token]);
+    }, [token, backend]);
 
     // fetch the root conversation
     useEffect(() => {
@@ -293,7 +334,7 @@ function AuthorizedChatApp({token}) {
             .catch(e => {
                 setErrorMessage(e.message);
             });
-    }, [path, defaultAgentName, token]);
+    }, [path, defaultAgentName, token, backend]);
 
 
     // fetch the conversation
@@ -427,7 +468,7 @@ function AuthorizedChatApp({token}) {
         return () => {
             client.close();
         }
-    }, [path, token]);
+    }, [path, token, backend, ws_backend]);
 
 
     const handleSubConversationClick = (subConversationId) => {
@@ -574,6 +615,7 @@ function AuthorizedChatApp({token}) {
                 showInitMessages={showInitMessages}
                 token={token}
                 setErrorMessage={setErrorMessage}
+                backend={backend}
             />
             <div style={{ height: "50px" }}></div>
             <ErrorHeader errorMessage={errorMessage} setErrorMessage={setErrorMessage} />
@@ -591,6 +633,7 @@ function AuthorizedChatApp({token}) {
                             forkFromMessage={forkFromMessage}
                             token={token}
                             setErrorMessage={setErrorMessage}
+                            backend={backend}
                         />
                     )
                 })}
@@ -607,6 +650,7 @@ function AuthorizedChatApp({token}) {
                             forkFromMessage={forkFromMessage}
                             token={token}
                             setErrorMessage={setErrorMessage}
+                            backend={backend}
                         />
                     )
                 })}
