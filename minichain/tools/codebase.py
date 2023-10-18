@@ -393,7 +393,7 @@ async def test_codebase():
     # )
     # print(await view_symbol(path="./minichain/agent.py", symbol="doesntexist"))
     out = await edit(path="./bla.py", start=1, end=1, code="hello(\n", indent="")
-    breakpoint()
+    # breakpoint()
     print(out)
 
 

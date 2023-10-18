@@ -383,7 +383,7 @@ async def main():
         print("\n\n".join([memory.format_as_snippet(i) for i in results]))
         print([i.memory.title for i in results])
     
-    breakpoint()
+    # breakpoint()
 
 
 

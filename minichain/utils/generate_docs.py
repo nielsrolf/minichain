@@ -23,7 +23,8 @@ def parse_function(code, file, id_prefix=""):
     try:
         function_name = line.split("def ")[1].split("(")[0]
     except:
-        breakpoint()
+        # breakpoint()
+        pass
     function_signature = ""
     for potential_signature_end in lines[end_line:]:
         end_line += 1
@@ -188,10 +189,7 @@ def symbol_as_markdown(symbol, prefix=""):
         nonlocal response
         response += " ".join([str(i) for i in args]) + "\n"
 
-    try:
-        print(f"{prefix}{symbol['signature']}Lines: {symbol['start']}-{symbol['end']}")
-    except:
-        breakpoint()
+    print(f"{prefix}{symbol['signature']}Lines: {symbol['start']}-{symbol['end']}")
     if symbol["docstring"]:
         print(f"{prefix}{symbol['docstring']}")
     if symbol.get("fields"):

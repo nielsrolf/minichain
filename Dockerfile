@@ -31,7 +31,7 @@ RUN apt-get install -y tree ffmpeg
 
 # # # Clean up
 # RUN apt-get clean \
-#     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+#     && rm -rf /var/lib/apt/lists/x* /tmp/* /var/tmp/*
 
 RUN pip install --upgrade pip
 RUN pip install numpy pandas matplotlib seaborn plotly scikit-learn requests beautifulsoup4
@@ -45,7 +45,10 @@ RUN pip install moviepy
 # install jupyter
 RUN pip install jupyterlab
 
-RUN pip install pip install git+https://github.com/nielsrolf/minichain
+
+RUN pip install git+https://github.com/nielsrolf/minichain
+
+RUN pip install python-jose[cryptography]
 
 # Start minichain api
 CMD ["python", "-m", "minichain.api"]

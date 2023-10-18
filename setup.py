@@ -33,6 +33,7 @@ setup(
         "numpy",
         "tiktoken",
         "uvicorn[standard]",
+        "python-jose[cryptography]",
     ],
     entry_points={
         "console_scripts": [],

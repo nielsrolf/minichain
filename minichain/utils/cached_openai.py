@@ -71,7 +71,8 @@ def fix_common_errors(response: Dict[str, Any]) -> Dict[str, Any]:
             else:
                 code, content_after = code.split("\n```", 1)
         except:
-            breakpoint()
+            # breakpoint()
+            pass
         response["function_call"]["arguments"]["code"] = code
     return response
 

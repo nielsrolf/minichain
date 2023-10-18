@@ -46,7 +46,7 @@ class StreamCollector():
         except Exception as e:
             import traceback
             traceback.print_exc()
-            breakpoint()
+            # breakpoint()
     
     def off(self):
         """Turn the stream off and trigger saving"""

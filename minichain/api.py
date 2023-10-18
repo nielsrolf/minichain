@@ -351,7 +351,7 @@ async def preload_agents():
 
 def start(port=8745):
     import uvicorn
-    uvicorn.run(app, host="localhost", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 # We want to run this via python -m minichain.api

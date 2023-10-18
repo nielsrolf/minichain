@@ -1,10 +1,8 @@
 import json
-import traceback
 
 from pydantic import BaseModel
-import pydantic.error_wrappers
 
-from minichain.dtypes import (Cancelled, SystemMessage, UserMessage, ExceptionForAgent,
+from minichain.dtypes import (SystemMessage, UserMessage, ExceptionForAgent,
                               AssistantMessage, FunctionMessage, messages_types_to_history)
 from minichain.functions import Function
 from minichain.schemas import DefaultResponse, DefaultQuery
