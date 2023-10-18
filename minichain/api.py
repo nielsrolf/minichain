@@ -7,16 +7,17 @@ from typing import Any, Dict, Optional
 import shutil
 from pydantic import BaseModel, Field
 import yaml
-from fastapi import FastAPI, HTTPException, WebSocket, Depends
+from fastapi import FastAPI, HTTPException, WebSocket, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import click
 
 from minichain.dtypes import ConsumerClosed, FunctionCall, UserMessage
 from minichain.functions import tool
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
-from minichain.auth import get_token_payload, create_access_token
+from minichain.auth import get_token_payload, get_token_payload_or_none, create_access_token
 
 
 
@@ -29,6 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+ui_build_dir = None
 
 
 class Payload(BaseModel):
@@ -156,15 +159,6 @@ async def fork(path: str, token_payload: dict = Depends(get_token_payload)):
     return forked_conversation.as_json()
 
 
-@app.get("/static/{path:path}")
-async def static(path, token_payload: dict = Depends(get_token_payload)):
-    print("static", path)
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path)
-
-
-
 @app.post("/run/")
 async def run_cell(cell: Execute, token_payload: dict = Depends(get_token_payload)):
     """Run a cell and insert the function call output after the specified cell."""
@@ -258,6 +252,22 @@ async def run_agent(payload: Payload, token_payload: dict = Depends(get_token_pa
     return {"path": session.conversation.path}
 
 
+@app.get("/{path:path}")
+async def static(path, request: Request):
+    """Serve static files from the workdir and also serve the frontend from the build dir"""
+    if ui_build_dir is not None:
+        ui_path = os.path.join(ui_build_dir, path)
+        if os.path.exists(ui_path):
+            return FileResponse(ui_path)
+        else:
+            print("not found:", ui_path)
+    # check the token before serving workdir files
+    token_payload = get_token_payload(request.headers.get("Authorization"))
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path)
+
+
 @app.websocket("/ws/{conversation_id}")
 async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
     await websocket.accept()
@@ -349,7 +359,12 @@ async def preload_agents():
         agents[agent.name] = agent
 
 
-def start(port=8745):
+@click.command()
+@click.option("--port", default=8745)
+@click.option("--build-dir", default=None)
+def start(port=8745, build_dir=None):
+    global ui_build_dir
+    ui_build_dir = build_dir
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=port)
 

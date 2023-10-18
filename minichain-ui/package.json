@@ -29,7 +29,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && tidy -m -i build/index.html && rm -rf ../minichain-vscode/build && mv build ../minichain-vscode/",
+    "build": "react-scripts build && tidy -m -i build/index.html && rm -rf ../minichain-vscode/build && cp -r build ../minichain-vscode/",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
