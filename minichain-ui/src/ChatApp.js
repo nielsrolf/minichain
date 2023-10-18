@@ -6,7 +6,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import NewCell from "./NewCell";
 
 
-const backend = 'localhost:8745';
+const backend = window.REACT_APP_BACKEND_URL || 'http://localhost:8745';
+const ws_backend = backend.replace('http', 'ws')
 
 
 function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultAgentName, availableAgents, setShowInitMessages, showInitMessages, token, setErrorMessage }) {
@@ -15,7 +16,7 @@ function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultA
 
     const sendCancelRequest = (conversationId) => {
         // Send a GET /cancel/{conversationId} request
-        fetch(`http://${backend}/cancel/${conversationId}`, {
+        fetch(`${backend}/cancel/${conversationId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -24,7 +25,7 @@ function ChatHeader({ path, setPath, conversation, defaultAgentName, setDefaultA
 
     function createAndCopyShareLink(type) {
         // Send a POST request to /share/ to create a share link
-        fetch(`http://${backend}/share/`, {
+        fetch(`${backend}/share/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -162,7 +163,7 @@ function ChatApp() {
         if (!token) {
             return;
         }
-        fetch(`http://${backend}/messages/root`, {headers: {'Authorization': `Bearer ${token}`}})
+        fetch(`${backend}/messages/root`, {headers: {'Authorization': `Bearer ${token}`}})
             .then(response => {
                 if (!response.ok) {
                     // If the response is not ok, throw an error
@@ -256,7 +257,7 @@ function AuthorizedChatApp({token}) {
 
     // fetch the available agents
     useEffect(() => {
-        fetch(`http://${backend}/agents`, {headers: {'Authorization': `Bearer ${token}`}})
+        fetch(`${backend}/agents`, {headers: {'Authorization': `Bearer ${token}`}})
             .then(response => response.json())
             .then(data => {
                 setAvailableAgents(data);
@@ -271,7 +272,7 @@ function AuthorizedChatApp({token}) {
         if (path[path.length - 1] !== "root") {
             return;
         }
-        const url = `http://${backend}/byagent/${defaultAgentName}`;
+        const url = `${backend}/byagent/${defaultAgentName}`;
         fetch(url, {headers: {'Authorization': `Bearer ${token}`}})
             .then(response => {
                 if (!response.ok) {
@@ -308,7 +309,7 @@ function AuthorizedChatApp({token}) {
             return;
         }
 
-        fetch(`http://${backend}/messages/${path[path.length - 1]}`, {
+        fetch(`${backend}/messages/${path[path.length - 1]}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -323,7 +324,7 @@ function AuthorizedChatApp({token}) {
             });
 
 
-        const client = new W3CWebSocket(`ws://${backend}/ws/${path[path.length - 1]}`);
+        const client = new W3CWebSocket(`${ws_backend}/ws/${path[path.length - 1]}`);
         client.onopen = () => {
             console.log('WebSocket Client Connected');
             setMessages([]);
@@ -442,7 +443,7 @@ function AuthorizedChatApp({token}) {
 
     const runCodeAfterMessage = (message) => async (code) => {
         // send the code as a POST request to /run/
-        await fetch(`http://localhost:8745/run/`, {
+        await fetch(`${backend}/run/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -466,7 +467,7 @@ function AuthorizedChatApp({token}) {
     const saveCodeInMessage = (message) => async (code) => {
         // send the code as a PUT request to /chat/
         console.log("saving code in message", message);
-        await fetch(`http://localhost:8745/chat/${message.path[message.path.length - 1]}`, {
+        await fetch(`${backend}/chat/${message.path[message.path.length - 1]}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -491,7 +492,7 @@ function AuthorizedChatApp({token}) {
     function forkFromMessage(path) {
         // Send GET request to /fork/{path} to fork a conversation
         const pathString = path.join('/');
-        fetch(`http://localhost:8745/fork/${pathString}`, {
+        fetch(`${backend}/fork/${pathString}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -512,7 +513,7 @@ function AuthorizedChatApp({token}) {
     }
 
     function createNewCell(code) {
-        fetch(`http://${backend}/cell/`, {
+        fetch(`${backend}/cell/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -532,7 +533,7 @@ function AuthorizedChatApp({token}) {
     }
 
     function postMessage() {
-        fetch(`http://${backend}/message/`, {
+        fetch(`${backend}/message/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

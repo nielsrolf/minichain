@@ -9,6 +9,10 @@ import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 import ForkRightIcon from '@mui/icons-material/ForkRight';
 
+
+const backend = window.REACT_APP_BACKEND_URL || 'http://localhost:8745';
+
+
 const functionsToRenderAsCode = [
     "jupyter",
     "view",
@@ -119,7 +123,7 @@ function formatCost(cost) {
 
 function sendMessageMeta(path, meta, token, setErrorMessage) {
     // Send PUT request to /messages/{path} with meta data
-    fetch(`http://localhost:8745/meta/${path[path.length - 1]}`, {
+    fetch(`${backend}/meta/${path[path.length - 1]}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',

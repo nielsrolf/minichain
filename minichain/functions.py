@@ -51,7 +51,7 @@ class Function:
             try:
                 arguments = self.pydantic_model(**arguments).dict()
             except pydantic.error_wrappers.ValidationError as e:
-                if "missing 1 required positional argument: 'code'" in str(e) or "\ncode\n  field required" in str(e):
+                if 'code' in str(e) and self.has_code_argument:
                     msg = ("Error: this function requires a code. "
                            "Write the code first into the normal content field like here:\n```\ncode here\n```\n"
                            f"Then call the {self.name} function.")
