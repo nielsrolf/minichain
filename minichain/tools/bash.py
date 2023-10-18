@@ -45,7 +45,9 @@ class JupyterQuery(BaseModel):
     background: Optional[bool] = Field(
         False,
         description="Set to true if you start e.g. a webserver in the background (Use: `node server.js` rather than `node server.js &` ). Commands will be run in a new jupyter kernel. Tasks like installing dependencies should not run in the background.")
-
+    restart: Optional[bool] = Field(
+        False,
+        description="Set to true in order to restart the jupyter kernel before running the code. Required to import newly installed pip packages.")
 
 class Jupyter(Function):
     def __init__(self, message_handler=None, continue_on_timeout=False, **kwargs):
@@ -70,7 +72,7 @@ class Jupyter(Function):
         result = await self.call(**arguments)
         return result
 
-    async def call(self, code: str, timeout: int = 60, type: str = "python", background=False) -> str:
+    async def call(self, code: str, timeout: int = 60, type: str = "python", background=False, restart=False) -> str:
         if background:
             # run this code in a new juptyer kernel
             jupyter = Jupyter(continue_on_timeout=True)
@@ -83,6 +85,10 @@ class Jupyter(Function):
             return output
         if type == "bash" and not code.startswith("!"):
             code = "\n".join([f"!{line}" for line in code.split("\n")])
+        
+        if restart:
+            self.kernel_manager.restart_kernel()
+            self.kernel_client.start_channels()
         # Execute the code
         msg_id = self.kernel_client.execute(code)
         await self.message_handler.chunk(f"Out: \n")

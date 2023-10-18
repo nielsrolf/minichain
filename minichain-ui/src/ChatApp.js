@@ -138,12 +138,14 @@ function ChatApp() {
     const currentDomain = window.location.origin;
     const [protocol, domainWithPort] = currentDomain.split('//');
     const [domain, frontendPort] = domainWithPort.split(':');
-    // const [port, setPort] = useState(frontendPort);
-    const [port, setPort] = useState(8745);
+    const [port, setPort] = useState(frontendPort === 3000 ? 8745 : (frontendPort || 8745));
     // backend needs to change automatically when the port changes - we use a memoized value for this
     const backend = useMemo(() => {
+        if (currentDomain.includes('vscode-webview')) {
+            return `http://localhost:${port}`;
+        }
         return `${protocol}//${domain}:${port}`;
-    }, [protocol, domain, port]);
+    }, [protocol, domain, port, currentDomain]);
     const ws_backend = useMemo(() => {
         return backend.replace('http', 'ws');
     }, [backend]);
