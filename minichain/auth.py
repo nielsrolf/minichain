@@ -18,19 +18,22 @@ ALGORITHM = "HS256"
 def get_or_create_secret_and_token():
     """Check if the JWT_SECRET environment variable exists in .vscode/settings.json[minichain.jwt_secret]"""
     secret = os.environ.get("JWT_SECRET")
-    if not secret:
-        try:
-            settings = None
-            with open(".vscode/settings.json") as f:
-                settings = json.load(f)
-            secret = settings["minichain.jwt_secret"]
-        except Exception as e:
-            secret = uuid4().hex
-            os.makedirs(".vscode", exist_ok=True)
-            settings = settings or {}
-            settings["minichain.jwt_secret"] = secret
-            with open(".vscode/settings.json", "w") as f:
-                json.dump(settings, f, indent=4)
+    if secret:
+        token = create_access_token({"sub": "frontend", "scopes": ["root", "edit"]}, secret)
+        print("Token for frontend:", token)
+        return secret
+    try:
+        settings = None
+        with open(".vscode/settings.json") as f:
+            settings = json.load(f)
+        secret = settings["minichain.jwt_secret"]
+    except Exception as e:
+        secret = uuid4().hex
+        os.makedirs(".vscode", exist_ok=True)
+        settings = settings or {}
+        settings["minichain.jwt_secret"] = secret
+        with open(".vscode/settings.json", "w") as f:
+            json.dump(settings, f, indent=4)
     # check if a frontend token exists in .vscode/settings.json[minichain.token]
     try:
         token = settings["minichain.token"]
