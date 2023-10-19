@@ -4,6 +4,7 @@ import './ChatApp.css';
 import ChatMessage from "./ChatMessage";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import NewCell from "./NewCell";
+import TextWithCode from "./TextWithCode";
 
 
 // const backend = window.REACT_APP_BACKEND_URL || 'http://localhost:8745';
@@ -139,6 +140,10 @@ function ChatApp() {
     const [protocol, domainWithPort] = currentDomain.split('//');
     const [domain, frontendPort] = domainWithPort.split(':');
     const [port, setPort] = useState(frontendPort === '3000' ? 8745 : (frontendPort));
+    const [busy, setBusy] = useState(false);
+    const [retry, setRetry] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
+
     // backend needs to change automatically when the port changes - we use a memoized value for this
     const backend = useMemo(() => {
         if (currentDomain.includes('vscode-webview')) {
@@ -156,36 +161,47 @@ function ChatApp() {
 
     useEffect(() => {
         function handleMessage(event) {
+            setBusy("Trying to connect to backend...");
             const message = event.data;
-            if (message.token) {
+            console.log("got message", message)
+            if (!message.cwd && message.token) {
                 setToken(message.token);
+                setBusy(false);
             }
-            // if (message.cwd) {
-            //     // request the start up of a new backend
-            //     const masterBackend = `${protocol}//${domain}:8745`;
-            //     fetch(`${masterBackend}/workspace/`, {
-            //         // POST request to /workspace/ with cwd
-            //         method: 'POST',
-            //         headers: {
-            //             'Content-Type': 'application/json',
-            //             'Authorization': `Bearer ${token}`
-            //         },
-            //         body: JSON.stringify({
-            //             cwd: message.cwd,
-            //         }),
-            //     }).then(response => {
-            //         if (!response.ok) {
-            //             // If the response is not ok, throw an error
-            //             setErrorMessage(`Permission error! Status: ${response.status}`);
-            //         }
-            //         return response.json()
-            //     }).then(data => {
-            //         // set the port to the new port
-            //         setPort(data.port);
-            //     }).catch(e => {
-            //         console.error(e);
-            //     });
-            // }
+            if (message.cwd) {
+                // request the start up of a new backend
+                fetch(`http://localhost:8745/workspace/`, {
+                    // POST request to /workspace/ with cwd
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        cwd: message.cwd,
+                    }),
+                }).then(response => {
+                    if (!response.ok) {
+                        // If the response is not ok, throw an error
+                        setErrorMessage(`Permission error! Status: ${response.status}`);
+                    }
+                    return response.json()
+                }).then(data => {
+                    // set the port to the new port
+                    setPort(data.port);
+                    setToken(message.token);
+                    setBusy(false);
+                }).catch(e => {
+                    setErrorMessage("Error starting backend");
+                    console.error(e);
+                    setBusy(false);
+                    setIsOffline(true);
+                    // retry in 1 second - send the same message again
+                    setTimeout(() => {
+                        // send the event again
+                        window.postMessage(message, "*");
+                    }, 1000);
+                });
+            }
         }
 
         window.addEventListener('message', handleMessage);
@@ -201,6 +217,7 @@ function ChatApp() {
         const token = urlParams.get('token');
         if (token) {
             setToken(token);
+            setTokenInput(token);
         }
     }, []);
 
@@ -224,24 +241,43 @@ function ChatApp() {
             .catch(e => {
                 console.error(e);
                 setErrorMessage(e.message);
+                // retry in 1 second
+                setTimeout(() => {
+                    setRetry(!retry);
+                }, 1000);
             });
-    }, [token, backend]);
+    }, [token, backend, retry]);
+
+    if (busy) {
+        return (
+            <div className="main">
+                <div style={{ margin: 'auto', marginTop: '40vh', width: "350px" }}>
+                    {busy}
+                </div>
+            </div>
+        );
+    }
 
 
     if (!isValidated) {
         return (
             <div className="main">
-                <div style={{ margin: 'auto', marginTop: '40vh', width: "350px" }}>
+                <div style={{ margin: 'auto', marginTop: '20vh', width: "350px" }}>
+                    {errorMessage && (
+                        <div>
+                            <div className="error-message">
+                                {errorMessage}
+                            </div>
+                        </div>
+                    )}
+                    {isOffline && (
+                        <TextWithCode text={"Please start minichain via ```\n python -m minichain.api``` or ```\ndocker run -v $(pwd):$(pwd) \\ \n -w $(pwd) -p 8745:8745 \\ \n --env-file .env.example \\ \n nielsrolf/minichain```"} />
+                    )}
                     Enter your token: <input type="text" value={tokenInput} onChange={e => setTokenInput(e.target.value)} />
                     <button onClick={() => {
                         setToken(tokenInput);
                     }
                     }>Submit</button>
-                    {errorMessage && (
-                        <div className="error-message">
-                            {errorMessage}
-                        </div>
-                    )}
                 </div>
             </div>
         );

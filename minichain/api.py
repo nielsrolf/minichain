@@ -53,6 +53,10 @@ class MessagePayload(BaseModel):
     function_call: Optional[Dict[str, Any]] = None
 
 
+class Workspace(BaseModel):
+    cwd: str
+
+
 message_db = MessageDB()
 agents = {}
 
@@ -266,6 +270,45 @@ async def static(path, request: Request):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path)
+
+
+def map_cwd_to_port(cwd):
+    """Hashes the cwd in a predictable way and returns a port number."""
+    import hashlib
+    m = hashlib.sha256()
+    m.update(cwd.encode("utf-8"))
+    return int(m.hexdigest(), 16) % 10000 + 10000
+
+
+@app.post("/workspace/")
+async def create_workspace(workspace: Workspace):
+    """Create a new workspace and return the port on that it is running."""
+    port = map_cwd_to_port(workspace.cwd)
+    # Start minichain.api in the specified cwd as a sub process
+    python_path = shutil.which("python") or shutil.which("python3")
+    print("python path", python_path)
+    if python_path is None:
+        raise HTTPException(status_code=500, detail="Python not found")
+    import subprocess
+    cmd = [
+            python_path,
+            "-m",
+            "minichain.api",
+            "--port",
+            str(port)
+        ]
+    if ui_build_dir is not None:
+        cmd += ["--build-dir", ui_build_dir]
+    # pipe stdout and stderr to {cwd}/.minichain/debug/logs.txt
+    os.makedirs(os.path.join(workspace.cwd, ".minichain/debug"), exist_ok=True)
+    with open(os.path.join(workspace.cwd, ".minichain/debug/logs.txt"), "w") as f:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=workspace.cwd,
+            stdout=f,
+            stderr=f,
+        )
+    return {"port": port}
 
 
 @app.websocket("/ws/{conversation_id}")

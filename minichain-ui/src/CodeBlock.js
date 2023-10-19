@@ -134,7 +134,7 @@ const CodeBlock = ({ code, save, run, editable=false, runnable=true }) => {
                     {code}
                 </SyntaxHighlighter>
             </div>
-            {runnable && (
+            {(runnable && run !== undefined) && (
                 <button
                     onClick={async () => {
                         await run(code)

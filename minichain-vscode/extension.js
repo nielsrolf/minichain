@@ -35,7 +35,7 @@ function activate(context) {
 				retainContextWhenHidden: true,
             }
         );
-		panel.webview.postMessage({ token: token });
+		panel.webview.postMessage({ token: token, cwd: vscode.workspace.workspaceFolders[0].uri.fsPath });
         const htmlContent = getWebviewContent(context, panel, token);
         console.log(htmlContent)
         panel.webview.html = htmlContent;
