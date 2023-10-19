@@ -1,7 +1,8 @@
-<!-- # minichain -->
-![`minichain`](logo.png)
 
-`{mini: ⛓}` is a framework for LLM powered agents with structured data, and many tools for them. It consists of three components
+# minichain 
+<img src='minichain-vscode/logo.png' width="100px"> 
+
+Minichain is a framework for LLM powered agents with structured data, and many tools for them. It consists of three components
 - the [python `minichain` package](#python-package) to build agents that run on the host
 - a [webui that can be started in docker](#web-ui)
 - a [vscode extension that wraps the ui and connects to a backend](#vscode-extension)
@@ -78,8 +79,8 @@ If you want to use the UI (either via browser or with the VSCode extension), run
 cp .env.example .env # add your openai, replicate and serp API keys.
 docker pull nielsrolf/minichain:latest
 docker run -v $(pwd):$(pwd) \
-     -w $(pwd) -p 8745:8745 \
-     --env-file .env.example \
+     -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \
+     --env-file .env \
      nielsrolf/minichain # optionally:  --gpus all 
 ```
 You can then open minichain on [`http://localhost:8745/index.html`](http://localhost:8745/index.html). You will need the token printed in the beginning of the startup to connect.

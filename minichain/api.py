@@ -277,7 +277,7 @@ def map_cwd_to_port(cwd):
     import hashlib
     m = hashlib.sha256()
     m.update(cwd.encode("utf-8"))
-    return int(m.hexdigest(), 16) % 10000 + 10000
+    return int(m.hexdigest(), 16) % 1000 + 20000
 
 
 @app.post("/workspace/")
@@ -361,6 +361,12 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
 @app.on_event("startup")
 async def preload_agents():
     """This function should run after the async event loop has started."""
+    # print the domain + token
+    token = create_access_token({"sub": "frontend", "scopes": ["root", "edit"]})
+    print("===========================================")
+    print("Open the following link in your browser:")
+    print(f"http://localhost:{PORT}/index.html?token=" + token)
+    print("===========================================")
     # load the ./minichain/settings.yml file
     if not os.path.exists(".minichain/settings.yml"):
         # copy the default settings file from the modules install dir (minichain/default_settings.yml) to the cwd ./minichain/settings.yml
@@ -402,11 +408,14 @@ async def preload_agents():
         agents[agent.name] = agent
 
 
+port = None
 @click.command()
 @click.option("--port", default=8745)
 @click.option("--build-dir", default=None)
 def start(port=8745, build_dir=None):
     global ui_build_dir
+    global PORT
+    PORT = port
     ui_build_dir = build_dir
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=port)

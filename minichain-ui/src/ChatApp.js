@@ -169,6 +169,7 @@ function ChatApp() {
                 setBusy(false);
             }
             if (message.cwd) {
+                setBusy("Starting backend...")
                 // request the start up of a new backend
                 fetch(`http://localhost:8745/workspace/`, {
                     // POST request to /workspace/ with cwd
@@ -189,11 +190,9 @@ function ChatApp() {
                     // set the port to the new port
                     setPort(data.port);
                     setToken(message.token);
-                    setBusy(false);
                 }).catch(e => {
                     setErrorMessage("Error starting backend");
                     console.error(e);
-                    setBusy(false);
                     setIsOffline(true);
                     // retry in 1 second - send the same message again
                     setTimeout(() => {
@@ -226,6 +225,7 @@ function ChatApp() {
         if (!token) {
             return;
         }
+        setBusy("Retrying..." + (retry? '.' : ''));
         fetch(`${backend}/messages/root`, {headers: {'Authorization': `Bearer ${token}`}})
             .then(response => {
                 if (!response.ok) {
@@ -241,22 +241,13 @@ function ChatApp() {
             .catch(e => {
                 console.error(e);
                 setErrorMessage(e.message);
+                setBusy("Retrying..." + (retry? '.' : ''));
                 // retry in 1 second
                 setTimeout(() => {
                     setRetry(!retry);
                 }, 1000);
             });
-    }, [token, backend, retry]);
-
-    if (busy) {
-        return (
-            <div className="main">
-                <div style={{ margin: 'auto', marginTop: '40vh', width: "350px" }}>
-                    {busy}
-                </div>
-            </div>
-        );
-    }
+    }, [token, backend, retry, isOffline]);
 
 
     if (!isValidated) {
@@ -266,12 +257,13 @@ function ChatApp() {
                     {errorMessage && (
                         <div>
                             <div className="error-message">
+                                {busy && ( <><p>{busy}</p></>)}
                                 {errorMessage}
                             </div>
                         </div>
                     )}
                     {isOffline && (
-                        <TextWithCode text={"Please start minichain via ```\n python -m minichain.api``` or ```\ndocker run -v $(pwd):$(pwd) \\ \n -w $(pwd) -p 8745:8745 \\ \n --env-file .env.example \\ \n nielsrolf/minichain```"} />
+                        <TextWithCode text={"Please start minichain via ```\n python -m minichain.api``` or ```\ndocker run -v $(pwd):$(pwd) \\ \n -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \\ \n --env-file .env.example \\ \n nielsrolf/minichain```"} />
                     )}
                     Enter your token: <input type="text" value={tokenInput} onChange={e => setTokenInput(e.target.value)} />
                     <button onClick={() => {

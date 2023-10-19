@@ -60,7 +60,14 @@ RUN pip install -e .
 WORKDIR /app
 
 # Add build files
-COPY minichain-ui/build /app/minichain-ui/build
+COPY minichain-ui/ /app/minichain-ui/
+WORKDIR /app/minichain-ui
+RUN npm ci
+RUN apt-get install -y tidy
+RUN npm run build
+# remove everything but the build folder
+RUN find . -maxdepth 1 ! -name 'build' ! -name '.' -exec rm -rf {} +
+WORKDIR /app
 
 # Start minichain api
 CMD ["python", "-m", "minichain.api", "--build-dir", "/app/minichain-ui/build"]
