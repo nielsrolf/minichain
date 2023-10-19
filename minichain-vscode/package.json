@@ -1,8 +1,8 @@
 {
-  "name": "minichain-vscode",
+  "name": "minichain",
   "displayName": "Minichain",
   "description": "VSCode extension for Minichain",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "publisher": "minichain",
   "engines": {
     "vscode": "^1.50.0"
@@ -18,6 +18,10 @@
     "onCommand:extension.openMinichain"
   ],
   "main": "./extension.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nielsrolf/minichain.git"
+  },
   "contributes": {
     "commands": [
       {

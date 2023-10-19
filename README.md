@@ -89,37 +89,10 @@ You can then open minichain on [`http://localhost:8745/index.html`](http://local
 
 The VSCode extension requires you to have a locally running backend - either started via [docker](#web-ui) or via [python](#python-package) - on `http://localhost:8745`.
 
-### Installing in development mode
-In VSCode, click `cmd` + `shift` + `P`, select: 'Developer: install extension from location', then select `minichain-vscode`. Then reload the window.
-
-### Installing via vsce
-Install vsce if you don't have it already:
-```
-cd minichain-vscode
-npm install vsce
-```
-
-Create the VSCode extension .vsix file:
-```
-vsce package
-```
+You can install the VSCode extension by downloading the `.vsix` file from [releases](https://github.com/nielsrolf/minichain/releases).
 
 To start the extension, you can open Visual Studio Code, go to the Extensions view (Ctrl+Shift+X), and click on the ... (More Actions) button at the top of the view and select Install from VSIX.... Navigate to the minichain-vscode/ directory, select the .vsix file, and click Install. After the installation, you should be able to use the "Open Minichain" command.
 
-
-## UI dev setup
-
-By default, the docker image serves both the bundled frontend and the API. For development, you can also start the api without serving the frontend:
-```
-OPENAI_API_KEY=key REPLICATE_API_TOKEN=key python -m minichain.api
-```
-And then start the react development server via:
-```
-cd minichain-ui
-npm run start
-```
-
-You will need your [OpenAI GPT-4](https://openai.com) and [Replicate](https://replicate.com) keys in your enviroment variables:
 
 ### macOS npm install
 Install [Brew](https://brew.sh/) if you don't have it already:
