@@ -10,6 +10,7 @@ from jose import JWTError, jwt
 import os
 import json
 from uuid import uuid4
+from fastapi import Request
 
 
 ALGORITHM = "HS256"
@@ -57,14 +58,18 @@ JWT_SECRET = get_or_create_secret_and_token()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-def get_token_payload(token: str = Depends(oauth2_scheme)):
+def get_token_payload(token: str = Depends(oauth2_scheme), request: Request = None):
     """Check if the token is valid and return the payload"""
     if token is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # Try to get the token from the query parameters
+        token = request.query_params.get('token')
+        print("yppppp")
+        if token is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
     try:
         print(token, JWT_SECRET)
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])

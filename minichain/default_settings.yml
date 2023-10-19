@@ -1,6 +1,6 @@
 agents:
-  MemoryAgent:
-    class: minichain.agents.memory_agent.MemoryAgent
+  MinichainHelp:
+    class: minichain.agents.memory_agent.MinichainHelp
     init:
       load_memory_from: .minichain/memory
     display: true
@@ -12,15 +12,22 @@ agents:
   ChatGPT:
     class: minichain.agents.chatgpt.ChatGPT
     display: true
-  artist:
+  Artist:
     class: minichain.agents.replicate_multimodal.Artist
     display: true
   WebGPT:
     class: minichain.agents.webgpt.WebGPT
-    display: true
+    display: false
   AGI:
     class: minichain.agents.agi.AGI
     display: true
+    init:
+      load_memory_from: .minichain/memory
+  Hippocampus:
+    class: minichain.agents.hippocampus.Hippocampus
+    display: false
+    init:
+      load_memory_from: .minichain/memory
   custom_agent:
     class: minichain.agent.Agent
     display: false

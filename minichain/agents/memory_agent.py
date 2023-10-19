@@ -12,7 +12,12 @@ class ProgrammerResponse(BaseModel):
     content: str = Field(..., description="The final response to the user.")
 
 
-class MemoryAgent(Agent):
+# Get the system message from the source dir of this file: memory_agent.prompt
+with open(__file__.replace(".py", ".prompt"), "r") as f:
+    system_message = f.read()
+
+
+class MinichainHelp(Agent):
     def __init__(self, memory=None, load_memory_from=None, **kwargs):
         self.memory = memory or SemanticParagraphMemory(agents_kwargs=kwargs)
         if load_memory_from:
@@ -34,7 +39,7 @@ class MemoryAgent(Agent):
                 self.memory.find_memory_tool(),
                 self.memory.ingest_tool(),
             ],
-            system_message="You are an expert programmer. You find relevant code sections by using the remember tool.",
+            system_message=system_message,
             prompt_template="{query}".format,
             response_openapi=ProgrammerResponse,
             init_history=init_history,
