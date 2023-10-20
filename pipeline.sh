@@ -4,10 +4,14 @@ npm run build/
 cd ..
 
 # Build the backend
-docker build -t nielsrolf/minichain .
+export VERSION='latest'
+docker buildx build --platform linux/amd64,linux/arm64 -t nielsrolf/minichain:$VERSION .
+docker buildx build --platform linux/amd64,linux/arm64 -t nielsrolf/minichain:$VERSION . --push
+
+
 
 # Push the backend
-docker push nielsrolf/minichain
+docker buildx build --push --tag nielsrolf/minichain:$VERSION --platform=linux/arm64,linux/amd64 .
 
 # Deploy the backend
 git push dokku main

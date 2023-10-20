@@ -28,12 +28,12 @@ To start the extension, you can open Visual Studio Code, go to the Extensions vi
 If you want to use the UI (either via browser or with the VSCode extension), run:
 ```bash
 cp .env.example .env # add your openai, replicate and serp API keys.
-docker pull nielsrolf/minichain:latest
 docker run -v $(pwd):$(pwd) \
      -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \
      --env-file .env \
      nielsrolf/minichain # optionally:  --gpus all 
 ```
+
 You can then open minichain on [`http://localhost:8745/index.html`](http://localhost:8745/index.html). You will need the token printed in the beginning of the startup to connect.
 
 
