@@ -142,7 +142,7 @@ function ChatApp() {
     const [port, setPort] = useState(frontendPort === '3000' ? 8745 : (frontendPort));
     const [busy, setBusy] = useState(false);
     const [retry, setRetry] = useState(false);
-    const [isOffline, setIsOffline] = useState(false);
+    const [isOffline, setIsOffline] = useState(true);
 
     // backend needs to change automatically when the port changes - we use a memoized value for this
     const backend = useMemo(() => {
@@ -228,14 +228,20 @@ function ChatApp() {
         setBusy("Retrying..." + (retry? '.' : ''));
         fetch(`${backend}/messages/root`, {headers: {'Authorization': `Bearer ${token}`}})
             .then(response => {
+                setIsOffline(false);
                 if (!response.ok) {
                     // If the response is not ok, throw an error
-                    throw new Error(`Permission error! Status: ${response.status}`);
+                    // is the backend running? can it be reached?
+                    if (response.status === 401) {
+                        throw new Error(`Permission error! Status: ${response.status}`);
+                    }
+
                 }
                 return response.json();
             })
             .then(data => {
                 console.log(data)
+                setIsOffline(false);
                 setIsValidated(true);
             })
             .catch(e => {
@@ -263,7 +269,7 @@ function ChatApp() {
                         </div>
                     )}
                     {isOffline && (
-                        <TextWithCode text={"Please start minichain via ```\n python -m minichain.api``` or ```\ndocker run -v $(pwd):$(pwd) \\ \n -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \\ \n --env-file .env.example \\ \n nielsrolf/minichain```"} />
+                        <TextWithCode text={"Please start minichain via ```python -m minichain.api``` or ```docker run -v $(pwd):$(pwd) \\ \n -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \\ \n --env-file .env.example nielsrolf/minichain```"} />
                     )}
                     Enter your token: <input type="text" value={tokenInput} onChange={e => setTokenInput(e.target.value)} />
                     <button onClick={() => {
