@@ -28,20 +28,15 @@ def get_or_create_secret_and_token():
             settings = json.load(f)
         secret = settings["minichain.jwt_secret"]
     except Exception as e:
+        raise Exception("JWT_SECRET environment variable not found and .vscode/settings.json[minichain.jwt_secret] not found")
         secret = uuid4().hex
         os.makedirs(".vscode", exist_ok=True)
         settings = settings or {}
         settings["minichain.jwt_secret"] = secret
         with open(".vscode/settings.json", "w") as f:
             json.dump(settings, f, indent=4)
-    # check if a frontend token exists in .vscode/settings.json[minichain.token]
-    try:
-        token = settings["minichain.token"]
-    except:
-        token = create_access_token({"sub": "frontend", "scopes": ["root", "edit"]}, secret)
-        settings["minichain.token"] = token
-        with open(".vscode/settings.json", "w") as f:
-            json.dump(settings, f, indent=4)
+    
+    token = create_access_token({"sub": "frontend", "scopes": ["root", "edit"]}, secret)
     print("Token for frontend:", token)
     return secret
 
@@ -59,6 +54,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_token_payload(token: str = Depends(oauth2_scheme)):
     """Check if the token is valid and return the payload"""
+    if token == JWT_SECRET:
+        return {"sub": "frontend", "scopes": ["root", "edit"]}
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
