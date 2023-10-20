@@ -170,7 +170,6 @@ class Message():
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
         filepath = os.path.join(target_dir, f"{self.path[-1]}.json")
-        print("saving to", filepath, self.meta)
         with open(filepath, 'w') as f:
             json.dump({
                 "chat": self.chat,
@@ -315,7 +314,6 @@ class Conversation():
         data = self.as_json()
         data['conversation_id'] = self.path[-1]
         data['message_ids'] = [m['path'][-1] for m in data.pop('messages')]
-        print("--> saving conversation to", filepath)
         with open(filepath, 'w') as f:
             json.dump(data, f, default=datetime_converter)
     

@@ -1,4 +1,5 @@
 import time
+import asyncio
 from typing import Optional
 from enum import Enum
 import jupyter_client
@@ -97,10 +98,12 @@ class Jupyter(Function):
 
         while True:
             try:
-                # Get messages from the kernel
-                remaining_time = timeout - (time.time() - start_time)
-                msg = self.kernel_client.get_iopub_msg(timeout=remaining_time)
+                # async sleep to avoid blocking the event loop
+                await asyncio.sleep(0.1)
+                msg = self.kernel_client.get_iopub_msg(timeout=0.5)
             except:
+                if time.time() - start_time < timeout:
+                    continue
                 # Timeout
                 await self.message_handler.chunk("Timeout")
                 if self.continue_on_timeout:

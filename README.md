@@ -11,6 +11,44 @@ Minichain is a framework for LLM powered agents with structured data, and many t
 - demo of a programmer agent built with minichain, using the [VSCode extension ui](./minichain-vscode/)
 
 
+# Installation
+
+If you want to use GPT powered agents as programming assistants in VSCode, install the VSCode extension and the minichain backend via docker.
+To develop your own agents, install the python package.
+
+## VSCode extension
+
+The VSCode extension requires you to have a locally running backend - either started via [docker](#web-ui) or via [python](#python-package) - on `http://localhost:8745`.
+
+You can install the VSCode extension by downloading the `.vsix` file from [releases](https://github.com/nielsrolf/minichain/releases).
+
+To start the extension, you can open Visual Studio Code, go to the Extensions view (Ctrl+Shift+X), and click on the ... (More Actions) button at the top of the view and select Install from VSIX.... Navigate to the minichain-vscode/ directory, select the .vsix file, and click Install. After the installation, you should be able to use the "Open Minichain" command.
+
+## Web-UI
+If you want to use the UI (either via browser or with the VSCode extension), run:
+```bash
+cp .env.example .env # add your openai, replicate and serp API keys.
+docker pull nielsrolf/minichain:latest
+docker run -v $(pwd):$(pwd) \
+     -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \
+     --env-file .env \
+     nielsrolf/minichain # optionally:  --gpus all 
+```
+You can then open minichain on [`http://localhost:8745/index.html`](http://localhost:8745/index.html). You will need the token printed in the beginning of the startup to connect.
+
+
+## Python package
+If you want to build agents, install the python library:
+```bash
+pip install git+https://github.com/nielsrolf/minichain
+cp .env.example .env # add your openai, replicate and serp API keys.
+```
+
+It is recommended to run agents inside of docker environments where they have no permission to destroy important things or have access to all secrets. If you feel like taking the risk, you can also run the api on the host via: `python -m minichain.api`.
+
+
+
+# Python library
 **Why?**
 - structured output should be the default. Always converting to text is often a bottleneck
 - langchain has too many classes and is generally too big.
@@ -60,56 +98,5 @@ print(response['content'], response['sources'])
 ## Running tests
 ```
 pytest test
-```
-
-# Installation
-
-## Python package
-If you want to build agents, install the python library:
-```bash
-pip install git+https://github.com/nielsrolf/minichain
-cp .env.example .env # add your openai, replicate and serp API keys.
-```
-
-It is recommended to run agents inside of docker environments where they have no permission to destroy important things or have access to all secrets. If you feel like taking the risk, you can also run the api on the host via: `python -m minichain.api`.
-
-## Web-UI
-If you want to use the UI (either via browser or with the VSCode extension), run:
-```bash
-cp .env.example .env # add your openai, replicate and serp API keys.
-docker pull nielsrolf/minichain:latest
-docker run -v $(pwd):$(pwd) \
-     -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \
-     --env-file .env \
-     nielsrolf/minichain # optionally:  --gpus all 
-```
-You can then open minichain on [`http://localhost:8745/index.html`](http://localhost:8745/index.html). You will need the token printed in the beginning of the startup to connect.
-
-
-## VSCode extension
-
-The VSCode extension requires you to have a locally running backend - either started via [docker](#web-ui) or via [python](#python-package) - on `http://localhost:8745`.
-
-You can install the VSCode extension by downloading the `.vsix` file from [releases](https://github.com/nielsrolf/minichain/releases).
-
-To start the extension, you can open Visual Studio Code, go to the Extensions view (Ctrl+Shift+X), and click on the ... (More Actions) button at the top of the view and select Install from VSIX.... Navigate to the minichain-vscode/ directory, select the .vsix file, and click Install. After the installation, you should be able to use the "Open Minichain" command.
-
-
-### macOS npm install
-Install [Brew](https://brew.sh/) if you don't have it already:
-```
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-Install npm [Node.js](https://nodejs.org/en/) if you don't have it already:
-```
-brew install npm
-```
-
-### Linux and macOS
-Then, install and start the frontend:
-```
-cd minichain-ui
-npm install
-npm run start
 ```
 
