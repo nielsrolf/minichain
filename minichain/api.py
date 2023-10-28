@@ -148,7 +148,7 @@ async def put_chat(path: str, update: MessagePayload, token_payload: dict = Depe
     if path == "":
         path = "root"
     path = path.split('/')
-    update = update.dict()
+    update = {k: v for k, v in update.dict().items() if v is not None}
     check_permission_return_item(token_payload, path[-1], 'edit')
     message = await message_db.update_message(path[-1], update)
     return message.as_json()

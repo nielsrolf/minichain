@@ -693,7 +693,7 @@ function AuthorizedChatApp({token, backend, ws_backend}) {
                         />
                     )
                 })}
-                {conversation.meta?.agent === 'Programmer' && (
+                {(conversation.meta?.agent === 'Programmer' || conversation.meta?.agent === 'Researcher') && (
                     <NewCell onRun={createNewCell} />
                 )}
                 <div id="bottom"></div> {/* this is used to scroll to the bottom when a new message is added */}

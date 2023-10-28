@@ -23,6 +23,11 @@ agents:
     display: true
     init:
       load_memory_from: .minichain/memory
+  Researcher:
+    class: minichain.agents.researcher.Researcher
+    init:
+      load_memory_from: .minichain/memory
+    display: true
   Hippocampus:
     class: minichain.agents.hippocampus.Hippocampus
     display: false
