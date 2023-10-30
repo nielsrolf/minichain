@@ -18,7 +18,7 @@ from minichain.functions import tool
 from minichain.message_handler import MessageDB
 from minichain.utils.json_datetime import datetime_converter
 from minichain.auth import get_token_payload, get_token_payload_or_none, create_access_token
-
+from minichain import settings
 
 
 app = FastAPI()
@@ -265,10 +265,21 @@ async def static(path, request: Request):
             return FileResponse(ui_path)
         else:
             print("not found:", ui_path)
-    # check the token before serving workdir files
-    token_payload = get_token_payload(request.headers.get("Authorization"))
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="File not found")
+        
+    # check the token before serving workdir files, unless it is in a /public/ folder
+    if not ".public/" in path:
+        token = request.query_params.get("token") or request.headers.get("Authorization") or ""
+        get_token_payload(token)
+
+    if os.path.isdir(path):
+        if os.path.exists(maybe := os.path.join(path, "index.html")):
+            path = maybe
+        elif os.path.exists(maybe := os.path.join(path, "index.htm")):
+            path = maybe
+        elif os.path.exists(maybe := os.path.join(path, "index.js")):
+            path = maybe
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path)
 
 
@@ -417,6 +428,7 @@ def start(port=8745, build_dir=None):
     global PORT
     PORT = port
     ui_build_dir = build_dir
+    settings.SERVE_URL = f"{settings.DOMAIN}:{port}/.public/"
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=port)
 

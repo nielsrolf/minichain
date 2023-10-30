@@ -6,6 +6,7 @@ from minichain.agent import Agent
 from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage, SystemMessage
 from minichain.tools import codebase
 from minichain.tools.bash import Jupyter
+from minichain.tools.deploy_static import deploy_static_website
 from minichain.agents.hippocampus import Hippocampus
 
 
@@ -28,6 +29,7 @@ class Programmer(Agent):
             codebase.view,
             codebase.edit,
             codebase.scan_file_for_info,
+            deploy_static_website,
             self.hippocampus.as_function(
                 name="find_memory",
                 description="Find relevant memories or code sections for the query. If the task is to work on an existing codebase, use this function to find relevant code sections."
