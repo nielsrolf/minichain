@@ -428,7 +428,9 @@ def start(port=8745, build_dir=None):
     global PORT
     PORT = port
     ui_build_dir = build_dir
-    settings.SERVE_URL = f"{settings.DOMAIN}:{port}/.public/"
+    if ":8745" in settings.DOMAIN:
+        settings.DOMAIN = settings.DOMAIN.replace(":8745", f":{port}")
+        settings.SERVE_URL = settings.SERVE_URL.replace(":8745", f":{port}")
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=port)
 
