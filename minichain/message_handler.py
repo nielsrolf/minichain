@@ -366,7 +366,7 @@ class MessageDB():
     
     def cancel(self, conversation_id):
         self._cancelled.append(conversation_id)
-
+    
     async def on_message(self, msg):
         # send the message to all other consumers if they want to consume it
         path = msg.get("path", None)
@@ -376,12 +376,17 @@ class MessageDB():
             else:
                 path = self.get(msg['id']).path
         not_yet_raised = []
+        raise_now = False
+        print("Cancelled:", self._cancelled)
         for cancelled in self._cancelled:
             if cancelled in path:
-                raise Cancelled()
+                raise_now = True
             else:
                 not_yet_raised.append(cancelled)
         self._cancelled = not_yet_raised
+        if raise_now:
+            raise Cancelled()
+
         """
         we send to subscribers of:
         path[-2] -> normal message of this conversation
