@@ -40,7 +40,7 @@ You can then open minichain on [`http://localhost:8745/index.html`](http://local
 # Demo
 
 The demos are created using the "Share"-Button that gives read access to a workspace of conversation. In order actually talk to agents, you need to install minichain and use your own OpenAI API key. 
-- build and deploy a [simple website])https://minichain.polybase.app/.public/portfolio_1): [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyIzNDUxNTQ4OSIsInZpZXciXX0.PUS3QWVJQ07MIoLtpfwUgE2mdYTBVx0K07o8C_MHAh0)
+- build and deploy a [simple website](https://minichain.polybase.app/.public/portfolio_1): [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyIzNDUxNTQ4OSIsInZpZXciXX0.PUS3QWVJQ07MIoLtpfwUgE2mdYTBVx0K07o8C_MHAh0)
 - create an illustrated children story: [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyJkMjlkZmUwNiIsInZpZXciXX0.pQKPW3HDmy039O2821y9iRaVYhwyvMb9etr1ITqlRMM)
 
 ## Python package
