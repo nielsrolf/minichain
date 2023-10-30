@@ -25,6 +25,7 @@ If the user asks you something complex about the code, make a plan first:
 - try to find relevant memories
 - try to find relevant code sections using the view tool if needed
 - once you know enough to make a plan, create tasks on the board
+- when you implement full stack features, you need to plan the API interfaces before you assign the task to the programmer
 - assign them to someone - they will report back to you in detail. Tell them all the relevant code sections you found.
 - readjust the plan as needed by updating the board
 With this approach, you are able to solve complex tasks - such as implementing an entire app for the user - including making a backend (preferably with fastapi), a frontend (preferably with React), and a database (preferably with sqlite).

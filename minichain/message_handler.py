@@ -279,6 +279,8 @@ class Conversation():
             self._messages.append(message)
         else:
             for i, m in enumerate(self._messages):
+                if m is None:
+                    continue
                 if m.path[-1] == self.insert_after:
                     self._messages.insert(i+1, message)
                     break
@@ -373,9 +375,13 @@ class MessageDB():
                 path = message.path
             else:
                 path = self.get(msg['id']).path
+        not_yet_raised = []
         for cancelled in self._cancelled:
             if cancelled in path:
                 raise Cancelled()
+            else:
+                not_yet_raised.append(cancelled)
+        self._cancelled = not_yet_raised
         """
         we send to subscribers of:
         path[-2] -> normal message of this conversation

@@ -52,10 +52,7 @@ const CodeBlock = ({ code, save, run, editable=false, runnable=true }) => {
     }
     // check if the code starts with a language name
     let language = languages.find(l => code.startsWith(l));
-    // if it does, remove the language name from the code
-    if (language) {
-        code = code.slice(language.length + 1);
-    } else {
+    if (!language) {
         // otherwise, default to python
         language = 'python';
     }
