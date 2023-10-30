@@ -132,7 +132,7 @@ class Session:
     async def run_until_done(self):
         while True:
             action = await self.get_next_action()
-            if action is not None:
+            if action is not None and action.get('name') is not None:
                 output = await self.execute_action(action)
                 if action['name'] == "return" and output is not False:
                     # output is the output of the return function
@@ -140,6 +140,10 @@ class Session:
                     await self.agent.before_return(output)
                     print("output", output)
                     return json.loads(output)
+            else:
+                await self.conversation.send(
+                    UserMessage("INFO: no action was taken. In order to end the conversation, please call the 'return' function. In order to continue, please call a function.")
+                )
 
     async def get_next_action(self):
         history_without_ids = messages_types_to_history(self.conversation.messages)
@@ -156,7 +160,7 @@ class Session:
                 stream=message_handler,
                 force_call=self._force_call,
             )
-        return llm_response['function_call']
+        return llm_response.get('function_call')
 
     async def execute_action(self, action):
         async with self.conversation.to(FunctionMessage(name=action['name'])) as message_handler:

@@ -54,7 +54,7 @@ class Programmer(Agent):
             demo_response,
             UserMessage(content="Great! Now also try the edit function: create a file /tmp/hello and write something in it."),
             AssistantMessage(
-                content="Okay, here you go:", function_call=FunctionCall(name="edit", arguments={"path": "/tmp/hello", "code": "This is a test. The content for files goes into this area - just like python code that I want to run", "start_line": 1, "end_line": 1})),
+                content="Okay, here you go:", function_call=FunctionCall(name="edit", arguments={"path": "/tmp/hello", "code": "This is a test. The content for files goes into this area - just like python code that I want to run", "start": 1, "end": 1})),
             FunctionMessage(content="/tmp/hello:1\n1: This is a test. The content for files goes into this area - just like python code that I want to run\n", name='edit'),
         ]
         init_msg = f"Perfect - always write the code or file content, and then call the function! Now here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"

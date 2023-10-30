@@ -304,7 +304,10 @@ async def edit(
     code = "\n".join([indent + line for line in code.split("\n")])
     with open(path, "r") as f:
         lines = f.read().split("\n")
-        lines[start - 1 : end - 1] = code.split("\n")
+        
+    if end < 0:
+        end = len(lines) + 2 + end
+    lines[start - 1 : end - 1] = code.split("\n")
     with open(path, "w") as f:
         f.write("\n".join(lines))
     updated_in_context = await view(

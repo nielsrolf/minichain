@@ -13,51 +13,19 @@ from minichain.utils.disk_cache import async_disk_cache, disk_cache
 
 
 def parse_function_call(function_call: Optional[Dict[str, Any]]):
-    if function_call is None:
-        return None
+    if function_call is None or function_call.get("name") is None:
+        return {}
     try:
         function_call["arguments"] = json.loads(function_call["arguments"])
         return FunctionCall(**function_call)
     except:
-        pass
-    if '"code": ```' in function_call["arguments"]:
-        # replace first occurrence of ``` with " and last
-        before, after = function_call["arguments"].split('"code": ```', 1)
-        try:
-            code, after = after.rsplit("```,", 1)[0]
-        except:
-            code, after = after.rsplit("```", 1)[0]
-        arguments_no_code = json.loads(before + after)
-        arguments = {"code": code, **arguments_no_code}
-        function_call["arguments"] = arguments
-        return FunctionCall(**function_call)
-
-    if '"code": `' in function_call["arguments"]:
-        # replace first occurrence of ``` with " and last
-        before, after = function_call["arguments"].split('"code": `', 1)
-        if "`, " in after:
-            try:
-                code, after = after.rsplit("`,", 1)[0]
-            except:
-                code, after = after.rsplit("`", 1)[0]
-        arguments_no_code = json.loads(before + after)
-        arguments = {"code": code, **arguments_no_code}
-        function_call["arguments"] = arguments
-        return FunctionCall(**function_call)
-
-    return FunctionCall(**function_call)
-
+        raise Exception(f"Could not parse function call: {function_call}")
+    
 
 def fix_common_errors(response: Dict[str, Any]) -> Dict[str, Any]:
     """Fix common errors in the formatting and turn the dict into a AssistantMessage"""
-    if not response.get("function_call"):
-        response["function_call"] = {
-            "name": "return",
-            "arguments": json.dumps({"content": response.pop("content")}),
-        }
-        response["content"] = ""
     response["function_call"] = parse_function_call(response["function_call"])
-    if "```" in response["content"] and response["function_call"]["name"] in ["jupyter", "edit"]:
+    if "```" in response["content"] and response["function_call"].get("name") in ["jupyter", "edit"]:
         # move the code to the arguments
         raw = response["content"]
         for language in ["python", "bash", "javascript", "html", "css", "json", "yaml", "sql", "markdown", "latex", "c", "cpp", "csharp", "go", "java", "kotlin", "php", "ruby", "rust", "scala", "swift", "py", "sh", "js", "x", "jsx", "ts", "tsx", "typescript"]:
@@ -92,8 +60,11 @@ def format_history(messages: list) -> list:
             if message['role'] == 'user':
                 function_call = message.pop("function_call")
                 message['content'] += f"\n**Calling function: {function_call['name']}** with arguments: \n{function_call['arguments']}\n"
-        if message['role'] == 'user':
-            message.pop("function_call", None)
+        if message['role'] == 'user' or message.get('function_call') is None or message['function_call'].get('name') is None:
+            try:
+                message.pop("function_call", None)
+            except KeyError:
+                pass
     return messages
 
 

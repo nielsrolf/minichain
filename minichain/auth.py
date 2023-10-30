@@ -28,7 +28,6 @@ def get_or_create_secret_and_token():
             settings = json.load(f)
         secret = settings["minichain.jwt_secret"]
     except Exception as e:
-        raise Exception("JWT_SECRET environment variable not found and .vscode/settings.json[minichain.jwt_secret] not found")
         secret = uuid4().hex
         os.makedirs(".vscode", exist_ok=True)
         settings = settings or {}
