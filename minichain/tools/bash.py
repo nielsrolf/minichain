@@ -89,6 +89,7 @@ class Jupyter(Function):
         
         if restart:
             self.kernel_manager.restart_kernel()
+            self.kernel_client = self.kernel_manager.client()
             self.kernel_client.start_channels()
         # Execute the code
         msg_id = self.kernel_client.execute(code)

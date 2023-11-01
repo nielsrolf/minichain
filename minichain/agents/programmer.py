@@ -42,6 +42,7 @@ class Programmer(Agent):
             init_history=init_history,
             **kwargs,
         )
+        self.memory = self.hippocampus.memory
 
     @property
     def init_history(self):

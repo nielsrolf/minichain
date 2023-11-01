@@ -8,7 +8,6 @@ from minichain.functions import Function
 from minichain.schemas import DefaultResponse, DefaultQuery
 from minichain.message_handler import MessageDB, Conversation
 from minichain.utils.cached_openai import get_openai_response_stream
-from minichain.utils.summarize_history import get_summarized_history
 
 
 def make_return_function(openapi_json: BaseModel, check=None):
@@ -24,6 +23,12 @@ def make_return_function(openapi_json: BaseModel, check=None):
         description="End the conversation and return a structured response.",
     )
     return function_obj
+
+
+CONTEXT_SIZE = {
+    "gpt-3.5-turbo": 1024 * 8,
+    "gpt-4-0613": 1024 * 2
+}
 
 
 class Agent:
@@ -53,6 +58,8 @@ class Agent:
         self.name = name or self.__class__.__name__
         self.llm = llm
         self.message_handler = message_handler or MessageDB()
+        self.context_size = CONTEXT_SIZE[llm]
+        self.memory = None
     
     @property
     def init_history(self):
@@ -69,9 +76,17 @@ class Agent:
     async def session(self, conversation=None, **arguments):
         if not isinstance(conversation, Conversation):
             if conversation is None:
-                conversation = await self.message_handler.conversation(meta=dict(agent=self.name))
+                conversation = await self.message_handler.conversation(
+                    meta=dict(agent=self.name),
+                    context_size=self.context_size,
+                    memory=self.memory,
+                )
             else:
-                conversation = await conversation.conversation(meta=dict(agent=self.name))
+                conversation = await conversation.conversation(
+                    meta=dict(agent=self.name),
+                    context_size=self.context_size,
+                    memory=self.memory,
+                )
             for message in self.init_history:
                 await conversation.send(message, is_initial=True)
         agent_session = Session(self, conversation)
@@ -87,6 +102,7 @@ class Agent:
         await agent_session.conversation.send(
             UserMessage(self.prompt_template(**arguments)),
             is_initial=False,
+            is_initial_user_message=True,
             **message_meta
         )
         response = await agent_session.run_until_done()
@@ -130,6 +146,7 @@ class Session:
         self._force_call = None
 
     async def run_until_done(self):
+        print("running until done", self.agent.name)
         while True:
             action = await self.get_next_action()
             if action is not None and action.get('name') is not None:
@@ -146,15 +163,11 @@ class Session:
                 )
 
     async def get_next_action(self):
-        history_without_ids = messages_types_to_history(self.conversation.messages)
-        # summarized_history = await get_summarized_history(
-        #     history_without_ids, self.agent.functions_openai
-        # )
-        summarized_history = history_without_ids
+        history = await self.conversation.fit_to_context()
         # do the openai call
         async with self.conversation.to(AssistantMessage()) as message_handler:
             llm_response = await get_openai_response_stream(
-                summarized_history,
+                history,
                 self.agent.functions_openai,
                 model=self.agent.llm,
                 stream=message_handler,

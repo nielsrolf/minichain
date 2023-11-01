@@ -166,7 +166,7 @@ class SemanticParagraphMemory:
         memory.memory.end_line = end_line
         return True
 
-    async def ingest(self, content, source, watch_source=True):
+    async def ingest(self, content, source, watch_source=True, scope=None, return_summary=False):
         """Ingest a text and create memories from it.
         
         If memories for this source exist already, this method updates the memories by:
@@ -177,12 +177,18 @@ class SemanticParagraphMemory:
         """
         content_hash = hash_string(content)
         existing_memories = [i for i in self.memories if i.meta.source == source]
+        if scope:
+            existing_memories = [i for i in existing_memories if scope == i.meta.scope]
         if self.ingested_hashed.get(source) == content_hash:
             return existing_memories
         existing_memories = [i for i in existing_memories if self.check_if_still_valid(i, content)]
-        memories = await text_to_memory(text=content, source=source, agent_kwargs=self.agent_kwargs, existing_memories=existing_memories)
+        memories, document_summary = await text_to_memory(
+            text=content, source=source, agent_kwargs=self.agent_kwargs,
+            existing_memories=existing_memories, return_summary=True)
         # Add memories to vector db
         for memory in memories:
+            if scope:
+                memory.meta.scope = scope
             memory.meta.watch_source = watch_source
             # title
             self.vector_db.add(memory.memory.title, memory)
@@ -194,7 +200,10 @@ class SemanticParagraphMemory:
         self.ingested_hashed[source] = content_hash
         if self.auto_save_dir is not None:
             self.save(self.auto_save_dir)
-        return memories
+        if return_summary:
+            return memories, document_summary
+        else:
+            return memories
 
     async def ingest_rec(self, path):
         if not os.path.exists(path):
@@ -321,6 +330,7 @@ class SemanticParagraphMemory:
         except:
             print("No memories found in", memory_dir)
         self.auto_save_dir = memory_dir
+        return self
     
     def reload(self):
         self.load(self.auto_save_dir)
@@ -385,7 +395,11 @@ async def main():
     
     # breakpoint()
 
+from minichain import settings
 
+settings.set_default_memory(
+    SemanticParagraphMemory
+)
 
 
 if __name__ == "__main__":

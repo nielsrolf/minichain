@@ -86,7 +86,7 @@ def add_line_numbers(text):
 class EndThisMemorySession(Exception):
     pass
 
-async def text_to_memory(text, source=None, agent_kwargs={}, existing_memories=[]) -> List[MemoryWithMeta]:
+async def text_to_memory(text, source=None, agent_kwargs={}, existing_memories=[], return_summary=False) -> List[MemoryWithMeta]:
     """
     Turn a text into a list of semantic paragraphs.
     - add line numbers to the text
@@ -122,6 +122,7 @@ async def text_to_memory(text, source=None, agent_kwargs={}, existing_memories=[
     )
 
     agent = Agent(
+        name="TextToMemories",
         functions=[
             add_memory_function,
         ],
@@ -141,17 +142,23 @@ async def text_to_memory(text, source=None, agent_kwargs={}, existing_memories=[
         try:
             for paragraph in paragraphs:
                 print(paragraph)
+                import tiktoken
+                print("tokens:", len(tiktoken.encoding_for_model("gpt-3.5-turbo").encode(paragraph)))
                 await agent.run(text=paragraph)
                 # If the agent ran until the end, it means the agent didn't create a memory
             # if we come here, no memory was added for any paragraph
             done = True
         except EndThisMemorySession:
             continue
-    return memories
+    if return_summary:
+        return memories, hide_already_memorized(text, existing_memories + memories)
+    else:
+        return memories
 
 
 async def text_to_single_memory(text=None, source=None, agent_kwargs={}) -> MemoryWithMeta:
     agent = Agent(
+        name="TextToSingleMemory",
         functions=[],
         system_message="Describe the content of this text and turn provide structured metadata about it.",
         prompt_template="{text}".format,

@@ -26,6 +26,7 @@ If the user asks you something complex about the code, make a plan first:
 - try to find relevant code sections using the view tool if needed
 - once you know enough to make a plan, create tasks on the board
 - when you implement full stack features, you need to plan the API interfaces before you assign the task to the programmer
+- again when implementing full stack features, you (or an assigned worker) should start the backend, and use frontend testing tools to test interactions with the backend
 - assign them to someone - they will report back to you in detail. Tell them all the relevant code sections you found.
 - readjust the plan as needed by updating the board
 With this approach, you are able to solve complex tasks - such as implementing an entire app for the user - including making a backend (preferably with fastapi), a frontend (preferably with React), and a database (preferably with sqlite).
@@ -57,7 +58,7 @@ class AGI(Agent):
             assignee: str = Field(
                 "programmer",
                 description="The name of the assignee.",
-                enum=["programmer", "copy-of-self", "artist"],
+                enum=["programmer", "artist"],
                 # enum=["programmer", "webgpt", "copy-of-self", "artist"],
             ),
             relevant_code: List[str] = Field(
@@ -69,14 +70,15 @@ class AGI(Agent):
             ),
             conversation=None,
         ):
-            """Assign a task to an agent (copy-of-self: for complex tasks with sub tasks, programmer: to work on the codebase, webgpt (rarely): to research something on the web, artist: for generating images and music). The assignee will immediately start working on the task."""
+            """Assign a task to an agent (programmer: to work on the codebase, artist: for generating images and music). The assignee will immediately start working on the task."""
             task = [i for i in self.board.tasks if i.id == task_id][0]
             board_before = await taskboard.update_status(
                 self.board, task_id, "IN_PROGRESS"
             )
             query = (
                 f"Your team is working on this customer request: \n{conversation.first_user_message.chat['content']}\n"
-                f"Please work on the following ticket: \n{str(task)}\n{additional_info}\n"
+                f"Please work on the following ticket: \n{str(task)}\n{additional_info}\n",
+                f"If you modify source files, always write tests for them.\n",
                 "When you are done, return with a detailed explanation of what you did, including a list of all the files you changed and an explanation of how to test and use the new feature.\n"
             )
             if len(relevant_code) > 0:
@@ -156,6 +158,7 @@ class AGI(Agent):
             response_openapi=MultiModalResponse,
             **kwargs,
         )
+        self.memory = self.programmer.memory
 
     @property
     def init_history(self):
