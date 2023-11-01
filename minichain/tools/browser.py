@@ -29,6 +29,7 @@ class Browser:
 
         # Adding listener for network requests
         self.page.on('request', self._on_network_request)
+        self.page.on('response', self._on_network_response)
 
         await self.page.goto(url)
 
@@ -54,7 +55,13 @@ class Browser:
         self.console_messages.append(str(msg.text))
 
     def _on_network_request(self, req):
-        text = f"{req.method} {req.url}: {req.response.status}"
+        text = f"{req.method} {req.url}"
+        self.network_requests.append(text)
+    
+    def _on_network_response(self, res):
+        text = f"{res.status} {res.url}"
+        if res.status >= 400:
+            text += f" {res.text}"
         self.network_requests.append(text)
 
     async def devtools(self, tab="console", pattern="*"):
@@ -102,18 +109,18 @@ class Browser:
 
 async def main():
     test_url = 'http://localhost:8745/.public/'
-    test_url = "http://localhost:8745/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyJyb290IiwiZWRpdCJdfQ.0kvXK-aEEgZoPdUjQviDdU1GeKj9OZYPxzLrjOPOaa8"
+    # test_url = "http://localhost:8745/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyJyb290IiwiZWRpdCJdfQ.0kvXK-aEEgZoPdUjQviDdU1GeKj9OZYPxzLrjOPOaa8"
     browser = Browser()
     await browser.open_url(test_url)
     print(await browser.get_dom())
     # await browser.interact('type', '#text-input', 'yo yo yo')
     # await browser.interact('click', '#run-button')
-    await browser.wait(1)
     print(await browser.devtools("console", ".*"))
     print(await browser.devtools("network", "ws://.*"))
     print(await browser.devtools("network", "http://.*"))
+    input()
     print(await browser.get_dom())
-
+    await browser.browser.close()
 
 if __name__ == '__main__':
     asyncio.run(main())
