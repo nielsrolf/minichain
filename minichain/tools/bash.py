@@ -29,23 +29,24 @@ def shorten_response(response: str, max_lines = 100, max_chars = 200) -> str:
     return response
 
 
-class PythonOrBashEnum(str, Enum):
+class Type(str, Enum):
     python = "python"
     bash = "bash"
+
 
 class JupyterQuery(BaseModel):
     code: str = Field(
         ...,
         description="Code or commands to run",
     )
-    type: PythonOrBashEnum = Field(
-        PythonOrBashEnum.python,
+    type: Type = Field(
+        Type.python,
         description="The type of code to run.",
     )
     timeout: Optional[int] = Field(60, description="The timeout in seconds.")
-    background: Optional[bool] = Field(
-        False,
-        description="Set to true if you start e.g. a webserver in the background (Use: `node server.js` rather than `node server.js &` ). Commands will be run in a new jupyter kernel. Tasks like installing dependencies should not run in the background.")
+    process: Optional[str] = Field(
+        "main",
+        description="Anything other than 'main' causes the process to run in the background. Set to e.g. 'backend' if you webserver in the background (Use: `node server.js` rather than `node server.js &` ). Commands will be run in a new jupyter kernel. Tasks like installing dependencies should run in 'main'.")
     restart: Optional[bool] = Field(
         False,
         description="Set to true in order to restart the jupyter kernel before running the code. Required to import newly installed pip packages.")
@@ -67,21 +68,39 @@ class Jupyter(Function):
         self.kernel_client.start_channels()
         self.continue_on_timeout = continue_on_timeout
         self.has_code_argument = True
+        self.bg_processes = {}
     
     async def __call__(self, **arguments):
         self.check_arguments_raise_error(arguments)
         result = await self.call(**arguments)
         return result
 
-    async def call(self, code: str, timeout: int = 60, type: str = "python", background=False, restart=False) -> str:
-        if background:
-            # run this code in a new juptyer kernel
-            jupyter = Jupyter(continue_on_timeout=True)
+    async def call(self, code: str, timeout: int = 60, type: str = "python", process='main', restart=False) -> str:
+        if process != "main":
+            if self.bg_processes.get(process):
+                jupyter = self.bg_processes[process]
+                if code == 'logs':
+                    logs = jupyter.message_handler.current_message['content']
+                    logs = shorten_response(logs, 20)
+                    await self.message_handler.set(f"Logs of process {process}:\n{logs}")
+                    return f"Logs of process {process}:\n{logs}"
+                # interrupt the process if it is still running
+                jupyter.kernel_manager.restart_kernel()
+            else:
+                if code == 'logs':
+                    await self.message_handler.set(f"Process {process} does not exist.")
+                    return f"Process {process} does not exist."
+                # run this code in a new juptyer kernel
+                jupyter = Jupyter(continue_on_timeout=True)
+                self.bg_processes[process] = jupyter
+
             # remove `&` from the end of the code
             code = "\n".join([line if not line.strip().endswith("&") else line.strip()[:-1] for line in code.split("\n")])
+            await self.message_handler.set(f"Starting background process...")
             initial_logs = await jupyter(code=code, timeout=10, type=type)
             initial_logs = shorten_response(initial_logs, 20)
-            output = f"Started background process with logs:\n{initial_logs}"
+            output = f"Started background process with logs:\n{initial_logs}\n"
+            output += f"You can check the logs of this process by typing \n```\nlogs\n```\n and calling jupyter with process={process}"
             await self.message_handler.set(output)
             return output
         if type == "bash" and not code.startswith("!"):
@@ -106,11 +125,11 @@ class Jupyter(Function):
                 if time.time() - start_time < timeout:
                     continue
                 # Timeout
-                await self.message_handler.chunk("Timeout")
                 if self.continue_on_timeout:
                     # just return the current output
                     return self.message_handler.current_message['content']
                 else:
+                    await self.message_handler.chunk("Timeout")
                     output =  self.message_handler.current_message['content']
                     # Interrupt the kernel
                     self.kernel_manager.interrupt_kernel()

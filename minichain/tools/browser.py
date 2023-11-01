@@ -54,14 +54,23 @@ class Browser:
         self.console_messages.append(str(msg.text))
 
     def _on_network_request(self, req):
-        self.network_requests.append(req.url)
+        text = f"{req.method} {req.url}: {req.response.status}"
+        self.network_requests.append(text)
 
     async def devtools(self, tab="console", pattern="*"):
         """Returns all console logs or network requests that match the pattern, just like Chrome DevTools would show them"""
         if tab == "console":
-            return "\n".join([msg for msg in self.console_messages if re.search(pattern, msg)])
+            message_ids = [i for i, msg in enumerate(self.console_messages) if re.search(pattern, msg)]
+            messages = [self.console_messages[i] for i in message_ids]
+            # delete the messages that were returned
+            self.console_messages = [msg for i, msg in enumerate(self.console_messages) if i not in message_ids]
+            return "\n".join(messages)
         elif tab == "network":
-            return "\n".join([req for req in self.network_requests if re.search(pattern, req)])
+            network_ids = [i for i, req in enumerate(self.network_requests) if re.search(pattern, req)]
+            requests = [self.network_requests[i] for i in network_ids]
+            # delete the requests that were returned
+            self.network_requests = [req for i, req in enumerate(self.network_requests) if i not in network_ids]
+            return "\n".join(requests)
         return ""
     
     def as_tool(self):
@@ -69,7 +78,7 @@ class Browser:
         async def browser(
             url: Optional[str] = Field(None, description="The URL to open, format: http://localhost:8745/.public/"),
             interactions: List[Interaction] = Field([], description="A list of interactions to perform on the page."),
-            return_dom_selector: str = Field('', description="If set, returns the DOM of the selected element after the specified interaction."),
+            return_dom_selector: Optional[str] = Field('', description="If set, returns the DOM of the selected element after the specified interaction."),
             return_console_pattern: str = Field('.*Error.*', description="If set, returns the console logs that match the specified pattern."),
             return_network_pattern: str = Field('', description="If set, returns the network requests that match the specified pattern."),
         ):

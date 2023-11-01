@@ -161,11 +161,10 @@ class Session:
                 if self.agent.response_openapi == DefaultResponse:
                     return {"content": self.conversation.messages[-1].chat['content']}
                 msg = "INFO: no action was taken. In order to end the conversation, please call the 'return' function. In order to continue, please call a function."
-                if self.conversation.messages[-1] == self.conversation.messages[-3]:
-                    msg += "\n\nIt seems like you are maybe stuck, you have repeated the same message twice. Take a deep breath. Now, think step by step what you want to do."
-                await self.conversation.send(
-                    UserMessage(msg)
-                )
+                await self.conversation.send(UserMessage(msg))
+            if self.conversation.messages[-1].chat['content'] == self.conversation.messages[-3].chat['content']:
+                msg = "\n\nIt seems like you are maybe stuck, you have repeated the same message twice. Take a deep breath. Now, think step by step what you want to do. Write down your analysis of the error. Then try to solve the problem and continue."
+                await self.conversation.send(UserMessage(msg))
 
     async def get_next_action(self):
         history = await self.conversation.fit_to_context()

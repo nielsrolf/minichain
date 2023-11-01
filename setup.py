@@ -34,6 +34,8 @@ setup(
         "tiktoken",
         "uvicorn[standard]",
         "python-jose[cryptography]",
+        "pyppeteer==1.0.2",
+        "jupyter",
     ],
     entry_points={
         "console_scripts": [],
