@@ -6,6 +6,7 @@ from minichain.agent import Agent
 from minichain.dtypes import AssistantMessage, FunctionCall, UserMessage, FunctionMessage, SystemMessage
 from minichain.tools import codebase
 from minichain.tools.bash import Jupyter
+from minichain.tools.browser import Browser
 from minichain.tools.deploy_static import deploy_static_website
 from minichain.agents.hippocampus import Hippocampus
 
@@ -16,10 +17,17 @@ You can do a wide range of tasks, such as implementing features, debugging and r
 Start and get familiar with the environment by using jupyter to print hello world.
 """
 
+
+
+class ProgrammerResponse(BaseModel):
+    content: str = Field(..., description="The final response to the user.")
+
+
 class Programmer(Agent):
     def __init__(self, load_memory_from=None, **kwargs):
         self.hippocampus = Hippocampus(load_memory_from=load_memory_from, **kwargs)
         self.jupyter = Jupyter()
+        self.browser = Browser()
         print("Init history for programmer:", kwargs.get("init_history", []))
         init_history = kwargs.pop("init_history", [])
 
@@ -28,7 +36,7 @@ class Programmer(Agent):
             codebase.get_file_summary,
             codebase.view,
             codebase.edit,
-            codebase.scan_file_for_info,
+            self.browser.as_tool(),
             deploy_static_website,
             self.hippocampus.as_function(
                 name="find_memory",
@@ -40,6 +48,7 @@ class Programmer(Agent):
             system_message=system_message,
             prompt_template="{query}".format,
             init_history=init_history,
+            response_openapi=ProgrammerResponse,
             **kwargs,
         )
         self.memory = self.hippocampus.memory

@@ -8,9 +8,6 @@ from minichain.memory import SemanticParagraphMemory
 from minichain.tools import codebase
 
 
-class ProgrammerResponse(BaseModel):
-    content: str = Field(..., description="The final response to the user.")
-
 
 # Get the system message from the source dir of this file: memory_agent.prompt
 with open(__file__.replace(".py", ".prompt"), "r") as f:
@@ -41,7 +38,6 @@ class MinichainHelp(Agent):
             ],
             system_message=system_message,
             prompt_template="{query}".format,
-            response_openapi=ProgrammerResponse,
             init_history=init_history,
             **kwargs,
         )

@@ -18,6 +18,9 @@ async def deploy_static_website(
         new_public_path = path.split("/")[-1] + f"_{v}"
         target = os.path.join(settings.SERVE_PATH, new_public_path )
         v += 1
-    shutil.copytree(path, target)
+    if os.path.isfile(path):
+        shutil.copyfile(path, target)
+    else:
+        shutil.copytree(path, target)
     public_url = settings.SERVE_URL + new_public_path
     return f"Your file(s) are now available [here]({public_url})"
