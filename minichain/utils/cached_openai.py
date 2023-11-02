@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Any, Dict, Optional
+import asyncio
 
 import numpy as np
 import openai
@@ -126,7 +127,7 @@ async def get_openai_response_stream(
     except openai.error.RateLimitError as e:
         import time
         print("We got rate limited, chilling for a minute...")
-        time.sleep(60)
+        await asyncio.sleep(60)
         raise e
     raw_response = {
         key: value for key, value in stream.current_message.items() if "id" not in key

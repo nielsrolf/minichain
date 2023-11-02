@@ -3,9 +3,13 @@ import json
 import os
 from uuid import uuid4
 from collections import defaultdict
+import asyncio
 
 from minichain.utils.json_datetime import datetime_converter
-from minichain.dtypes import Cancelled, ConsumerClosed
+from minichain.dtypes import Cancelled, ConsumerClosed, UserMessage
+from minichain.utils.tokens import count_tokens
+from minichain import settings
+
 
 async def do_nothing(*args, **kwargs):
     pass
@@ -52,9 +56,9 @@ class StreamCollector():
         """Turn the stream off and trigger saving"""
         self.active = False
     
-    async def conversation(self, meta=None):
+    async def conversation(self, meta=None, **init_kwargs):
         """Create a new conversation"""
-        conversation = Conversation(meta=meta, shared=self.shared, path=self.path)
+        conversation = Conversation(meta=meta, shared=self.shared, path=self.path, **init_kwargs)
         child_ids = self.meta["children"] + [conversation.path[-1]]
         await self.set(meta={"children": child_ids})
         return conversation
@@ -163,7 +167,80 @@ class Message():
         self.chat = self._stream_target.current_message
         self.meta.update(self._stream_target.meta)
         self._stream_target.off()
+        self.meta["_chat_summary"] = self.chat # will be overwritten by to_memory when needed
         self.save()
+
+    async def to_memory(self):
+        """Save the message to the memory of the conversation"""
+        print("to_memory", self.chat)
+        if self.meta.get('_memories') is not None:
+            print("already in memory: ", self.meta)
+            return
+        conversation = self.shared['message_db'].get(self.path[-2])
+        tokens = count_tokens(self.chat)
+        self.meta['_tokens'] = tokens
+
+        # check if this messages should be memorized
+        function_call = self.chat.get('function_call', None) or {}
+        action = function_call.get('name', None)
+        function_response = self.chat.get("name", None)
+        if (
+            conversation.memory is None or
+            action in ["find_memory", "upload_file_to_chat", "view", "return", "add_memory"] 
+            or function_response in ["return", "upload_file_to_chat", "edit", "add_memory"]
+            or self.meta.get("is_initial", False)
+            or self.chat['role'] != 'user' and action is None
+            or self.meta.get('deleted', False)
+        ):
+            self.meta['_memories'] = []
+            self.meta['_outline'] = ""
+            self.meta["_chat_summary"] = self.chat
+            return
+        
+        print(conversation.meta, self.chat)
+        async with self as handler:
+            conversation.memory.register_message_handler(handler)
+        
+        if tokens > conversation.context_size * 0.2:
+            memories, document_summary = await conversation.memory.ingest(
+                self.as_document(),
+                source=f"Message #{len(conversation.messages)}",
+                scope=self.path[-2],
+                watch_source=False,
+                return_summary=True
+            )
+            self.meta['_memories'] = memories
+            summary = (
+                f"INFO: {self.chat['role']} has sent a message that is too long to display in full. Here is an outline of the sections of the message:\n" +
+                document_summary
+            )
+            print(memories, "len:", len(memories))
+            print(summary)
+            input("press enter to continue")
+            if self.chat.get('function_call', None) is not None and self.chat['function_call'].get('name', None) is not None:
+                summary += f"\nThe message called the function: {self.chat['function_call']['name']}"
+            summary += "\nEach section can be accessed by calling the `find_memory` function."
+            self.meta['_chat_summary'] = {
+                'role': self.chat['role'],
+                'content': summary
+            }
+            self.meta['_outline'] = self.chat['role'] + ":\n" + "".join([f"- {i.memory.title}\n" for i in memories])
+        else:
+            memory = await conversation.memory.add_single_memory(
+                source=f"Message #{len(conversation.messages)}",
+                content=self.as_document(),
+                scope=self.path[-2],
+            )
+            self.meta['_memories'] = [memory]
+            self.meta['_outline'] =  self.chat['role'] + f": {memory.memory.title}"
+            self.meta["_chat_summary"] = self.chat
+        self.save()
+    
+    def as_document(self):
+        document = f"Message from {self.chat['role']} {self.chat.get('name', '')}\n{self.chat['content']}"
+        if (name:= (self.chat.get("function_call", None) or {}).get("name", None)) is not None:
+            document += f"\n{self.chat['role']} invoked {name} with arguments: {json.dumps(self.chat['function_call']['arguments'], indent=2)}"
+        return document
     
     def save(self):
         target_dir = self.shared['save_dir'] + "/" + "/".join(self.path[:-1])
@@ -214,11 +291,13 @@ class Conversation():
     def __init__(self,
                  path: List[str],
                  shared: Dict,
+                 memory=None,
                  meta: Dict=None,
                  conversation_id: str=None,
                  messages: List[Message] = None,
                  insert_after: str=None,
-                 forked_from: str=None
+                 forked_from: str=None,
+                 context_size: int = 1024 * 8,
                  ):
         path = path or ['Trash']
         if conversation_id is None:
@@ -232,6 +311,8 @@ class Conversation():
         self.shared['message_db'].register_conversation(self)
         self.forked_from = forked_from
         self.insert_after = insert_after
+        self.context_size = context_size
+        self.memory = memory
     
     @property
     def first_user_message(self):
@@ -252,6 +333,40 @@ class Conversation():
                 
         result += [i for i in self._messages if i is not None and i.meta.get('deleted', False)==False]
         return result
+    
+    async def fit_to_context(self):
+        init_messages = [i for i in self.messages if i.meta.get('is_initial', False)]
+        messages = [i for i in self.messages if i.meta.get('is_initial', False)==False]
+        # Move original user message to init messages (where it does not get summarized)
+        # unless it is very long
+        if count_tokens(messages[0].chat) < self.context_size * 0.2:
+            init_messages += [messages.pop(0)]
+        # if there are no messages that could be summarized, return
+        if len(messages) == 0:
+            return [i.chat for i in init_messages]
+        
+        # replace old message by their outline iteratively - start by replacing 0 (change nothing)
+        while True:
+            for i, message in enumerate(messages):
+                summarized = [i.chat for i in init_messages] + [
+                    UserMessage(
+                        "Our chat history is already quite long. Here are the topics we discussed earlier:\n" + 
+                        "\n".join([i.meta['_outline'] for i in messages[:i]])
+                    )
+                ][:i] +[
+                    i.meta['_chat_summary'] for i in messages[i:] 
+                ]
+                total_tokens = sum([count_tokens(j) for j in summarized])
+                if total_tokens < self.context_size * 0.8:
+                    return summarized
+                print(total_tokens, "do not fit into context - summarizing", i)
+                await message.to_memory()
+                # before .to_memory is called, _chat_summary is a copy of the original message. We now also call it for the most recent message
+                # to replace very long messages with a summary, without replacing the entire conversation by an outline
+                await messages[-1].to_memory()
+            # if we get here, we have summarized all messages, but they still don't fit into the context
+            # we now cutoff from the beginning
+            messages = messages[len(messages)//2:]
     
     def fork(self, message_id, new_path=None):
         """Returns a new conversation that is forked from the given message_id"""
@@ -274,7 +389,6 @@ class Conversation():
         if self.insert_after is not None:
             meta['insert_after'] = self.insert_after
         message = Message(chat=chat, path=self.path, shared=self.shared, meta=meta)
-        print("insert after", self.insert_after)
         if self.insert_after is None:
             self._messages.append(message)
         else:
@@ -349,6 +463,9 @@ class Conversation():
 
 class MessageDB():
     def __init__(self, save_dir=".minichain/messages", on_message=None):
+        if settings.default_memory is None:
+            import minichain.memory
+        self.memory = settings.default_memory
         on_message = on_message or do_nothing
         self.shared = {
             'on_message': self.on_message,
@@ -377,7 +494,6 @@ class MessageDB():
                 path = self.get(msg['id']).path
         not_yet_raised = []
         raise_now = False
-        print("Cancelled:", self._cancelled)
         for cancelled in self._cancelled:
             if cancelled in path:
                 raise_now = True
@@ -483,8 +599,8 @@ class MessageDB():
             if conversation.path[-1] == conversation_id:
                 return conversation
 
-    async def conversation(self, meta=None) -> Conversation:
-        conversation = Conversation(meta=meta, shared=self.shared, path=['root'])
+    async def conversation(self, meta=None, **init_kwargs) -> Conversation:
+        conversation = Conversation(meta=meta, shared=self.shared, path=['root'], **init_kwargs)
         return conversation
     
     def as_json(self, agent=None):

@@ -6,7 +6,6 @@ import uuid
 from typing import Any, Dict, Optional
 import shutil
 from pydantic import BaseModel, Field
-import yaml
 from fastapi import FastAPI, HTTPException, WebSocket, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -251,7 +250,7 @@ async def run_agent(payload: Payload, token_payload: dict = Depends(get_token_pa
         content=payload.query,
         function_call=payload.function_call,
     )
-    await session.conversation.send(message)
+    await session.conversation.send(message, is_initial_user_message=True)
     asyncio.create_task(session.run_until_done())
     return {"path": session.conversation.path}
 
@@ -378,23 +377,9 @@ async def preload_agents():
     print("Open the following link in your browser:")
     print(f"http://localhost:{PORT}/index.html?token=" + token)
     print("===========================================")
-    # load the ./minichain/settings.yml file
-    if not os.path.exists(".minichain/settings.yml"):
-        # copy the default settings file from the modules install dir (minichain/default_settings.yml) to the cwd ./minichain/settings.yml
-        print("Copying default settings file to .minichain/settings.yml")
-        os.makedirs(".minichain", exist_ok=True)
-        import shutil
-
-        shutil.copyfile(
-            os.path.join(os.path.dirname(__file__), "default_settings.yml"),
-            ".minichain/settings.yml",
-        )
-
-    with open(".minichain/settings.yml", "r") as f:
-        settings = yaml.load(f, Loader=yaml.FullLoader)
     
     # load the agents
-    for agent_name, agent_settings in settings.get("agents", {}).items():
+    for agent_name, agent_settings in settings.yaml.get("agents", {}).items():
         if not agent_settings.get("display", False):
             continue
         try:

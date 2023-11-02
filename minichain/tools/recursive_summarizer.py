@@ -8,7 +8,6 @@ from minichain.schemas import Done
 from minichain.tools.document_qa import qa
 from minichain.tools.summarize import summarize
 from minichain.utils.document_splitter import split_document
-from minichain.utils.markdown_browser import markdown_browser
 
 
 async def summarize_until_word_limit_is_okay(
@@ -108,16 +107,6 @@ async def text_scan(
         await document_to_json.run(text=paragraph)
     return outputs
 
-
-async def recursive_web_summarizer(url, question=None, max_words=500):
-    text = markdown_browser(url)
-    if question is None:
-        document_request = DocumentSummaryRequest(text=text, max_words=max_words)
-    else:
-        document_request = DocumentQARequest(
-            text=text, question=question, max_words=max_words
-        )
-    return await recursive_summarizer(document_request)
 
 
 long_document_qa = Function(

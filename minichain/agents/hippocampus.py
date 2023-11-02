@@ -31,14 +31,14 @@ class RelevantInfos(BaseModel):
 
 class Hippocampus(Agent):
     def __init__(self, load_memory_from=None, **kwargs):
-        self.memory = SemanticParagraphMemory(agents_kwargs=kwargs)
+        memory = SemanticParagraphMemory(agents_kwargs=kwargs)
         try:
-            self.memory.load(load_memory_from)
+            memory.load(load_memory_from)
         except FileNotFoundError:
             print(f"Memory file {load_memory_from} not found.")
 
         functions = [
-            self.memory.find_memory_tool(),
+            memory.find_memory_tool(),
             Jupyter(),
             codebase.get_file_summary,
             codebase.view,
@@ -52,6 +52,7 @@ class Hippocampus(Agent):
             response_openapi=RelevantInfos,
             **kwargs,
         )
+        self.memory = memory
     
     async def before_run(self, *args, **kwargs):
         self.memory.reload()
