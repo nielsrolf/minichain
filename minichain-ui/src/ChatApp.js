@@ -269,7 +269,7 @@ function ChatApp() {
                         </div>
                     )}
                     {isOffline && (
-                        <TextWithCode text={"Please start minichain via ```python -m minichain.api``` or ```docker run -v $(pwd):$(pwd) \\ \n -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 \\ \n --env-file .env.example nielsrolf/minichain```"} />
+                        <TextWithCode text={"Please start minichain via ```python -m minichain.api``` or ```docker run -v $(pwd):$(pwd) -w $(pwd) -p 20000-21000:20000-21000 -p 8745:8745 --env-file .env nielsrolf/minichain```"} />
                     )}
                     Enter your token: <input type="text" value={tokenInput} onChange={e => setTokenInput(e.target.value)} />
                     <button onClick={() => {

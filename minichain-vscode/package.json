@@ -2,7 +2,7 @@
   "name": "minichain",
   "displayName": "Minichain",
   "description": "VSCode extension for Minichain",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "minichain",
   "engines": {
     "vscode": "^1.50.0"

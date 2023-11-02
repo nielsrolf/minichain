@@ -40,9 +40,23 @@ You can then open minichain on [`http://localhost:8745/index.html`](http://local
 # Demo
 
 The demos are created using the "Share"-Button that gives read access to a workspace of conversation. In order actually talk to agents, you need to install minichain and use your own OpenAI API key. 
-- build and deploy a [simple website](https://minichain.polybase.app/.public/portfolio_1): [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyIzNDUxNTQ4OSIsInZpZXciXX0.PUS3QWVJQ07MIoLtpfwUgE2mdYTBVx0K07o8C_MHAh0)
-- create an illustrated children story: [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyJkMjlkZmUwNiIsInZpZXciXX0.pQKPW3HDmy039O2821y9iRaVYhwyvMb9etr1ITqlRMM)
-
+- **create and deploy a simple full stack app**: [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyIxMmFlMWYyYiIsInZpZXciXX0.GFcoM6lGzx6pK_qBxqs7jPFZxpWhYs99RseLcRUNiek)
+    - creates a backend
+    - starts it
+    - creates a frontend
+    - tests the frontend using "Chrome Devtools" as a function
+    - finds and fixes some CORS issues
+    - fixes the errors
+- build and deploy a [simple portfolio website](https://minichain.polybase.app/.public/portfolio): [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyIzNDUxNTQ4OSIsInZpZXciXX0.PUS3QWVJQ07MIoLtpfwUgE2mdYTBVx0K07o8C_MHAh0)
+- help as a research assistant: [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyIzMjMzMTVjOSIsInZpZXciXX0.jPrNeH5tsWXakhALjEPft7Gc81BTS1O_85DMboqPyHQ)
+    - derive a loss function from an idea
+    - solve the optimizatin problem using torch
+    - visualize the results
+- make a beautiful 3d plot to demonstrate the jupyter like environment: [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyJiOGZkNTRhYiIsInZpZXciXX0.To41pbcUND5Zwba8EVKuUR6-Wr7fWSaiVcxzkSQpQh0)
+- working with messages that are longer than the context: [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyJiMmYwNGYyMyIsInZpZXciXX0.eG088GxE6g9ib_LW0oCXdhg6-ba7fGPyPUF3U0-fpEY)
+    - for this example the context size was set to 2k
+    - the messages is first ingested into semantic memories that can be accessed using the `find_memory` tool
+    
 ## Python package
 If you want to build agents, install the python library:
 ```bash
