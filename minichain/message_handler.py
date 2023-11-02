@@ -123,10 +123,13 @@ def sort_by_timestamp(items):
     return sorted(items, key=lambda x: datetime_or_str_to_datetime(x.meta['timestamp']))
 
 import datetime as dt
-def get_default_meta():
-    return {
+def get_default_meta(chat_summary=None):
+    meta = {
         "timestamp": dt.datetime.now(),
     }
+    if chat_summary is not None:
+        meta["_chat_summary"] = chat_summary
+    return meta
 
 class Message():
     def __init__(self,
@@ -137,7 +140,7 @@ class Message():
                  shared=None):
         self.shared = shared
         self.chat = chat or {}
-        self.meta = get_default_meta()
+        self.meta = get_default_meta(chat)
         self.meta.update(meta or {})
         self.path = path or ['Trash']
         if message_id is None:
