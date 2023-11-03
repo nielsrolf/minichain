@@ -2,15 +2,12 @@
 # minichain 
 <img src='minichain-vscode/logo.png' width="100px"> 
 
-Minichain is a framework for LLM powered agents with structured data, and many tools for them. It consists of three components
-- checkout the [example use cases](#demo)
+Minichain is a framework for LLM agents with structured data, and useful tools for them. It consists of three components
 - the [python `minichain` package](#python-package) to build agents that run on the host
-- a [webui that can be started in docker](#web-ui)
-- a [vscode extension that wraps the ui and connects to a backend](#vscode-extension)
+- tools that allow agents to work with on a codebase, run and debug code, interact with frontend devtools, and a semantic memory creation and retireval system that allow for infinitely long messages and conversations
+- a webui that can be started in [docker](#web-ui) and used as a [vscode extension](#vscode-extension)
 
-[![Demo video](https://img.youtube.com/vi/wxj7qjC8Xb4/0.jpg)](https://www.youtube.com/watch?v=wxj7qjC8Xb4)
-- demo of a programmer agent built with minichain, using the [VSCode extension ui](./minichain-vscode/)
-
+Checkout the [example use cases](#demo)
 
 # Installation
 
@@ -56,7 +53,10 @@ The demos are created using the "Share"-Button that gives read access to a works
 - working with messages that are longer than the context: [demo](https://minichain.polybase.app/index.html?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmcm9udGVuZCIsInNjb3BlcyI6WyJiMmYwNGYyMyIsInZpZXciXX0.eG088GxE6g9ib_LW0oCXdhg6-ba7fGPyPUF3U0-fpEY)
     - for this example the context size was set to 2k
     - the messages is first ingested into semantic memories that can be accessed using the `find_memory` tool
-    
+
+
+[![Demo video](https://img.youtube.com/vi/wxj7qjC8Xb4/0.jpg)](https://www.youtube.com/watch?v=wxj7qjC8Xb4)
+
 ## Python package
 If you want to build agents, install the python library:
 ```bash
