@@ -4,7 +4,7 @@
 
 Minichain is a framework for LLM agents with structured data, and useful tools for them. It consists of three components
 - the [python `minichain` package](#python-package) to build agents that run on the host
-- tools that allow agents to work with on a codebase, run and debug code, interact with frontend devtools, and a semantic memory creation and retireval system that allow for infinitely long messages and conversations
+- tools that allow agents to run, debug, and edit code, interact with frontend devtools, and a semantic memory creation and retrieval system that allow for infinitely long messages and conversations
 - a webui that can be started in [docker](#web-ui) and used as a [vscode extension](#vscode-extension)
 
 Checkout the [example use cases](#demo)
