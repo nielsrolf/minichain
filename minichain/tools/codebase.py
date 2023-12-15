@@ -307,6 +307,10 @@ async def edit(
         
     if end < 0:
         end = len(lines) + 2 + end
+    
+    if end < len(lines) and lines[end - 1].strip() == code.split("\n")[-1].strip():
+        end += 1
+    
     lines[start - 1 : end - 1] = code.split("\n")
     with open(path, "w") as f:
         f.write("\n".join(lines))

@@ -293,6 +293,8 @@ def map_cwd_to_port(cwd):
 @app.post("/workspace/")
 async def create_workspace(workspace: Workspace):
     """Create a new workspace and return the port on that it is running."""
+    if os.getcwd() == workspace.cwd:
+        return {"port": PORT}
     port = map_cwd_to_port(workspace.cwd)
     # Start minichain.api in the specified cwd as a sub process
     python_path = shutil.which("python") or shutil.which("python3")

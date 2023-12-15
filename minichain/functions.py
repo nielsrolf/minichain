@@ -28,15 +28,6 @@ class Function:
             raise ValueError(
                 "openapi must be a dict or a pydantic BaseModel describing the function parameters."
             )
-        self.has_code_argument = False
-        if "code" in parameters_openapi["properties"]:
-            self.has_code_argument = True
-            code_param = parameters_openapi["properties"].pop("code")
-            description = (
-                description + 
-                f"\nUse the normal message content fiield to put ```{code_param['description']}```"
-            )
-            parameters_openapi["required"].remove("code")
         self.has_conversation_argument = has_conversation_argument
         self.parameters_openapi = parameters_openapi
         self.name = name
@@ -45,23 +36,15 @@ class Function:
     
     def check_arguments_raise_error(self, arguments):
         """Check if the arguments are valid. If not, raise an error."""
-        if "code" in arguments and not self.has_code_argument:
-            arguments.pop("code")
         if self.pydantic_model is not None:
             try:
                 arguments = self.pydantic_model(**arguments).dict()
             except pydantic.error_wrappers.ValidationError as e:
-                if 'code' in str(e) and self.has_code_argument:
-                    msg = ("Error: this function requires a code. "
-                           "Write the code first into the normal content field like here:\n```\ncode here\n```\n"
-                           f"Then call the {self.name} function.")
-                    print(arguments)
-                    raise ExceptionForAgent(msg)
                 msg = f"Error: arguments passed to {self.name} are not valid. Check the function call arguments and correct it."
                 msg += f"You need to call {self.name} with arguments for: {self.parameters_openapi['required']}\n"
                 msg += f"Validation errors: {e}\n"
                 msg += f"Please fix this and call the function {self.name} again."
-                raise ExceptionForAgent(msg)
+                raise ExceptionForAgent(msg) from e
         return arguments
 
     async def __call__(self, **arguments):

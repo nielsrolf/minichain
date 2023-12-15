@@ -300,7 +300,7 @@ class Conversation():
                  messages: List[Message] = None,
                  insert_after: str=None,
                  forked_from: str=None,
-                 context_size: int = 1024 * 8,
+                 context_size: int = 1024 * 128,
                  ):
         path = path or ['Trash']
         if conversation_id is None:
@@ -380,7 +380,8 @@ class Conversation():
             conversation_id=new_path[-1],
             shared=self.shared,
             meta=self.meta,
-            forked_from=self.path + [message_id]
+            forked_from=self.path + [message_id],
+            context_size=self.context_size
         )
     
     async def set(self, **meta):
@@ -413,7 +414,8 @@ class Conversation():
             conversation_id=[self.path[-1]],
             shared=self.shared,
             meta=meta,
-            insert_after=message_id
+            insert_after=message_id,
+            context_size=self.context_size
         )
     
     async def __aenter__(self):

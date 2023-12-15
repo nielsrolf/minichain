@@ -67,20 +67,7 @@ class Programmer(Agent):
     @property
     def init_history(self):
         init_history = [SystemMessage(self.system_message)]
-        demo_call = FunctionCall(
-            name="jupyter",
-            arguments={"code": "print('Hello world!')"}
-        )
-        demo_response = FunctionMessage(content="Hello world!", name='jupyter')
-        init_history += [
-            AssistantMessage(content="Okay, let's see if I understood correctly.", function_call=demo_call),
-            demo_response,
-            UserMessage(content="Great! Now also try the edit function: create a file /tmp/hello and write something in it."),
-            AssistantMessage(
-                content="Okay, here you go:", function_call=FunctionCall(name="edit", arguments={"path": "/tmp/hello", "code": "This is a test. The content for files goes into this area - just like python code that I want to run", "start": 1, "end": 1})),
-            FunctionMessage(content="/tmp/hello:1\n1: This is a test. The content for files goes into this area - just like python code that I want to run\n", name='edit'),
-        ]
-        init_msg = f"Perfect - always write the code or file content, and then call the function! Now here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
+        init_msg = f"Here is a summary of the project we are working on: \n{codebase.get_initial_summary()}"
         if len(self.hippocampus.memory.memories) > 0:
             init_msg += f"\nHere is a summary of your memory: \n{self.hippocampus.memory.get_content_summary()}\nUse the `find_memory` function to find relevant memories."
         init_history.append(UserMessage(init_msg))

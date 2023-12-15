@@ -42,7 +42,6 @@ class Hippocampus(Agent):
             Jupyter(),
             codebase.get_file_summary,
             codebase.view,
-            codebase.scan_file_for_info,
         ]
         
         super().__init__(

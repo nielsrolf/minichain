@@ -28,6 +28,7 @@ def make_return_function(openapi_json: BaseModel, check=None):
 CONTEXT_SIZE = {
     "gpt-3.5-turbo": 1024 * 8,
     "gpt-4-0613": 1024 * 8,
+    "gpt-4-1106-preview": 128 * 1024
 }
 
 
@@ -42,7 +43,7 @@ class Agent:
         message_handler=None,
         name=None,
         # llm="gpt-3.5-turbo",
-        llm="gpt-4-0613",
+        llm="gpt-4-1106-preview",
     ):
         functions = functions.copy()
         self.response_openapi = response_openapi
@@ -182,7 +183,7 @@ class Session:
     async def execute_action(self, action):
         async with self.conversation.to(FunctionMessage(name=action['name'])) as message_handler:
             if not isinstance(action['arguments'], dict):
-                await message_handler.set(f"Error: arguments for {function.name} are not valid JSON.")
+                await message_handler.set(f"Error: arguments for {action['name']} are not valid JSON.")
                 return False
             
             found = False

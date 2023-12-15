@@ -26,23 +26,6 @@ def parse_function_call(function_call: Optional[Dict[str, Any]]):
 def fix_common_errors(response: Dict[str, Any]) -> Dict[str, Any]:
     """Fix common errors in the formatting and turn the dict into a AssistantMessage"""
     response["function_call"] = parse_function_call(response["function_call"])
-    if "```" in response["content"] and response["function_call"].get("name") in ["jupyter", "edit"]:
-        # move the code to the arguments
-        raw = response["content"]
-        for language in ["python", "bash", "javascript", "html", "css", "json", "yaml", "sql", "markdown", "latex", "c", "cpp", "csharp", "go", "java", "kotlin", "php", "ruby", "rust", "scala", "swift", "py", "sh", "js", "x", "jsx", "ts", "tsx", "typescript"]:
-            raw = raw.replace(f"```{language}", "```")
-        content, code = raw.split("```\n", 1)
-        response["content"] = content
-        # remove the last ``` and everything after it
-        try:
-            if not ("\n```" in code):
-                code, content_after = code.rsplit("```", 1)[0]
-            else:
-                code, content_after = code.split("\n```", 1)
-        except:
-            # breakpoint()
-            pass
-        response["function_call"]["arguments"]["code"] = code
     return response
 
 
@@ -53,9 +36,6 @@ def format_history(messages: list) -> list:
             if function_call.get("arguments", None) is not None and isinstance(function_call["arguments"], dict):
                 content = function_call["arguments"].pop("content", None)
                 message["content"] = content or message["content"]
-                code = function_call["arguments"].pop("code", None)
-                if code is not None:
-                    message["content"] = (message["content"] or "") + f"\n```\n{code}\n```"
                 function_call["arguments"] = json.dumps(function_call["arguments"])
                 message["function_call"] = function_call
             if message['role'] == 'user':
@@ -124,9 +104,8 @@ async def get_openai_response_stream(
         async for chunk in openai_response:
             chunk = chunk["choices"][0]["delta"].to_dict_recursive()
             await stream.chunk(chunk)
-    except openai.error.RateLimitError as e:
-        import time
-        print("We got rate limited, chilling for a minute...")
+    except Exception as e:
+        print("We probably got rate limited, chilling for a minute...", e)
         await asyncio.sleep(60)
         raise e
     raw_response = {
