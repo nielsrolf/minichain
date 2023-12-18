@@ -381,29 +381,8 @@ async def preload_agents():
     print("===========================================")
     
     # load the agents
-    for agent_name, agent_settings in settings.yaml.get("agents", {}).items():
-        if not agent_settings.get("display", False):
-            continue
-        try:
-            print("Loading agent", agent_name)
-            class_name = agent_settings.pop("class")
-            # class name is e.g. minichain.agents.programmer.Programmer
-            # import the agent class
-            module_name, class_name = class_name.rsplit(".", 1)
-            module = __import__(module_name, fromlist=[class_name])
-            agent_class = getattr(module, class_name)
-            # create the agent
-            print("Creating agent", agent_name, agent_class, agent_settings)
-            agent = agent_class(**agent_settings.get("init", {}))
-            # add the agent to the agents dict
-            agents[agent_name] = agent
-        except Exception as e:
-            print("Error loading agent", agent_name, e)
-
-    for agent in list(agents.values()):
-        agent.functions.append(upload_file_to_chat)
-    for agent in list(agents.values()):
-        agents[agent.name] = agent
+    settings.load_agents_into_dict(agents, add_functions=[upload_file_to_chat])
+    
 
 
 port = None

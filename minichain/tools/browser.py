@@ -85,7 +85,7 @@ class Browser:
         async def browser(
             url: Optional[str] = Field(None, description="The URL to open, format: http://localhost:8745/.public/"),
             interactions: List[Interaction] = Field([], description="A list of interactions to perform on the page."),
-            return_dom_selector: Optional[str] = Field('', description="If set, returns the DOM of the selected element after the specified interaction."),
+            return_dom_selector: str = Field('', description="If set, returns the DOM of the selected element after the specified interaction."),
             return_console_pattern: str = Field('.*Error.*', description="If set, returns the console logs that match the specified pattern."),
             return_network_pattern: str = Field('', description="If set, returns the network requests that match the specified pattern."),
         ):

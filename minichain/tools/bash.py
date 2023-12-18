@@ -2,7 +2,7 @@ import time
 import asyncio
 from typing import Optional
 from enum import Enum
-import jupyter_client
+# import jupyter_client
 import re
 
 
@@ -43,11 +43,11 @@ class JupyterQuery(BaseModel):
         Type.python,
         description="The type of code to run.",
     )
-    timeout: Optional[int] = Field(60, description="The timeout in seconds.")
-    process: Optional[str] = Field(
+    timeout: int = Field(60, description="The timeout in seconds.")
+    process: str = Field(
         "main",
         description="Anything other than 'main' causes the process to run in the background. Set to e.g. 'backend' if you webserver in the background (Use: `node server.js` rather than `node server.js &` ). Commands will be run in a new jupyter kernel. Tasks like installing dependencies should run in 'main'.")
-    restart: Optional[bool] = Field(
+    restart: bool = Field(
         False,
         description="Set to true in order to restart the jupyter kernel before running the code. Required to import newly installed pip packages.")
 
@@ -62,13 +62,13 @@ class Jupyter(Function):
         )
 
         # Start a Jupyter kernel
-        self.kernel_manager = jupyter_client.KernelManager(kernel_name='python3')
-        self.kernel_manager.start_kernel()
-        self.kernel_client = self.kernel_manager.client()
-        self.kernel_client.start_channels()
-        self.continue_on_timeout = continue_on_timeout
-        self.has_code_argument = True
-        self.bg_processes = {}
+        # self.kernel_manager = jupyter_client.KernelManager(kernel_name='python3')
+        # self.kernel_manager.start_kernel()
+        # self.kernel_client = self.kernel_manager.client()
+        # self.kernel_client.start_channels()
+        # self.continue_on_timeout = continue_on_timeout
+        # self.has_code_argument = True
+        # self.bg_processes = {}
     
     async def __call__(self, **arguments):
         self.check_arguments_raise_error(arguments)
@@ -178,7 +178,7 @@ class Jupyter(Function):
         await self.message_handler.set(short)
         return short
 
-    def __del__(self):
-        # Ensure cleanup when the class instance is deleted
-        self.kernel_client.stop_channels()
-        self.kernel_manager.shutdown_kernel()
+    # def __del__(self):
+    #     # Ensure cleanup when the class instance is deleted
+    #     self.kernel_client.stop_channels()
+    #     self.kernel_manager.shutdown_kernel()

@@ -1,5 +1,7 @@
 import os
 import yaml
+from typing import Dict, List
+
 
 SERVE_PATH = ".public"
 DOMAIN = os.environ.get("DOMAIN", "http://localhost:8745")
@@ -28,3 +30,32 @@ if not os.path.exists(".minichain/settings.yml"):
 
 with open(".minichain/settings.yml", "r") as f:
     yaml = yaml.load(f, Loader=yaml.FullLoader)
+
+
+def load_agents_into_dict(agents: Dict = None, add_functions: List = None):
+    agents = agents or {}
+    add_functions = add_functions or []
+    for agent_name, agent_settings in yaml.get("agents", {}).items():
+        if not agent_settings.get("display", False):
+            continue
+        try:
+            print("Loading agent", agent_name)
+            class_name = agent_settings.pop("class")
+            # class name is e.g. minichain.agents.programmer.Programmer
+            # import the agent class
+            module_name, class_name = class_name.rsplit(".", 1)
+            module = __import__(module_name, fromlist=[class_name])
+            agent_class = getattr(module, class_name)
+            # create the agent
+            print("Creating agent", agent_name, agent_class, agent_settings)
+            agent = agent_class(**agent_settings.get("init", {}))
+            # add the agent to the agents dict
+            agents[agent_name] = agent
+        except Exception as e:
+            print("Error loading agent", agent_name, e)
+
+    for agent in list(agents.values()):
+        agent.functions.extend(add_functions)
+    for agent in list(agents.values()):
+        agents[agent.name] = agent
+    return agents
